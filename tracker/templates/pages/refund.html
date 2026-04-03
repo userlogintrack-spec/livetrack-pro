@@ -1,0 +1,105 @@
+{% extends "pages/base_public.html" %}
+
+{% block title %}Refund Policy{% endblock %}
+{% block meta_desc %}LiveTrack Pro Refund Policy - Our money-back guarantee and refund process{% endblock %}
+
+{% block hero %}
+<section class="page-hero">
+    <div class="breadcrumb">
+        <a href="/">Home</a> <span>/</span> <span>Refund Policy</span>
+    </div>
+    <h1>Refund <span>Policy</span></h1>
+    <p>We want you to be completely satisfied. Here's our transparent refund policy.</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="content-card">
+    <p class="last-updated"><i class="fas fa-calendar-alt"></i> Last updated: March 31, 2026</p>
+
+    <div class="highlight-box">
+        <p><strong>14-Day Money-Back Guarantee:</strong> All paid plans come with a 14-day no-questions-asked refund guarantee. If you're not satisfied, we'll refund your payment in full.</p>
+    </div>
+
+    <h2>1. Eligibility for Refund</h2>
+    <p>You are eligible for a full refund if:</p>
+    <ul>
+        <li>You request a refund within <strong>14 days</strong> of your initial purchase or renewal</li>
+        <li>You are on a <strong>paid plan</strong> (Pro or Enterprise)</li>
+        <li>This is your <strong>first refund request</strong> for the same subscription</li>
+    </ul>
+
+    <h2>2. Non-Refundable Items</h2>
+    <p>The following are NOT eligible for refund:</p>
+    <ul>
+        <li><strong>Free plan:</strong> No charges are made, so no refund applies</li>
+        <li><strong>After 14 days:</strong> Refund requests made after the 14-day window</li>
+        <li><strong>Partial months:</strong> If you cancel mid-cycle after the 14-day period, the current billing period will not be refunded, but you will retain access until the end of the period</li>
+        <li><strong>Account abuse:</strong> Accounts terminated due to Terms of Service violations</li>
+        <li><strong>Repeated refund requests:</strong> Multiple refund requests for the same plan type within 6 months</li>
+    </ul>
+
+    <h2>3. How to Request a Refund</h2>
+    <p>To request a refund, follow these steps:</p>
+    <ol>
+        <li>Email us at <strong>billing@livetrackpro.com</strong> with the subject line "Refund Request"</li>
+        <li>Include your <strong>account email</strong> and <strong>reason for refund</strong> (optional but helpful)</li>
+        <li>You can also submit a request through our <a href="{% url 'pages:contact' %}">Contact Page</a></li>
+    </ol>
+
+    <h2>4. Refund Processing</h2>
+    <ul>
+        <li>Refund requests are reviewed within <strong>1-2 business days</strong></li>
+        <li>Approved refunds are processed to the <strong>original payment method</strong></li>
+        <li>Bank/card refunds may take <strong>5-10 business days</strong> to appear in your account</li>
+        <li>UPI and wallet refunds are typically processed within <strong>2-3 business days</strong></li>
+        <li>You will receive an email confirmation once the refund is processed</li>
+    </ul>
+
+    <h2>5. Plan Cancellation</h2>
+    <h3>5.1 Canceling Your Subscription</h3>
+    <ul>
+        <li>You can cancel your subscription at any time from your account settings or by contacting us</li>
+        <li>After cancellation, you retain access to paid features until the end of your current billing period</li>
+        <li>Once the billing period ends, your account will be downgraded to the Free plan</li>
+        <li>Your data will be retained for 30 days after downgrade, then data exceeding Free plan limits may be removed</li>
+    </ul>
+
+    <h3>5.2 Annual Subscriptions</h3>
+    <ul>
+        <li>Annual subscriptions are eligible for a full refund within 14 days of purchase</li>
+        <li>After 14 days, annual subscriptions can be canceled but will not be refunded for the remaining period</li>
+        <li>You retain access until the end of the annual billing period</li>
+    </ul>
+
+    <h2>6. Downgrades</h2>
+    <p>
+        If you downgrade from a higher plan to a lower plan:
+    </p>
+    <ul>
+        <li>The downgrade takes effect at the next billing cycle</li>
+        <li>You retain access to higher-tier features until the current period ends</li>
+        <li>No partial refund is issued for the remaining days of the current billing period</li>
+        <li>Data exceeding the lower plan's limits will be retained for 30 days</li>
+    </ul>
+
+    <h2>7. Chargebacks</h2>
+    <p>
+        If you dispute a charge with your bank or card issuer (chargeback), we may suspend your account pending resolution. We encourage you to contact us directly before filing a chargeback — we're always happy to resolve issues quickly.
+    </p>
+
+    <h2>8. Exceptions</h2>
+    <p>
+        In special circumstances (service outages lasting more than 24 hours, billing errors, or technical issues preventing use), we may issue refunds or credits outside the standard policy. Please contact us to discuss your situation.
+    </p>
+
+    <h2>9. Contact for Billing</h2>
+    <p>For refund requests or billing questions:</p>
+    <ul>
+        <li><strong>Email:</strong> billing@livetrackpro.com</li>
+        <li><strong>Contact Page:</strong> <a href="{% url 'pages:contact' %}">Contact Us</a></li>
+        <li><strong>Response Time:</strong> Within 1-2 business days</li>
+    </ul>
+
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: livetrack
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+    startCommand: daphne -b 0.0.0.0 -p $PORT tracker.asgi:application
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: livetrack-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: livetrack-redis
+          type: redis
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: "3.10.7"
+
+  - type: redis
+    name: livetrack-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+
+databases:
+  - name: livetrack-db
+    plan: free

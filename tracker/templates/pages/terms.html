@@ -1,0 +1,138 @@
+{% extends "pages/base_public.html" %}
+
+{% block title %}Terms of Service{% endblock %}
+{% block meta_desc %}LiveTrack Pro Terms of Service - Rules governing the use of our platform{% endblock %}
+
+{% block hero %}
+<section class="page-hero">
+    <div class="breadcrumb">
+        <a href="/">Home</a> <span>/</span> <span>Terms of Service</span>
+    </div>
+    <h1>Terms of <span>Service</span></h1>
+    <p>Please read these terms carefully before using LiveTrack Pro.</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="content-card">
+    <p class="last-updated"><i class="fas fa-calendar-alt"></i> Last updated: March 31, 2026</p>
+
+    <h2>1. Acceptance of Terms</h2>
+    <p>
+        By accessing or using LiveTrack Pro ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree, you may not use the Service. These Terms apply to all users, including agents, administrators, and visitors interacting with the chat widget.
+    </p>
+
+    <h2>2. Description of Service</h2>
+    <p>LiveTrack Pro provides:</p>
+    <ul>
+        <li>Real-time website visitor tracking and analytics</li>
+        <li>Live chat widget for customer engagement</li>
+        <li>Agent dashboard for managing conversations and visitors</li>
+        <li>Chat history and visitor data management</li>
+        <li>Related APIs and integrations</li>
+    </ul>
+
+    <h2>3. Account Registration</h2>
+    <ul>
+        <li>You must provide accurate and complete information when creating an account</li>
+        <li>You are responsible for maintaining the security of your account credentials</li>
+        <li>You must be at least 16 years old to create an account</li>
+        <li>One person or entity may not maintain more than one free account</li>
+        <li>You are responsible for all activity that occurs under your account</li>
+    </ul>
+
+    <h2>4. Acceptable Use</h2>
+    <p>You agree NOT to use the Service to:</p>
+    <ul>
+        <li>Violate any applicable laws, regulations, or third-party rights</li>
+        <li>Send spam, unsolicited messages, or harassing content through the chat</li>
+        <li>Collect or harvest personal data without proper consent</li>
+        <li>Distribute malware, viruses, or harmful code</li>
+        <li>Attempt to gain unauthorized access to other users' accounts</li>
+        <li>Interfere with or disrupt the Service infrastructure</li>
+        <li>Use the Service for any illegal or fraudulent activity</li>
+        <li>Impersonate another person or entity</li>
+        <li>Reverse-engineer, decompile, or disassemble the Service</li>
+    </ul>
+
+    <h2>5. Subscription Plans and Billing</h2>
+    <h3>5.1 Free Plan</h3>
+    <p>The Free plan is available at no cost and includes core features with usage limits as described on our pricing page.</p>
+
+    <h3>5.2 Paid Plans</h3>
+    <ul>
+        <li>Paid plans are billed monthly or annually as selected during purchase</li>
+        <li>Prices are listed in USD and exclude applicable taxes</li>
+        <li>Payment is processed securely through our payment partners</li>
+        <li>You authorize us to charge your payment method on a recurring basis</li>
+    </ul>
+
+    <h3>5.3 Plan Changes</h3>
+    <ul>
+        <li>You may upgrade or downgrade your plan at any time</li>
+        <li>Upgrades take effect immediately; downgrades take effect at the next billing cycle</li>
+        <li>Downgrading may result in loss of features or data beyond the new plan's limits</li>
+    </ul>
+
+    <h2>6. Data Ownership</h2>
+    <div class="highlight-box">
+        <p><strong>You own your data.</strong> All visitor data, chat conversations, and analytics collected through your account belong to you. We do not claim ownership of your content.</p>
+    </div>
+    <ul>
+        <li>You grant us a limited license to process your data solely to provide the Service</li>
+        <li>You are responsible for obtaining necessary consents from your website visitors for data collection</li>
+        <li>Upon account deletion, we will delete your data within 30 days (unless required by law to retain it)</li>
+    </ul>
+
+    <h2>7. Intellectual Property</h2>
+    <p>
+        The Service, including its design, code, features, logos, and documentation, is the intellectual property of LiveTrack Pro and is protected by copyright and trademark laws. You may not copy, modify, or distribute any part of the Service without our written permission.
+    </p>
+
+    <h2>8. Service Availability</h2>
+    <ul>
+        <li>We strive for 99.9% uptime but do not guarantee uninterrupted service</li>
+        <li>Scheduled maintenance will be communicated in advance when possible</li>
+        <li>We are not liable for downtime caused by factors beyond our control (force majeure)</li>
+    </ul>
+
+    <h2>9. Limitation of Liability</h2>
+    <p>
+        To the maximum extent permitted by law, LiveTrack Pro shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or business opportunities, arising from your use of the Service.
+    </p>
+    <p>
+        Our total liability for any claims shall not exceed the amount you paid us in the 12 months preceding the claim.
+    </p>
+
+    <h2>10. Indemnification</h2>
+    <p>
+        You agree to indemnify and hold harmless LiveTrack Pro, its officers, directors, employees, and agents from any claims, damages, or expenses arising from your use of the Service or violation of these Terms.
+    </p>
+
+    <h2>11. Termination</h2>
+    <ul>
+        <li>You may terminate your account at any time from your account settings</li>
+        <li>We may suspend or terminate your account if you violate these Terms</li>
+        <li>Upon termination, your right to use the Service ceases immediately</li>
+        <li>Sections on liability, indemnification, and intellectual property survive termination</li>
+    </ul>
+
+    <h2>12. Modifications to Terms</h2>
+    <p>
+        We reserve the right to modify these Terms at any time. Material changes will be communicated via email or prominent notice on our website. Continued use after changes constitutes acceptance of the modified Terms.
+    </p>
+
+    <h2>13. Governing Law</h2>
+    <p>
+        These Terms shall be governed by the laws of India. Any disputes shall be resolved exclusively in the courts of Bengaluru, Karnataka, India.
+    </p>
+
+    <h2>14. Contact</h2>
+    <p>For questions about these Terms, contact us at:</p>
+    <ul>
+        <li><strong>Email:</strong> legal@livetrackpro.com</li>
+        <li><strong>Contact Page:</strong> <a href="{% url 'pages:contact' %}">Contact Us</a></li>
+    </ul>
+
+</div>
+{% endblock %}

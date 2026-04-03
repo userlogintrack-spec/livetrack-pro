@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Banned Visitors{% endblock %}
+{% block page_title %}Banned Visitors{% endblock %}
+
+{% block content %}
+<div style="max-width:800px;">
+    <form method="get" style="margin-bottom:16px;display:flex;gap:10px;">
+        <input type="text" name="q" value="{{ search }}" class="form-control" placeholder="Search by IP, country, city..." style="flex:1;">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+    </form>
+
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-ban" style="color:var(--danger);"></i> Banned Visitors ({{ banned|length }})</h3></div>
+        <div class="card-body" style="padding:0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Browser / OS</th>
+                        <th>Country</th>
+                        <th>Last Seen</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in banned %}
+                    <tr>
+                        <td><code>{{ v.ip_address }}</code></td>
+                        <td>{{ v.browser }} / {{ v.os }}</td>
+                        <td>{{ v.country|default:"-" }}, {{ v.city|default:"-" }}</td>
+                        <td><small>{{ v.last_seen|timesince }} ago</small></td>
+                        <td>
+                            <button onclick="unbanVisitor({{ v.id }})" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-user-check"></i> Unban
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);">No banned visitors</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function unbanVisitor(id) {
+    fetch('/dashboard/visitors/' + id + '/ban/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'unban'}),
+    }).then(() => location.reload());
+}
+</script>
+{% endblock %}

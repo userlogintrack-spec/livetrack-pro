@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Activity Log{% endblock %}
+{% block page_title %}Activity Log{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:900px;">
+    <div class="card-header"><h3><i class="fas fa-history" style="color:var(--primary);"></i> Recent Activity</h3></div>
+    <div class="card-body" style="padding:0;">
+        {% for log in logs %}
+        <div style="padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:{% if 'created' in log.action %}rgba(16,185,129,0.12){% elif 'deleted' in log.action or 'closed' in log.action %}rgba(239,68,68,0.12){% else %}rgba(99,102,241,0.12){% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas {% if 'chat' in log.action %}fa-comments{% elif 'agent' in log.action %}fa-user{% elif 'webhook' in log.action %}fa-plug{% elif 'visitor' in log.action %}fa-eye{% else %}fa-bolt{% endif %}" style="font-size:12px;color:{% if 'created' in log.action %}#10b981{% elif 'deleted' in log.action %}#ef4444{% else %}#6366f1{% endif %};"></i>
+            </div>
+            <div style="flex:1;">
+                <div style="font-size:13px;"><strong>{{ log.user.get_full_name|default:log.user.username|default:"System" }}</strong> {{ log.description }}</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ log.created_at|timesince }} ago</div>
+            </div>
+        </div>
+        {% empty %}
+        <div style="text-align:center;padding:40px;color:var(--text-muted);">
+            <i class="fas fa-history" style="font-size:28px;opacity:0.3;display:block;margin-bottom:8px;"></i>
+            No activity recorded yet
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

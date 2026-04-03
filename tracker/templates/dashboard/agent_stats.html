@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Agent Stats{% endblock %}
+{% block nav_stats %}active{% endblock %}
+{% block page_title %}Agent Performance{% endblock %}
+
+{% block top_actions %}
+<div style="display: flex; gap: 8px;">
+    <a href="{% url 'dashboard:export_chats' %}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> Export Chats CSV</a>
+    <a href="{% url 'dashboard:export_visitors' %}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> Export Visitors CSV</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Overview Stats -->
+<div class="stats-grid">
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-comments"></i></div>
+        <div class="stat-value">{{ total_chats }}</div>
+        <div class="stat-label">Total Chats</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-value">{{ total_closed }}</div>
+        <div class="stat-label">Chats Resolved</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-calendar-day"></i></div>
+        <div class="stat-value">{{ today_total }}</div>
+        <div class="stat-label">Today's Chats</div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-star"></i></div>
+        <div class="stat-value">{{ avg_rating|floatformat:1|default:"N/A" }}</div>
+        <div class="stat-label">Avg Rating</div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom: 24px;">
+    <!-- Daily Chat Chart -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-chart-bar" style="color: var(--primary-light);"></i> Last 7 Days</h3></div>
+        <div class="card-body">
+            <div style="display: flex; align-items: flex-end; gap: 8px; height: 120px;">
+                {% for d in daily_chats %}
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                    <div style="font-size: 11px; font-weight: 600;">{{ d.count }}</div>
+                    <div style="width: 100%; background: linear-gradient(180deg, var(--primary-light), var(--primary)); border-radius: 6px 6px 0 0; min-height: 4px; height: {% if d.count %}{{ d.count }}0{% else %}4{% endif %}px; max-height: 100px;"></div>
+                    <div style="font-size: 11px; color: var(--text-muted);">{{ d.day }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Rating Distribution -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-star" style="color: var(--warning);"></i> Rating Distribution</h3></div>
+        <div class="card-body">
+            {% for r in rating_dist %}
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <span style="font-size: 13px; min-width: 30px;">{{ r.rating }} <i class="fas fa-star" style="color: var(--warning); font-size: 11px;"></i></span>
+                <div style="flex: 1; height: 8px; background: var(--bg-primary); border-radius: 4px; overflow: hidden;">
+                    <div style="width: {% widthratio r.count total_chats 100 %}%; height: 100%; background: var(--warning); border-radius: 4px; min-width: {% if r.count %}2{% endif %}px;"></div>
+                </div>
+                <span style="font-size: 12px; color: var(--text-muted); min-width: 24px;">{{ r.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Agent Leaderboard -->
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-trophy" style="color: var(--warning);"></i> Agent Leaderboard</h3></div>
+    <div class="card-body" style="padding: 0;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Agent</th>
+                    <th>Total Chats</th>
+                    <th>Today</th>
+                    <th>This Week</th>
+                    <th>Active Now</th>
+                    <th>Avg Rating</th>
+                    <th>Messages Sent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for agent in agents %}
+                <tr>
+                    <td>
+                        {% if forloop.counter == 1 %}<span style="font-size: 18px;">🥇</span>
+                        {% elif forloop.counter == 2 %}<span style="font-size: 18px;">🥈</span>
+                        {% elif forloop.counter == 3 %}<span style="font-size: 18px;">🥉</span>
+                        {% else %}#{{ forloop.counter }}{% endif %}
+                    </td>
+                    <td><strong>{{ agent.get_full_name|default:agent.username }}</strong></td>
+                    <td>{{ agent.total_chats }}</td>
+                    <td>{{ agent.today_chats }}</td>
+                    <td>{{ agent.week_chats }}</td>
+                    <td><span class="status status-active">{{ agent.active_chats }}</span></td>
+                    <td>
+                        {% if agent.avg_rating %}
+                        <span style="color: var(--warning);"><i class="fas fa-star"></i> {{ agent.avg_rating|floatformat:1 }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ agent.total_messages }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8"><div class="empty-state"><p>No agents found</p></div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

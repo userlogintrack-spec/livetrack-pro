@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Widget Settings{% endblock %}
+{% block page_title %}Widget Settings{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;max-width:1200px;">
+
+<!-- LEFT: Settings Form -->
+<div>
+    {% if saved %}
+    <div style="margin-bottom:16px;padding:12px 16px;border-radius:12px;background:rgba(16,185,129,0.1);color:#10b981;font-weight:600;font-size:13px;border:1px solid rgba(16,185,129,0.2);">
+        <i class="fas fa-check-circle"></i> Settings saved successfully!
+    </div>
+    {% endif %}
+    {% if error %}
+    <div style="margin-bottom:16px;padding:12px 16px;border-radius:12px;background:rgba(239,68,68,0.1);color:#ef4444;font-weight:600;font-size:13px;border:1px solid rgba(239,68,68,0.2);">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Install Widget Card -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><h3><i class="fas fa-code" style="color:var(--primary);"></i> Install Widget</h3></div>
+        <div class="card-body">
+            <p style="margin-bottom:8px;color:var(--text-muted);font-size:13px;">Copy this code and paste it before the closing <code>&lt;/body&gt;</code> tag on your website:</p>
+            <div style="position:relative;">
+                <textarea id="embedCode" class="form-control" rows="2" readonly style="font-family:monospace;font-size:12px;background:var(--bg-primary);resize:none;">{{ embed_code }}</textarea>
+                <button type="button" onclick="copyEmbed()" style="position:absolute;top:8px;right:8px;border:none;background:var(--primary);color:white;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+                <span style="font-size:11px;color:var(--text-muted);">Widget Key:</span>
+                <code style="font-size:11px;background:var(--bg-primary);padding:2px 8px;border-radius:4px;">{{ widget_key }}</code>
+            </div>
+        </div>
+    </div>
+
+    <!-- Widget Appearance -->
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><h3><i class="fas fa-palette" style="color:var(--warning);"></i> Widget Appearance</h3></div>
+        <div class="card-body">
+            <form method="post" id="settingsForm">
+                {% csrf_token %}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div class="form-group">
+                        <label>Organization Name</label>
+                        <input class="form-control" type="text" name="site_name" value="{{ org.name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Widget Title</label>
+                        <input class="form-control" type="text" name="widget_title" value="{{ org.widget_title }}" placeholder="LiveTrack Support">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div class="form-group">
+                        <label>Widget Color</label>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <input type="color" name="chat_widget_color" value="{{ org.widget_color }}" id="colorPicker" style="width:50px;height:38px;border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:2px;">
+                            <input class="form-control" type="text" id="colorText" value="{{ org.widget_color }}" style="flex:1;font-family:monospace;" oninput="document.getElementById('colorPicker').value=this.value">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Widget Position</label>
+                        <select class="form-control" name="widget_position">
+                            {% for val, label in position_choices %}
+                            <option value="{{ val }}" {% if org.widget_position == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Welcome Message</label>
+                    <textarea class="form-control" name="welcome_message" rows="2">{{ org.welcome_message }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Offline Message</label>
+                    <textarea class="form-control" name="offline_message" rows="2">{{ org.offline_message }}</textarea>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" name="auto_reply_enabled" {% if org.auto_reply_enabled %}checked{% endif %}> Enable Auto Reply
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" name="require_email" {% if org.require_email %}checked{% endif %}> Require Email
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Auto Reply Message</label>
+                    <textarea class="form-control" name="auto_reply_message" rows="2">{{ org.auto_reply_message }}</textarea>
+                </div>
+
+                <!-- Notifications -->
+                <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px;">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px;"><i class="fas fa-bell" style="color:var(--warning);margin-right:6px;"></i> Notifications</h4>
+                    <div class="form-group">
+                        <label>Notification Email</label>
+                        <input class="form-control" type="email" name="notify_email" value="{{ org.notify_email }}" placeholder="you@company.com">
+                    </div>
+                    <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" name="notify_on_new_chat" {% if org.notify_on_new_chat %}checked{% endif %}> Email me on new chat
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Business Hours -->
+                <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px;">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px;"><i class="fas fa-clock" style="color:var(--info);margin-right:6px;"></i> Business Hours</h4>
+                    <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" name="business_hours_enabled" {% if org.business_hours_enabled %}checked{% endif %}> Enable business hours (show offline outside hours)
+                        </label>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div class="form-group">
+                            <label>Start Time</label>
+                            <input class="form-control" type="time" name="business_hours_start" value="{{ org.business_hours_start|time:'H:i' }}">
+                        </div>
+                        <div class="form-group">
+                            <label>End Time</label>
+                            <input class="form-control" type="time" name="business_hours_end" value="{{ org.business_hours_end|time:'H:i' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Proactive Chat -->
+                <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px;">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px;"><i class="fas fa-comment-dots" style="color:var(--success);margin-right:6px;"></i> Proactive Chat</h4>
+                    <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" name="proactive_enabled" {% if org.proactive_enabled %}checked{% endif %}> Auto-popup chat after delay
+                        </label>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;">
+                        <div class="form-group">
+                            <label>Delay (seconds)</label>
+                            <input class="form-control" type="number" name="proactive_delay" value="{{ org.proactive_delay }}" min="5" max="300">
+                        </div>
+                        <div class="form-group">
+                            <label>Proactive Message</label>
+                            <input class="form-control" type="text" name="proactive_message" value="{{ org.proactive_message }}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Auto-Responder -->
+                <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px;">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px;"><i class="fas fa-robot" style="color:var(--primary);margin-right:6px;"></i> Auto-Responder</h4>
+                    <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" name="auto_responder_enabled" {% if org.auto_responder_enabled %}checked{% endif %}> Send auto-reply if no agent responds
+                        </label>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;">
+                        <div class="form-group">
+                            <label>Delay (minutes)</label>
+                            <input class="form-control" type="number" name="auto_responder_delay" value="{{ org.auto_responder_delay }}" min="1" max="30">
+                        </div>
+                        <div class="form-group">
+                            <label>Auto-Reply Message</label>
+                            <input class="form-control" type="text" name="auto_responder_message" value="{{ org.auto_responder_message }}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Assignment Rule -->
+                <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px;">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px;"><i class="fas fa-random" style="color:var(--info);margin-right:6px;"></i> Chat Assignment</h4>
+                    <div class="form-group">
+                        <label>Assignment Rule</label>
+                        <select class="form-control" name="chat_assign_rule">
+                            <option value="least_busy" {% if org.chat_assign_rule == 'least_busy' %}selected{% endif %}>Least Busy Agent</option>
+                            <option value="round_robin" {% if org.chat_assign_rule == 'round_robin' %}selected{% endif %}>Round Robin</option>
+                            <option value="manual" {% if org.chat_assign_rule == 'manual' %}selected{% endif %}>Manual Only (No Auto-Assign)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" type="submit" style="width:100%;margin-top:12px;"><i class="fas fa-save"></i> Save Settings</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- RIGHT: Live Preview -->
+<div>
+    <div class="card" style="position:sticky;top:20px;">
+        <div class="card-header"><h3><i class="fas fa-eye" style="color:var(--info);"></i> Live Preview</h3></div>
+        <div class="card-body" style="padding:20px;background:#f0f0f0;border-radius:0 0 12px 12px;min-height:420px;position:relative;">
+            <!-- Mini widget preview -->
+            <div id="previewWidget" style="position:absolute;bottom:16px;right:16px;width:100%;max-width:300px;">
+                <!-- Widget panel -->
+                <div id="previewPanel" style="background:white;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.12);overflow:hidden;margin-bottom:12px;">
+                    <div id="previewHeader" style="background:{{ org.widget_color }};padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:white;"><i class="fas fa-headset"></i></div>
+                            <div>
+                                <div id="previewTitle" style="font-size:13px;font-weight:700;color:white;">{{ org.widget_title }}</div>
+                                <div style="font-size:11px;color:rgba(255,255,255,0.8);"><span style="display:inline-block;width:6px;height:6px;background:#34d399;border-radius:50%;margin-right:4px;"></span>We're online</div>
+                            </div>
+                        </div>
+                        <div style="color:rgba(255,255,255,0.7);font-size:14px;">✕</div>
+                    </div>
+                    <div style="padding:16px;">
+                        <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">Please fill in this form.</p>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <input disabled placeholder="Your name *" style="padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;color:#9ca3af;background:white;">
+                            <input disabled placeholder="Email (optional)" style="padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;color:#9ca3af;background:white;">
+                            <div id="previewBtn" style="padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;color:white;background:{{ org.widget_color }};cursor:default;">
+                                <i class="fas fa-paper-plane"></i> Start Chat
+                            </div>
+                        </div>
+                    </div>
+                    <div style="padding:8px 16px;background:#fafafa;border-top:1px solid #f0f0f0;font-size:11px;color:#9ca3af;text-align:center;">
+                        <span style="display:inline-block;width:7px;height:7px;background:#34d399;border-radius:50;margin-right:4px;"></span> Online
+                    </div>
+                </div>
+                <!-- Widget button -->
+                <div id="previewButton" style="width:50px;height:50px;border-radius:50%;background:{{ org.widget_color }};display:flex;align-items:center;justify-content:center;color:white;font-size:20px;box-shadow:0 4px 16px rgba(0,0,0,0.2);margin-left:auto;">
+                    💬
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script>
+function copyEmbed() {
+    const box = document.getElementById('embedCode');
+    navigator.clipboard.writeText(box.value).then(() => {
+        const btn = event.target.closest('button');
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => btn.innerHTML = '<i class="fas fa-copy"></i> Copy', 2000);
+    });
+}
+
+// Live preview updates
+document.getElementById('colorPicker').addEventListener('input', function() {
+    const c = this.value;
+    document.getElementById('colorText').value = c;
+    document.getElementById('previewHeader').style.background = c;
+    document.getElementById('previewBtn').style.background = c;
+    document.getElementById('previewButton').style.background = c;
+});
+
+document.querySelector('[name="widget_title"]').addEventListener('input', function() {
+    document.getElementById('previewTitle').textContent = this.value || 'LiveTrack Support';
+});
+</script>
+{% endblock %}

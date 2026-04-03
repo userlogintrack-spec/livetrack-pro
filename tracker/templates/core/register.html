@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Started | LiveTrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;min-height:100vh;display:flex;background:#fafbff;}
+
+        /* Left Panel */
+        .auth-left{
+            width:42%;min-height:100vh;
+            background:linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#4338ca 100%);
+            display:flex;flex-direction:column;justify-content:center;
+            padding:60px;position:relative;overflow:hidden;
+        }
+        .auth-left::before{
+            content:'';position:absolute;width:500px;height:500px;
+            background:radial-gradient(circle,rgba(129,140,248,0.15) 0%,transparent 70%);
+            top:-100px;right:-150px;border-radius:50%;
+        }
+        .auth-left::after{
+            content:'';position:absolute;width:400px;height:400px;
+            background:radial-gradient(circle,rgba(167,139,250,0.1) 0%,transparent 70%);
+            bottom:-80px;left:-100px;border-radius:50%;
+        }
+        .auth-left .brand{position:relative;z-index:1;}
+        .auth-left .logo{
+            width:48px;height:48px;background:rgba(255,255,255,0.15);
+            border-radius:14px;display:flex;align-items:center;justify-content:center;
+            font-size:22px;color:white;margin-bottom:32px;backdrop-filter:blur(10px);
+            border:1px solid rgba(255,255,255,0.1);
+        }
+        .auth-left h1{font-size:34px;font-weight:800;color:white;line-height:1.2;margin-bottom:16px;letter-spacing:-0.5px;}
+        .auth-left h1 span{background:linear-gradient(135deg,#a78bfa,#c4b5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+        .auth-left p.desc{color:rgba(255,255,255,0.6);font-size:15px;line-height:1.7;max-width:360px;}
+
+        .checklist{margin-top:36px;display:flex;flex-direction:column;gap:14px;position:relative;z-index:1;}
+        .check-item{display:flex;align-items:flex-start;gap:12px;color:rgba(255,255,255,0.85);font-size:14px;line-height:1.5;}
+        .check-item i{width:24px;height:24px;border-radius:50%;background:rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;font-size:10px;color:#34d399;flex-shrink:0;margin-top:2px;}
+        .check-item strong{color:white;}
+
+        .stats-row{margin-top:40px;display:flex;gap:32px;position:relative;z-index:1;}
+        .stat-item .num{font-size:28px;font-weight:800;color:white;}
+        .stat-item .lbl{font-size:12px;color:rgba(255,255,255,0.45);margin-top:2px;}
+
+        /* Right Panel */
+        .auth-right{
+            flex:1;display:flex;align-items:center;justify-content:center;
+            padding:40px;background:white;overflow-y:auto;
+        }
+        .auth-form-wrap{width:100%;max-width:440px;}
+        .auth-form-wrap h2{font-size:26px;font-weight:700;color:#1e1b4b;margin-bottom:4px;}
+        .auth-form-wrap .subtitle{font-size:14px;color:#6b7280;margin-bottom:24px;}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
+        .form-control{
+            width:100%;padding:11px 14px;background:#f9fafb;
+            border:1.5px solid #e5e7eb;border-radius:10px;color:#111827;
+            font-size:14px;font-family:inherit;transition:all .2s;
+        }
+        .form-control:focus{outline:none;border-color:#6366f1;background:white;box-shadow:0 0 0 3px rgba(99,102,241,0.1);}
+        .form-control::placeholder{color:#9ca3af;}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+        .btn-submit{
+            width:100%;padding:13px;margin-top:6px;
+            background:linear-gradient(135deg,#6366f1,#4f46e5);
+            color:white;border:none;border-radius:10px;
+            font-size:15px;font-weight:600;cursor:pointer;
+            font-family:inherit;transition:all .2s;
+            box-shadow:0 4px 14px rgba(99,102,241,0.3);
+            display:flex;align-items:center;justify-content:center;gap:8px;
+        }
+        .btn-submit:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,0.4);}
+        .auth-footer{text-align:center;margin-top:20px;font-size:14px;color:#6b7280;}
+        .auth-footer a{color:#6366f1;text-decoration:none;font-weight:600;}
+        .auth-footer a:hover{text-decoration:underline;}
+        .alert{padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;display:flex;align-items:center;gap:8px;}
+        .terms{font-size:12px;color:#9ca3af;text-align:center;margin-top:14px;line-height:1.5;}
+        .terms a{color:#6366f1;text-decoration:none;}
+        .section-label{
+            font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+            color:#6366f1;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #f3f4f6;
+            display:flex;align-items:center;gap:6px;
+        }
+        .section-label i{font-size:12px;}
+
+        @media(max-width:900px){
+            .auth-left{display:none;}
+            .auth-right{padding:24px;}
+            body{background:white;}
+        }
+    </style>
+</head>
+<body>
+    <!-- Left Panel -->
+    <div class="auth-left">
+        <div class="brand">
+            <div class="logo"><i class="fas fa-bolt"></i></div>
+            <h1>Start growing with<br><span>LiveTrack</span></h1>
+            <p class="desc">Create your free account and start engaging visitors in minutes. No credit card required.</p>
+
+            <div class="checklist">
+                <div class="check-item"><i class="fas fa-check"></i> <div><strong>Free forever plan</strong> — no credit card needed to get started</div></div>
+                <div class="check-item"><i class="fas fa-check"></i> <div><strong>1-minute setup</strong> — copy one line of code to your website</div></div>
+                <div class="check-item"><i class="fas fa-check"></i> <div><strong>177+ features</strong> — live chat, analytics, webhooks, and more</div></div>
+                <div class="check-item"><i class="fas fa-check"></i> <div><strong>Multi-agent teams</strong> — invite your team and collaborate</div></div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-item"><div class="num">10K+</div><div class="lbl">Active Users</div></div>
+                <div class="stat-item"><div class="num">50M+</div><div class="lbl">Messages Sent</div></div>
+                <div class="stat-item"><div class="num">99.9%</div><div class="lbl">Uptime</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="auth-right">
+        <div class="auth-form-wrap">
+            <h2>Create your account</h2>
+            <p class="subtitle">Get started free in 30 seconds</p>
+
+            {% if messages %}
+            {% for message in messages %}
+            <div class="alert"><i class="fas fa-exclamation-circle"></i> {{ message }}</div>
+            {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="section-label"><i class="fas fa-building"></i> Organization</div>
+                <div class="form-group">
+                    <label>Company / Organization Name</label>
+                    <input type="text" name="org_name" class="form-control" placeholder="Acme Inc." required>
+                </div>
+
+                <div class="section-label" style="margin-top:20px;"><i class="fas fa-user"></i> Your Details</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" name="first_name" class="form-control" placeholder="John">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" name="last_name" class="form-control" placeholder="Doe">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="john@acme.com" required>
+                </div>
+
+                <div class="section-label" style="margin-top:20px;"><i class="fas fa-lock"></i> Login Credentials</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" name="username" class="form-control" placeholder="johndoe" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control" placeholder="Min 6 characters" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit">
+                    <i class="fas fa-rocket"></i> Create Free Account
+                </button>
+            </form>
+
+            <div class="terms">
+                By creating an account, you agree to our<br>
+                <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+            </div>
+
+            <div class="auth-footer">
+                Already have an account? <a href="{% url 'core:login' %}">Sign in</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

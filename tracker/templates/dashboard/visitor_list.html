@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Visitors{% endblock %}
+{% block nav_visitors %}active{% endblock %}
+{% block page_title %}Visitors{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'dashboard:export_visitors' %}{% if date_from or date_to %}?{% endif %}{% if date_from %}from={{ date_from }}{% endif %}{% if date_from and date_to %}&{% endif %}{% if date_to %}to={{ date_to }}{% endif %}" class="btn btn-sm btn-secondary">
+    <i class="fas fa-download"></i> Export CSV
+</a>
+{% endblock %}
+
+{% block content %}
+<form method="get" style="margin-bottom: 12px; display: flex; gap: 10px; align-items: center;">
+    <input type="hidden" name="filter" value="{{ current_filter }}">
+    <input type="text" name="q" value="{{ search_q }}" class="form-control" placeholder="Search IP, browser, OS, source..." style="max-width: 320px;">
+    <input type="date" name="from" value="{{ date_from }}" class="form-control" style="max-width: 170px;">
+    <input type="date" name="to" value="{{ date_to }}" class="form-control" style="max-width: 170px;">
+    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-search"></i> Apply</button>
+</form>
+
+<div class="filter-tabs">
+    <a href="?filter=all{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}" class="filter-tab {% if current_filter == 'all' %}active{% endif %}">
+        <i class="fas fa-users"></i> All Visitors
+    </a>
+    <a href="?filter=online{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}" class="filter-tab {% if current_filter == 'online' %}active{% endif %}">
+        <i class="fas fa-circle" style="font-size: 8px; color: var(--success);"></i> Online Now
+    </a>
+    <a href="?filter=today{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}" class="filter-tab {% if current_filter == 'today' %}active{% endif %}">
+        <i class="fas fa-calendar-day"></i> Today
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>IP Address</th>
+                    <th>Browser / OS</th>
+                    <th>Device</th>
+                    <th>Source</th>
+                    <th>Score</th>
+                    <th>Pages</th>
+                    <th>Chats</th>
+                    <th>First Visit</th>
+                    <th>Last Seen</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in visitors %}
+                <tr>
+                    <td>
+                        {% if v.last_seen >= last_30_min %}
+                            <span class="status status-online"><span class="dot"></span> Online</span>
+                        {% else %}
+                            <span class="status status-offline"><span class="dot"></span> Offline</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'dashboard:visitor_detail' v.id %}" style="color: var(--primary-light); text-decoration: none; font-weight: 500;">
+                            {{ v.ip_address }}
+                        </a>
+                    </td>
+                    <td>{{ v.browser }} / {{ v.os }}</td>
+                    <td>
+                        {% if v.device_type == "desktop" %}<i class="fas fa-desktop"></i>
+                        {% elif v.device_type == "mobile" %}<i class="fas fa-mobile-alt"></i>
+                        {% elif v.device_type == "tablet" %}<i class="fas fa-tablet-alt"></i>
+                        {% else %}<i class="fas fa-question"></i>{% endif %}
+                        {{ v.device_type|title }}
+                    </td>
+                    <td><span class="status status-active">{{ v.referrer_source }}</span></td>
+                    <td>
+                        {% if v.score >= 70 %}
+                        <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;"><i class="fas fa-fire"></i> {{ v.score }}</span>
+                        {% elif v.score >= 30 %}
+                        <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:rgba(245,158,11,0.15);color:#f59e0b;">{{ v.score }}</span>
+                        {% else %}
+                        <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;background:rgba(100,116,139,0.1);color:#64748b;">{{ v.score }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ v.page_count }}</td>
+                    <td>{{ v.chat_count }}</td>
+                    <td><small>{{ v.first_visit|date:"M d, H:i" }}</small></td>
+                    <td><small>{{ v.last_seen|timesince }} ago</small></td>
+                    <td>
+                        <a href="{% url 'dashboard:visitor_detail' v.id %}" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="11">
+                        <div class="empty-state">
+                            <i class="fas fa-user-slash"></i>
+                            <p>No visitors found</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

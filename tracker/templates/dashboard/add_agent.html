@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Agents{% endblock %}
+{% block page_title %}Manage Agents{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:380px 1fr;gap:20px;max-width:1200px;">
+
+    <!-- LEFT: Add Agent Form -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-user-plus" style="color:var(--primary);"></i> Add New Agent</h3>
+        </div>
+        <div class="card-body">
+            {% if created %}
+            <div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:rgba(16,185,129,0.1);color:#10b981;font-weight:600;font-size:13px;border:1px solid rgba(16,185,129,0.2);">
+                <i class="fas fa-check-circle"></i> Agent created successfully!
+            </div>
+            {% endif %}
+            {% if error %}
+            <div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:rgba(239,68,68,0.1);color:#ef4444;font-weight:600;font-size:13px;border:1px solid rgba(239,68,68,0.2);">
+                <i class="fas fa-exclamation-circle"></i> {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input class="form-control" type="text" name="first_name" placeholder="John">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input class="form-control" type="text" name="last_name" placeholder="Doe">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input class="form-control" type="text" name="username" required placeholder="agent_john">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input class="form-control" type="email" name="email" placeholder="john@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input class="form-control" type="password" name="password" required placeholder="Strong password">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div class="form-group">
+                        <label>Max Chats</label>
+                        <input class="form-control" type="number" name="max_chats" min="1" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <label style="display:flex;align-items:center;gap:8px;padding:10px 0;">
+                            <input type="checkbox" name="is_available" checked> Available
+                        </label>
+                    </div>
+                </div>
+                <button class="btn btn-primary" type="submit" style="width:100%;"><i class="fas fa-user-plus"></i> Add Agent</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- RIGHT: Team Members -->
+    <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3><i class="fas fa-users" style="color:var(--info);"></i> Team Members ({{ agents|length }})</h3>
+        </div>
+        <div class="card-body" style="padding:0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Agent</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Active / Max</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for agent in agents %}
+                    <tr>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <div style="width:34px;height:34px;border-radius:50%;background:{{ agent.agent_profile.avatar_color }};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px;">
+                                    {{ agent.first_name|default:agent.username|first|upper }}
+                                </div>
+                                <div>
+                                    <div style="font-weight:600;font-size:13px;">{{ agent.get_full_name|default:agent.username }}</div>
+                                    <div style="font-size:11px;color:var(--text-muted);">{{ agent.email|default:"-" }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if agent.agent_profile.role == 'owner' %}
+                            <span style="background:rgba(99,102,241,0.1);color:var(--primary);padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;">Owner</span>
+                            {% else %}
+                            <span style="background:rgba(100,116,139,0.1);color:var(--text-secondary);padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;">Agent</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if agent.agent_profile.is_available %}
+                            <span class="status status-active"><span class="dot"></span> Online</span>
+                            {% else %}
+                            <span class="status status-closed"><span class="dot"></span> Offline</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span style="font-weight:600;">{{ agent.agent_profile.active_chats_count }}</span> / {{ agent.agent_profile.max_chats }}
+                        </td>
+                        <td>
+                            {% if agent.agent_profile.role != 'owner' %}
+                            <div style="display:flex;gap:6px;">
+                                <button onclick="toggleAvail({{ agent.id }})" class="btn btn-sm btn-secondary" title="Toggle availability">
+                                    <i class="fas fa-power-off"></i>
+                                </button>
+                                <button onclick="removeAgent({{ agent.id }}, '{{ agent.get_full_name|default:agent.username }}')" class="btn btn-sm btn-danger" title="Remove agent">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            {% else %}
+                            <span style="font-size:11px;color:var(--text-muted);">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No agents yet. Add your first agent!</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleAvail(agentId) {
+    fetch('/dashboard/settings/agents/' + agentId + '/toggle/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'},
+    }).then(r => r.json()).then(() => location.reload());
+}
+function removeAgent(agentId, name) {
+    if (!confirm('Remove agent "' + name + '"? This cannot be undone.')) return;
+    fetch('/dashboard/settings/agents/' + agentId + '/remove/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'},
+    }).then(r => r.json()).then(data => {
+        if (data.status === 'ok') location.reload();
+        else alert(data.error || 'Failed');
+    });
+}
+</script>
+{% endblock %}

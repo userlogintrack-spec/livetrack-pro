@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Chats{% endblock %}
+{% block page_title %}Chat Conversations{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'dashboard:export_chats' %}?status={{ current_filter }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> Export</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-row {
+        display: flex; align-items: center; gap: 14px;
+        padding: 14px 18px; border-bottom: 1px solid var(--border);
+        transition: background 0.15s; cursor: pointer; text-decoration: none; color: inherit;
+        border-left: 3px solid transparent;
+    }
+    .chat-row:hover { background: rgba(99,102,241,0.03); }
+    .chat-row.priority-high { border-left-color: #ef4444; }
+    .chat-row.priority-medium { border-left-color: #f59e0b; }
+    .chat-row.priority-low { border-left-color: #10b981; }
+
+    .chat-row .cr-avatar {
+        width: 40px; height: 40px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-weight: 700; font-size: 15px; flex-shrink: 0;
+        position: relative;
+    }
+    .chat-row .cr-avatar .online-dot {
+        position: absolute; bottom: 0; right: 0;
+        width: 10px; height: 10px; border-radius: 50%;
+        border: 2px solid var(--bg-card);
+    }
+    .cr-main { flex: 1; min-width: 0; }
+    .cr-top { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .cr-name { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+    .cr-time { font-size: 11px; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+    .cr-preview {
+        font-size: 12px; color: var(--text-secondary);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        max-width: 400px;
+    }
+    .cr-badges { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+    .cr-badge {
+        padding: 3px 8px; border-radius: 6px; font-size: 10px;
+        font-weight: 600; white-space: nowrap;
+    }
+    .cr-unread {
+        min-width: 20px; height: 20px; border-radius: 10px;
+        background: var(--primary); color: white; font-size: 10px;
+        font-weight: 700; display: flex; align-items: center;
+        justify-content: center; padding: 0 6px;
+    }
+    .cr-checkbox {
+        flex-shrink: 0; width: 16px; height: 16px; cursor: pointer;
+        accent-color: var(--primary);
+    }
+    .cr-action {
+        padding: 6px 14px; border-radius: 8px; font-size: 11px;
+        font-weight: 600; border: none; cursor: pointer; font-family: inherit;
+        white-space: nowrap; transition: all 0.15s; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 5px;
+    }
+    .cr-action.join { background: var(--primary); color: white; }
+    .cr-action.join:hover { opacity: 0.9; }
+    .cr-action.view { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border); }
+    .cr-action.view:hover { border-color: var(--primary); color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Search -->
+<form method="get" style="margin-bottom: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    <input type="hidden" name="status" value="{{ current_filter }}">
+    <div style="flex:1;min-width:200px;position:relative;">
+        <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;"></i>
+        <input type="text" name="q" value="{{ search_q }}" class="form-control" placeholder="Search chats..." style="padding-left:36px;">
+    </div>
+    <select name="priority" class="form-control" style="max-width:140px;">
+        <option value="all" {% if priority_filter == 'all' %}selected{% endif %}>All Priority</option>
+        <option value="high" {% if priority_filter == 'high' %}selected{% endif %}>High</option>
+        <option value="medium" {% if priority_filter == 'medium' %}selected{% endif %}>Medium</option>
+        <option value="low" {% if priority_filter == 'low' %}selected{% endif %}>Low</option>
+    </select>
+    <input type="date" name="from" value="{{ date_from }}" class="form-control" style="max-width:150px;">
+    <input type="date" name="to" value="{{ date_to }}" class="form-control" style="max-width:150px;">
+    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-search"></i></button>
+    {% if search_q or priority_filter != 'all' or date_from or date_to %}
+    <a href="?status={{ current_filter }}" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></a>
+    {% endif %}
+</form>
+
+<!-- Tabs -->
+<div class="filter-tabs">
+    <a href="?status=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}"><i class="fas fa-inbox"></i> All</a>
+    <a href="?status=waiting" class="filter-tab {% if current_filter == 'waiting' %}active{% endif %}"><i class="fas fa-clock"></i> Waiting</a>
+    <a href="?status=active" class="filter-tab {% if current_filter == 'active' %}active{% endif %}"><i class="fas fa-comments"></i> Active</a>
+    <a href="?status=closed" class="filter-tab {% if current_filter == 'closed' %}active{% endif %}"><i class="fas fa-check-circle"></i> Closed</a>
+</div>
+
+<!-- Bulk Actions -->
+<div id="bulkBar" style="display:none;padding:10px 16px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:10px;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:12px;font-weight:600;color:var(--primary);"><i class="fas fa-check-square"></i> <span id="bulkCount">0</span> selected</span>
+    <button onclick="bulkAction('close')" class="btn btn-sm btn-danger"><i class="fas fa-times-circle"></i> Close</button>
+    <button onclick="bulkAction('high_priority')" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-up"></i> High</button>
+    <button onclick="bulkAction('bookmark')" class="btn btn-sm btn-secondary"><i class="fas fa-bookmark"></i> Bookmark</button>
+    <button onclick="clearBulk()" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></button>
+</div>
+
+<!-- Chat List -->
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        {% for chat in chats %}
+        <div class="chat-row priority-{{ chat.priority }}">
+            <input type="checkbox" class="cr-checkbox chat-checkbox" value="{{ chat.room_id }}" onchange="updateBulkBar()">
+
+            <div class="cr-avatar">
+                {{ chat.visitor_name|first|upper }}
+                <div class="online-dot" style="background:{% if chat.status == 'active' %}#10b981{% elif chat.status == 'waiting' %}#f59e0b{% else %}#94a3b8{% endif %};"></div>
+            </div>
+
+            <a href="{% url 'dashboard:chat_room' chat.room_id %}" class="cr-main" style="text-decoration:none;color:inherit;">
+                <div class="cr-top">
+                    <span class="cr-name">{{ chat.visitor_name }}</span>
+                    {% if chat.is_bookmarked %}<i class="fas fa-bookmark" style="color:#f59e0b;font-size:10px;"></i>{% endif %}
+                    {% if chat.was_transferred %}<i class="fas fa-exchange-alt" style="color:#6366f1;font-size:9px;"></i>{% endif %}
+                    <span class="cr-time">{{ chat.created_at|timesince }} ago</span>
+                </div>
+                <div class="cr-preview">
+                    {% if chat.subject %}{{ chat.subject|truncatechars:60 }}{% else %}{{ chat.visitor.ip_address }} · {{ chat.agent.get_full_name|default:"Unassigned" }}{% endif %}
+                </div>
+            </a>
+
+            <div class="cr-badges">
+                {% if chat.notes_count %}
+                <span class="cr-badge" style="background:rgba(245,158,11,0.1);color:#f59e0b;"><i class="fas fa-sticky-note"></i> {{ chat.notes_count }}</span>
+                {% endif %}
+
+                <span class="cr-badge" style="{% if chat.priority == 'high' %}background:rgba(239,68,68,0.1);color:#ef4444;{% elif chat.priority == 'medium' %}background:rgba(245,158,11,0.1);color:#f59e0b;{% else %}background:rgba(16,185,129,0.1);color:#10b981;{% endif %}">
+                    {{ chat.priority|title }}
+                </span>
+
+                <span class="cr-badge" style="{% if chat.status == 'waiting' %}background:rgba(245,158,11,0.1);color:#f59e0b;{% elif chat.status == 'active' %}background:rgba(16,185,129,0.1);color:#10b981;{% else %}background:rgba(100,116,139,0.1);color:#64748b;{% endif %}">
+                    {{ chat.get_status_display }}
+                </span>
+
+                {% if chat.unread_count %}
+                <span class="cr-unread">{{ chat.unread_count }}</span>
+                {% endif %}
+
+                <span style="font-size:11px;color:var(--text-muted);">{{ chat.message_count }} <i class="fas fa-comment" style="font-size:9px;"></i></span>
+            </div>
+
+            <a href="{% url 'dashboard:chat_room' chat.room_id %}" class="cr-action {% if chat.status == 'waiting' %}join{% else %}view{% endif %}">
+                {% if chat.status == 'waiting' %}
+                <i class="fas fa-reply"></i> Join
+                {% else %}
+                <i class="fas fa-arrow-right"></i> Open
+                {% endif %}
+            </a>
+        </div>
+        {% empty %}
+        <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
+            <i class="fas fa-comments" style="font-size:40px;opacity:0.2;display:block;margin-bottom:12px;"></i>
+            <p style="font-size:15px;font-weight:600;">No chats found</p>
+            <p style="font-size:13px;margin-top:4px;">Chats will appear here when visitors start conversations.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function toggleSelectAll(el) {
+    document.querySelectorAll('.chat-checkbox').forEach(cb => cb.checked = el.checked);
+    updateBulkBar();
+}
+function updateBulkBar() {
+    const checked = document.querySelectorAll('.chat-checkbox:checked');
+    const bar = document.getElementById('bulkBar');
+    document.getElementById('bulkCount').textContent = checked.length;
+    bar.style.display = checked.length > 0 ? 'flex' : 'none';
+}
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.chat-checkbox:checked')).map(cb => cb.value);
+}
+function bulkAction(action) {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    if (!confirm('Apply "' + action + '" to ' + ids.length + ' chats?')) return;
+    fetch('/dashboard/chats/bulk-action/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify({action: action, room_ids: ids}),
+    }).then(r => r.json()).then(data => {
+        if (data.status === 'ok') location.reload();
+        else alert(data.error || 'Failed');
+    });
+}
+function clearBulk() {
+    document.querySelectorAll('.chat-checkbox').forEach(cb => cb.checked = false);
+    updateBulkBar();
+}
+</script>
+{% endblock %}

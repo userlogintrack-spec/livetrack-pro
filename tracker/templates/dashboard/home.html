@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-eye"></i></div>
+        <div class="stat-value">{{ online_visitors }}</div>
+        <div class="stat-label">Online Visitors</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-icon"><i class="fas fa-users"></i></div>
+        <div class="stat-value">{{ today_visitors }}</div>
+        <div class="stat-label">Today's Visitors</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-comments"></i></div>
+        <div class="stat-value">{{ active_chats }}</div>
+        <div class="stat-label">Active Chats</div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
+        <div class="stat-value">{{ today_page_views }}</div>
+        <div class="stat-label">Today's Page Views</div>
+    </div>
+</div>
+
+<!-- Second Row Stats -->
+<div class="stats-grid" style="margin-bottom:24px;">
+    <div class="stat-card green">
+        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        <div class="stat-value">{{ avg_response_min }}:{{ avg_response_sec|stringformat:"02d" }}</div>
+        <div class="stat-label">Avg Response Time</div>
+    </div>
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-star"></i></div>
+        <div class="stat-value">{% if avg_rating %}{{ avg_rating|floatformat:1 }}{% else %}-{% endif %}</div>
+        <div class="stat-label">CSAT Rating ({{ total_rated }} rated)</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-value">{{ completion_rate }}%</div>
+        <div class="stat-label">Completion Rate</div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-envelope"></i></div>
+        <div class="stat-value">{{ unread_offline }}</div>
+        <div class="stat-label">Unread Offline Msgs</div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom: 24px;">
+    <!-- Waiting Chats -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-clock" style="color: var(--warning);"></i> Waiting Chats</h3>
+            <a href="{% url 'dashboard:chat_list' %}?status=waiting" class="btn btn-sm btn-secondary">View All</a>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if waiting_chats %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Visitor</th>
+                        <th>Subject</th>
+                        <th>SLA</th>
+                        <th>Time</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for chat in waiting_chats %}
+                    <tr>
+                        <td>
+                            <strong>{{ chat.visitor_name }}</strong>
+                            <br><small style="color: var(--text-muted);">{{ chat.visitor.ip_address }}</small>
+                        </td>
+                        <td>{{ chat.subject|default:"No subject" }}</td>
+                        <td>
+                            {% if chat.created_at <= sla_cutoff %}
+                                <span class="status status-closed">Breached</span>
+                            {% else %}
+                                <span class="status status-active">OK</span>
+                            {% endif %}
+                        </td>
+                        <td><small>{{ chat.created_at|timesince }} ago</small></td>
+                        <td>
+                            <a href="{% url 'dashboard:chat_room' chat.room_id %}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-reply"></i> Join
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-check-circle"></i>
+                <p>No waiting chats</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Online Visitors -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-circle" style="color: var(--success); font-size: 10px;"></i> Online Visitors</h3>
+            <a href="{% url 'dashboard:visitor_list' %}?filter=online" class="btn btn-sm btn-secondary">View All</a>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if recent_visitors %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Visitor</th>
+                        <th>Browser / OS</th>
+                        <th>Source</th>
+                        <th>Last Seen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in recent_visitors %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'dashboard:visitor_detail' v.id %}" style="color: var(--primary-light); text-decoration: none;">
+                                {{ v.ip_address }}
+                            </a>
+                            <br><small style="color: var(--text-muted);">
+                                <i class="fas fa-{{ v.device_type }}"></i> {{ v.device_type|title }}
+                            </small>
+                        </td>
+                        <td>{{ v.browser }} / {{ v.os }}</td>
+                        <td>
+                            <span class="status status-active">{{ v.referrer_source }}</span>
+                        </td>
+                        <td><small>{{ v.last_seen|timesince }} ago</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-user-slash"></i>
+                <p>No visitors online right now</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="grid-3" style="margin-bottom: 24px;">
+    <!-- Browser Stats -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-globe" style="color: var(--info);"></i> Browsers</h3>
+        </div>
+        <div class="card-body">
+            {% for stat in browser_stats %}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 13px;">{{ stat.browser }}</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 80px; height: 6px; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
+                        <div style="width: {% widthratio stat.count total_visitors 100 %}%; height: 100%; background: var(--primary); border-radius: 3px;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-muted); min-width: 30px;">{{ stat.count }}</span>
+                </div>
+            </div>
+            {% empty %}
+            <p style="color: var(--text-muted); font-size: 13px;">No data yet</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Device Stats -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-laptop" style="color: var(--success);"></i> Devices</h3>
+        </div>
+        <div class="card-body">
+            {% for stat in device_stats %}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 13px;">
+                    {% if stat.device_type == "desktop" %}<i class="fas fa-desktop"></i>
+                    {% elif stat.device_type == "mobile" %}<i class="fas fa-mobile-alt"></i>
+                    {% elif stat.device_type == "tablet" %}<i class="fas fa-tablet-alt"></i>
+                    {% else %}<i class="fas fa-question"></i>{% endif %}
+                    {{ stat.device_type|title }}
+                </span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 80px; height: 6px; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
+                        <div style="width: {% widthratio stat.count total_visitors 100 %}%; height: 100%; background: var(--success); border-radius: 3px;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-muted); min-width: 30px;">{{ stat.count }}</span>
+                </div>
+            </div>
+            {% empty %}
+            <p style="color: var(--text-muted); font-size: 13px;">No data yet</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Referrer Stats -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-share-alt" style="color: var(--warning);"></i> Traffic Sources</h3>
+        </div>
+        <div class="card-body">
+            {% for stat in referrer_stats %}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 13px;">{{ stat.referrer_source }}</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 80px; height: 6px; background: var(--bg-primary); border-radius: 3px; overflow: hidden;">
+                        <div style="width: {% widthratio stat.count total_visitors 100 %}%; height: 100%; background: var(--warning); border-radius: 3px;"></div>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-muted); min-width: 30px;">{{ stat.count }}</span>
+                </div>
+            </div>
+            {% empty %}
+            <p style="color: var(--text-muted); font-size: 13px;">No data yet</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Hourly Visitors Chart -->
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header">
+        <h3><i class="fas fa-chart-bar" style="color: var(--primary-light);"></i> Today's Visitor Activity</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; align-items: flex-end; gap: 4px; height: 120px; padding: 0 4px;">
+            {% for h in hourly_data %}
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                <div style="
+                    width: 100%;
+                    max-width: 28px;
+                    background: linear-gradient(180deg, var(--primary-light), var(--primary));
+                    border-radius: 4px 4px 0 0;
+                    min-height: 2px;
+                    height: {% if h.count %}{{ h.count }}0{% else %}2{% endif %}px;
+                    max-height: 100px;
+                    transition: height 0.3s;
+                " title="{{ h.hour }}: {{ h.count }} visitors"></div>
+                {% if forloop.counter|divisibleby:3 %}
+                <small style="font-size: 9px; color: var(--text-muted);">{{ h.hour }}</small>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Recent Chats -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-history" style="color: var(--primary-light);"></i> Recent Chats</h3>
+        <a href="{% url 'dashboard:chat_list' %}" class="btn btn-sm btn-secondary">View All</a>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Room</th>
+                    <th>Visitor</th>
+                    <th>Agent</th>
+                    <th>Status</th>
+                    <th>Messages</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for chat in recent_chats %}
+                <tr>
+                    <td>
+                        <a href="{% url 'dashboard:chat_room' chat.room_id %}" style="color: var(--primary-light); text-decoration: none;">
+                            #{{ chat.room_id|truncatechars:10 }}
+                        </a>
+                    </td>
+                    <td>{{ chat.visitor_name }}</td>
+                    <td>{{ chat.agent.get_full_name|default:"Unassigned" }}</td>
+                    <td>
+                        <span class="status status-{{ chat.status }}">
+                            <span class="dot"></span> {{ chat.get_status_display }}
+                        </span>
+                    </td>
+                    <td>{{ chat.message_count }}</td>
+                    <td><small>{{ chat.created_at|timesince }} ago</small></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6">
+                        <div class="empty-state">
+                            <i class="fas fa-comments"></i>
+                            <p>No chats yet</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Agent Leaderboard -->
+<div class="card" style="margin-top:24px;">
+    <div class="card-header">
+        <h3><i class="fas fa-trophy" style="color: #f59e0b;"></i> Agent Leaderboard</h3>
+    </div>
+    <div class="card-body">
+        {% for agent in agent_leaderboard %}
+        <div style="display:flex;align-items:center;gap:14px;padding:10px 0;{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}">
+            <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white;flex-shrink:0;{% if forloop.counter == 1 %}background:linear-gradient(135deg,#f59e0b,#fbbf24);{% elif forloop.counter == 2 %}background:linear-gradient(135deg,#94a3b8,#cbd5e1);{% elif forloop.counter == 3 %}background:linear-gradient(135deg,#d97706,#b45309);{% else %}background:var(--bg-primary);color:var(--text-muted);{% endif %}">
+                {{ forloop.counter }}
+            </div>
+            <div style="width:32px;height:32px;border-radius:50%;background:{{ agent.agent_profile.avatar_color }};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:12px;flex-shrink:0;">
+                {{ agent.first_name|default:agent.username|first|upper }}
+            </div>
+            <div style="flex:1;">
+                <div style="font-weight:600;font-size:13px;">{{ agent.get_full_name|default:agent.username }}</div>
+                <div style="font-size:11px;color:var(--text-muted);">{{ agent.agent_profile.role|title }}</div>
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:18px;font-weight:800;color:var(--primary);">{{ agent.chats_handled }}</div>
+                <div style="font-size:10px;color:var(--text-muted);">chats closed</div>
+            </div>
+        </div>
+        {% empty %}
+        <p style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px;">No agent data yet</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

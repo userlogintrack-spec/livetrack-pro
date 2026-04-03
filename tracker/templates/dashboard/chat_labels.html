@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Chat Labels{% endblock %}
+{% block page_title %}Chat Labels{% endblock %}
+
+{% block content %}
+<div style="max-width:600px;">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-tags" style="color:var(--warning);"></i> Manage Labels</h3></div>
+        <div class="card-body">
+            <form method="post" style="display:flex;gap:10px;margin-bottom:16px;">
+                {% csrf_token %}
+                <input class="form-control" type="text" name="name" placeholder="Label name (e.g. Billing, Support)" required style="flex:1;">
+                <input type="color" name="color" value="#6366f1" style="width:42px;height:38px;border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+                <button class="btn btn-primary" type="submit"><i class="fas fa-plus"></i> Add</button>
+            </form>
+
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                {% for label in labels %}
+                <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:{{ label.color }}15;border:1px solid {{ label.color }}30;font-size:13px;font-weight:600;">
+                    <span style="width:10px;height:10px;border-radius:50%;background:{{ label.color }};"></span>
+                    {{ label.name }}
+                    <button onclick="if(confirm('Delete?'))fetch('/dashboard/settings/labels/{{ label.id }}/delete/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload())" style="border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0 2px;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                {% empty %}
+                <p style="color:var(--text-muted);font-size:13px;">No labels created yet. Add your first label above.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

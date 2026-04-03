@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Chat Analytics{% endblock %}
+
+{% block content %}
+<!-- Top Stats -->
+<div class="stats-grid" style="margin-bottom:20px;">
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-comments"></i></div>
+        <div class="stat-value">{{ total_chats }}</div>
+        <div class="stat-label">Total Chats</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-icon"><i class="fas fa-envelope"></i></div>
+        <div class="stat-value">{{ total_messages }}</div>
+        <div class="stat-label">Total Messages</div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-star"></i></div>
+        <div class="stat-value">{% if avg_rating %}{{ avg_rating|floatformat:1 }}{% else %}-{% endif %}</div>
+        <div class="stat-label">Avg CSAT</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-value">{{ status_counts.closed }}</div>
+        <div class="stat-label">Resolved Chats</div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- 7-Day Chat Volume -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Chat Volume (7 days)</h3></div>
+        <div class="card-body">
+            <div style="display:flex;align-items:flex-end;gap:8px;height:150px;padding:0 4px;">
+                {% for d in daily_chats %}
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                    <div style="font-size:10px;font-weight:700;color:var(--primary);">{{ d.count }}</div>
+                    <div style="width:100%;max-width:36px;background:linear-gradient(180deg,#818cf8,#6366f1);border-radius:6px 6px 0 0;min-height:4px;height:{% if d.count %}{{ d.count }}{% else %}2{% endif %}0px;max-height:120px;transition:height .5s;"></div>
+                    <div style="font-size:9px;color:var(--text-muted);font-weight:600;">{{ d.day }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 7-Day CSAT Trend -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-star" style="color:#f59e0b;"></i> CSAT Trend (7 days)</h3></div>
+        <div class="card-body">
+            <div style="display:flex;align-items:flex-end;gap:8px;height:150px;padding:0 4px;">
+                {% for d in daily_csat %}
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                    <div style="font-size:10px;font-weight:700;color:#f59e0b;">{% if d.avg %}{{ d.avg }}{% else %}-{% endif %}</div>
+                    <div style="width:100%;max-width:36px;background:linear-gradient(180deg,#fbbf24,#f59e0b);border-radius:6px 6px 0 0;min-height:4px;height:{% if d.avg %}{{ d.avg }}{% else %}0{% endif %}0px;max-height:120px;transition:height .5s;"></div>
+                    <div style="font-size:9px;color:var(--text-muted);font-weight:600;">{{ d.day }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- Chat Status Breakdown -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-pie-chart" style="color:var(--info);"></i> Chat Status</h3></div>
+        <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                {% with total=status_counts.waiting|add:status_counts.active|add:status_counts.closed %}
+                <div>
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:6px;"></span>Waiting</span>
+                        <span style="font-weight:700;">{{ status_counts.waiting }}</span>
+                    </div>
+                    <div style="height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden;">
+                        <div style="height:100%;background:#f59e0b;border-radius:4px;width:{% widthratio status_counts.waiting total 100 %}%;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:6px;"></span>Active</span>
+                        <span style="font-weight:700;">{{ status_counts.active }}</span>
+                    </div>
+                    <div style="height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden;">
+                        <div style="height:100%;background:#10b981;border-radius:4px;width:{% widthratio status_counts.active total 100 %}%;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6366f1;margin-right:6px;"></span>Closed</span>
+                        <span style="font-weight:700;">{{ status_counts.closed }}</span>
+                    </div>
+                    <div style="height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden;">
+                        <div style="height:100%;background:#6366f1;border-radius:4px;width:{% widthratio status_counts.closed total 100 %}%;"></div>
+                    </div>
+                </div>
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Countries -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-globe" style="color:var(--success);"></i> Top Visitor Countries</h3></div>
+        <div class="card-body" style="padding:0;">
+            {% for c in country_stats %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:11px;font-weight:600;color:var(--text-muted);">{{ forloop.counter }}.</span>
+                    <span style="font-size:13px;font-weight:600;">{{ c.country }}</span>
+                </div>
+                <span style="font-size:13px;font-weight:700;color:var(--primary);">{{ c.count }}</span>
+            </div>
+            {% empty %}
+            <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">No location data yet</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Busiest Hours -->
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-clock" style="color:var(--warning);"></i> Busiest Hours</h3></div>
+    <div class="card-body">
+        <div style="display:flex;align-items:flex-end;gap:3px;height:100px;">
+            {% for h in hourly_chats %}
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;" title="{{ h.hour }}:00 - {{ h.count }} chats">
+                <div style="width:100%;background:linear-gradient(180deg,#a78bfa,#7c3aed);border-radius:3px 3px 0 0;min-height:2px;height:{{ h.count }}0px;max-height:80px;"></div>
+                {% if forloop.counter|divisibleby:3 %}
+                <div style="font-size:8px;color:var(--text-muted);">{{ h.hour }}h</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

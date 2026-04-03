@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Welcome - Setup{% endblock %}
+{% block page_title %}Welcome to LiveTrack!{% endblock %}
+
+{% block content %}
+<div style="max-width:800px;margin:0 auto;">
+
+    <!-- Step 1: Welcome -->
+    <div class="card" style="margin-bottom:20px;text-align:center;padding:40px;">
+        <div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#a855f7);display:inline-flex;align-items:center;justify-content:center;font-size:28px;color:white;margin-bottom:16px;">
+            <i class="fas fa-rocket"></i>
+        </div>
+        <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;">Your account is ready!</h2>
+        <p style="color:var(--text-muted);font-size:15px;">{{ org.name }} has been created. Follow these steps to start receiving chats.</p>
+    </div>
+
+    <!-- Steps -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <!-- Step 2: Install Widget -->
+        <div class="card" style="grid-column:span 2;">
+            <div class="card-header"><h3><span style="background:var(--primary);color:white;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:8px;">1</span> Install Chat Widget on Your Website</h3></div>
+            <div class="card-body">
+                <p style="margin-bottom:12px;color:var(--text-muted);font-size:13px;">Copy this code and paste it before <code>&lt;/body&gt;</code> on every page of your website:</p>
+                <div style="position:relative;">
+                    <textarea id="embedCode" class="form-control" rows="2" readonly style="font-family:monospace;font-size:12px;background:var(--bg-primary);resize:none;">{{ embed_code }}</textarea>
+                    <button type="button" onclick="copyCode()" id="copyBtn" style="position:absolute;top:8px;right:8px;border:none;background:var(--primary);color:white;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+                        <i class="fas fa-copy"></i> Copy Code
+                    </button>
+                </div>
+                <p style="margin-top:10px;font-size:12px;color:var(--text-muted);">
+                    <i class="fas fa-key" style="color:var(--warning);"></i> Your Widget Key: <code>{{ widget_key }}</code>
+                </p>
+            </div>
+        </div>
+
+        <!-- Step 3: Customize -->
+        <div class="card">
+            <div class="card-header"><h3><span style="background:var(--warning);color:white;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:8px;">2</span> Customize Widget</h3></div>
+            <div class="card-body">
+                <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Change colors, title, position and more.</p>
+                <a href="{% url 'dashboard:website_settings' %}" class="btn btn-primary" style="width:100%;">
+                    <i class="fas fa-palette"></i> Widget Settings
+                </a>
+            </div>
+        </div>
+
+        <!-- Step 4: Add Team -->
+        <div class="card">
+            <div class="card-header"><h3><span style="background:var(--success);color:white;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:8px;">3</span> Add Team Members</h3></div>
+            <div class="card-body">
+                <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Invite agents to handle chats with you.</p>
+                <a href="{% url 'dashboard:add_agent' %}" class="btn btn-primary" style="width:100%;">
+                    <i class="fas fa-user-plus"></i> Manage Agents
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Go to Dashboard -->
+    <div style="text-align:center;margin-top:24px;">
+        <a href="{% url 'dashboard:home' %}" class="btn btn-primary" style="padding:14px 40px;font-size:15px;">
+            <i class="fas fa-arrow-right"></i> Go to Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+function copyCode() {
+    navigator.clipboard.writeText(document.getElementById('embedCode').value).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        btn.style.background = '#10b981';
+        setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i> Copy Code'; btn.style.background = ''; }, 2000);
+    });
+}
+</script>
+{% endblock %}

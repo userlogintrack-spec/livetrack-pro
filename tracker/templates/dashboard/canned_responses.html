@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Canned Responses{% endblock %}
+{% block nav_canned %}active{% endblock %}
+{% block page_title %}Canned Responses{% endblock %}
+
+{% block top_actions %}
+<button onclick="document.getElementById('addModal').style.display='flex'" class="btn btn-sm btn-primary">
+    <i class="fas fa-plus"></i> Add Response
+</button>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .modal-overlay {
+        display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+        z-index: 200; align-items: center; justify-content: center;
+    }
+    .modal-box {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 16px; padding: 28px; width: 460px; max-width: 90%;
+    }
+    .modal-box h3 { font-size: 18px; margin-bottom: 20px; }
+    .response-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 14px; padding: 20px; margin-bottom: 12px;
+        transition: border-color 0.2s;
+    }
+    .response-card:hover { border-color: var(--primary); }
+    .response-card .rc-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+    .response-card .rc-shortcut {
+        display: inline-block; background: var(--bg-primary); padding: 2px 10px;
+        border-radius: 6px; font-size: 12px; font-family: monospace;
+        color: var(--primary-light); margin-bottom: 8px;
+    }
+    .response-card .rc-message { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+    .response-card .rc-actions { margin-top: 12px; display: flex; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<p style="color: var(--text-muted); margin-bottom: 20px;">
+    Create pre-written responses for common questions. Use shortcuts (e.g., <code style="background: var(--bg-primary); padding: 2px 8px; border-radius: 4px;">/hello</code>) in the chat input to quickly insert them.
+</p>
+
+{% for resp in responses %}
+<div class="response-card">
+    <div class="rc-title">{{ resp.title }}</div>
+    {% if resp.shortcut %}<span class="rc-shortcut">/{{ resp.shortcut }}</span>{% endif %}
+    <div class="rc-message">{{ resp.message }}</div>
+    <div class="rc-actions">
+        <button onclick="copyResponse('{{ resp.message|escapejs }}')" class="btn btn-sm btn-secondary">
+            <i class="fas fa-copy"></i> Copy
+        </button>
+        <button onclick="deleteResponse({{ resp.id }})" class="btn btn-sm btn-danger">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+</div>
+{% empty %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <i class="fas fa-reply-all"></i>
+            <p>No canned responses yet. Create one to speed up your chats!</p>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-plus-circle" style="color: var(--primary-light);"></i> New Canned Response</h3>
+        <div class="form-group">
+            <label>Title *</label>
+            <input type="text" class="form-control" id="crTitle" placeholder="e.g., Greeting">
+        </div>
+        <div class="form-group">
+            <label>Shortcut</label>
+            <input type="text" class="form-control" id="crShortcut" placeholder="e.g., hello (use as /hello)">
+        </div>
+        <div class="form-group">
+            <label>Message *</label>
+            <textarea class="form-control" id="crMessage" rows="4" placeholder="Hello! How can I help you today?"></textarea>
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            <button onclick="document.getElementById('addModal').style.display='none'" class="btn btn-sm btn-secondary">Cancel</button>
+            <button onclick="createResponse()" class="btn btn-sm btn-primary"><i class="fas fa-check"></i> Create</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function createResponse() {
+    const title = document.getElementById('crTitle').value.trim();
+    const shortcut = document.getElementById('crShortcut').value.trim();
+    const message = document.getElementById('crMessage').value.trim();
+    if (!title || !message) { alert('Title and message required'); return; }
+
+    fetch('/dashboard/canned-responses/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+        body: JSON.stringify({action: 'create', title, shortcut, message}),
+    }).then(() => location.reload());
+}
+
+function deleteResponse(id) {
+    if (!confirm('Delete this response?')) return;
+    fetch('/dashboard/canned-responses/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+        body: JSON.stringify({action: 'delete', id}),
+    }).then(() => location.reload());
+}
+
+function copyResponse(text) {
+    navigator.clipboard.writeText(text);
+    alert('Copied to clipboard!');
+}
+</script>
+{% endblock %}

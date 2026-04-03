@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div style="max-width:800px;">
+    {% if saved %}
+    <div style="margin-bottom:16px;padding:12px 16px;border-radius:12px;background:rgba(16,185,129,0.1);color:#10b981;font-weight:600;font-size:13px;border:1px solid rgba(16,185,129,0.2);">
+        <i class="fas fa-check-circle"></i> Changes saved!
+    </div>
+    {% endif %}
+    {% if error %}
+    <div style="margin-bottom:16px;padding:12px 16px;border-radius:12px;background:rgba(239,68,68,0.1);color:#ef4444;font-weight:600;font-size:13px;border:1px solid rgba(239,68,68,0.2);">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <!-- Profile Info -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-user" style="color:var(--primary);"></i> Profile Information</h3></div>
+            <div class="card-body">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <div style="width:64px;height:64px;border-radius:50%;background:{{ profile.avatar_color }};display:inline-flex;align-items:center;justify-content:center;color:white;font-size:24px;font-weight:700;">
+                        {{ request.user.first_name|default:request.user.username|first|upper }}
+                    </div>
+                    <div style="margin-top:8px;font-weight:600;">{{ request.user.get_full_name|default:request.user.username }}</div>
+                    <div style="font-size:12px;color:var(--text-muted);">{{ profile.role|title }} @ {{ org.name }}</div>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_profile">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div class="form-group">
+                            <label>First Name</label>
+                            <input class="form-control" type="text" name="first_name" value="{{ request.user.first_name }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Last Name</label>
+                            <input class="form-control" type="text" name="last_name" value="{{ request.user.last_name }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input class="form-control" type="email" name="email" value="{{ request.user.email }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Avatar Color</label>
+                        <input type="color" name="avatar_color" value="{{ profile.avatar_color }}" style="width:50px;height:38px;border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+                    </div>
+                    <button class="btn btn-primary" type="submit" style="width:100%;"><i class="fas fa-save"></i> Save Profile</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-lock" style="color:var(--warning);"></i> Change Password</h3></div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="change_password">
+                    <div class="form-group">
+                        <label>Current Password</label>
+                        <input class="form-control" type="password" name="current_password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input class="form-control" type="password" name="new_password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm New Password</label>
+                        <input class="form-control" type="password" name="confirm_password" required>
+                    </div>
+                    <button class="btn btn-primary" type="submit" style="width:100%;"><i class="fas fa-key"></i> Update Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Info -->
+    <div class="card" style="margin-top:16px;">
+        <div class="card-header"><h3><i class="fas fa-building" style="color:var(--info);"></i> Organization</h3></div>
+        <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+                <div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Organization</div>
+                    <div style="font-weight:600;margin-top:4px;">{{ org.name }}</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Widget Key</div>
+                    <div style="font-family:monospace;font-size:12px;margin-top:4px;">{{ org.widget_key }}</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Your Role</div>
+                    <div style="margin-top:4px;">
+                        {% if profile.role == 'owner' %}
+                        <span style="background:rgba(99,102,241,0.1);color:var(--primary);padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700;">Owner</span>
+                        {% else %}
+                        <span style="background:rgba(100,116,139,0.1);color:var(--text-secondary);padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;">Agent</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

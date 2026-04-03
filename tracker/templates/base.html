@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LiveTrack{% endblock %} | LiveTrack Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* ===== LIGHT THEME (DEFAULT) ===== */
+        :root, [data-theme="light"] {
+            --primary: #7c3aed;
+            --primary-light: #a78bfa;
+            --primary-dark: #5b21b6;
+            --primary-soft: #ede9fe;
+            --success: #10b981;
+            --success-soft: #d1fae5;
+            --warning: #f59e0b;
+            --warning-soft: #fef3c7;
+            --danger: #ef4444;
+            --danger-soft: #fee2e2;
+            --info: #3b82f6;
+            --info-soft: #dbeafe;
+
+            --bg-body: #f5f3ff;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --bg-hover: #f5f3ff;
+            --bg-input: #faf9ff;
+            --bg-topbar: rgba(255, 255, 255, 0.85);
+
+            --text-primary: #1e1b4b;
+            --text-secondary: #4b5563;
+            --text-muted: #9ca3af;
+
+            --border: #e5e2ff;
+            --border-hover: #c4b5fd;
+
+            --shadow: 0 1px 3px rgba(124, 58, 237, 0.04);
+            --shadow-md: 0 4px 12px rgba(124, 58, 237, 0.06);
+            --shadow-lg: 0 8px 24px rgba(124, 58, 237, 0.08);
+
+            --gradient: linear-gradient(135deg, #7c3aed, #a855f7);
+            --radius: 14px;
+            --radius-sm: 10px;
+        }
+
+        /* ===== DARK THEME ===== */
+        [data-theme="dark"] {
+            --primary: #a78bfa;
+            --primary-light: #c4b5fd;
+            --primary-dark: #7c3aed;
+            --primary-soft: rgba(167, 139, 250, 0.12);
+            --success: #34d399;
+            --success-soft: rgba(52, 211, 153, 0.12);
+            --warning: #fbbf24;
+            --warning-soft: rgba(251, 191, 36, 0.12);
+            --danger: #f87171;
+            --danger-soft: rgba(248, 113, 113, 0.12);
+            --info: #60a5fa;
+            --info-soft: rgba(96, 165, 250, 0.12);
+
+            --bg-body: #0f0a2a;
+            --bg-sidebar: #170f3d;
+            --bg-card: #1a1145;
+            --bg-hover: #241760;
+            --bg-input: #0f0a2a;
+            --bg-topbar: rgba(15, 10, 42, 0.85);
+
+            --text-primary: #f1f0ff;
+            --text-secondary: #c4b5fd;
+            --text-muted: #7c6daf;
+
+            --border: rgba(167, 139, 250, 0.15);
+            --border-hover: rgba(167, 139, 250, 0.3);
+
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+            --gradient: linear-gradient(135deg, #a78bfa, #c084fc);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-body);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            position: fixed;
+            left: 0; top: 0; bottom: 0;
+            width: 260px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s;
+            box-shadow: var(--shadow-md);
+        }
+
+        .sidebar-brand {
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-brand .logo {
+            width: 40px; height: 40px;
+            background: var(--gradient);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: white;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+        }
+
+        .sidebar-brand h2 {
+            font-size: 18px; font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .sidebar-brand h2 em {
+            font-style: normal;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-brand small {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            padding: 14px 12px 6px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            margin-bottom: 2px;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            background: var(--gradient);
+            color: white;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+        }
+
+        .nav-link i { width: 20px; text-align: center; font-size: 15px; }
+
+        .nav-link .badge {
+            margin-left: auto;
+            background: var(--danger);
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .user-info { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-sm); }
+
+        .user-avatar {
+            width: 36px; height: 36px;
+            background: var(--gradient);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 600; font-size: 14px;
+        }
+
+        .user-details { flex: 1; }
+        .user-details .name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .user-details .role { font-size: 11px; color: var(--text-muted); }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content { margin-left: 260px; min-height: 100vh; }
+
+        .top-bar {
+            position: sticky; top: 0; z-index: 50;
+            background: var(--bg-topbar);
+            backdrop-filter: blur(16px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+            transition: background 0.3s;
+        }
+
+        .top-bar h1 { font-size: 22px; font-weight: 700; }
+        .top-bar-actions { display: flex; align-items: center; gap: 12px; }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 8px 16px; border-radius: var(--radius-sm);
+            font-size: 13px; font-weight: 600; border: none;
+            cursor: pointer; transition: all 0.2s; text-decoration: none; font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--gradient); color: white;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35); }
+
+        .btn-secondary {
+            background: var(--bg-hover); color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { border-color: var(--border-hover); }
+
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn-lg { padding: 12px 24px; font-size: 15px; }
+
+        .page-content { padding: 24px 32px; }
+
+        /* ===== CARDS ===== */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: all 0.2s;
+            box-shadow: var(--shadow);
+        }
+        .card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .card-header h3 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .card-body { padding: 20px; }
+
+        /* ===== STAT CARDS ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            border-radius: 14px 14px 0 0;
+        }
+
+        .stat-card.purple::before { background: var(--gradient); }
+        .stat-card.green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+        .stat-card.blue::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+        .stat-card.orange::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+        .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+        .stat-card .stat-icon {
+            width: 48px; height: 48px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; margin-bottom: 14px;
+        }
+
+        .stat-card.purple .stat-icon { background: var(--primary-soft); color: var(--primary); }
+        .stat-card.green .stat-icon { background: var(--success-soft); color: var(--success); }
+        .stat-card.blue .stat-icon { background: var(--info-soft); color: var(--info); }
+        .stat-card.orange .stat-icon { background: var(--warning-soft); color: var(--warning); }
+
+        .stat-card .stat-value { font-size: 30px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+        .stat-card .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+
+        /* ===== GRID ===== */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+        /* ===== TABLES ===== */
+        .table-container { overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-hover);
+        }
+
+        td {
+            padding: 12px 16px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:hover td { background: var(--bg-hover); }
+
+        /* ===== STATUS BADGES ===== */
+        .status {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 12px; font-weight: 600;
+        }
+
+        .status-online { background: var(--success-soft); color: var(--success); }
+        .status-offline { background: var(--bg-hover); color: var(--text-muted); }
+        .status-waiting { background: var(--warning-soft); color: var(--warning); }
+        .status-active { background: var(--primary-soft); color: var(--primary); }
+        .status-closed { background: var(--bg-hover); color: var(--text-muted); }
+
+        .status .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+        .status-online .dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* ===== FILTER TABS ===== */
+        .filter-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+
+        .filter-tab {
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 13px; font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+            background: var(--bg-card);
+        }
+
+        .filter-tab:hover { border-color: var(--border-hover); color: var(--text-primary); }
+        .filter-tab.active { background: var(--gradient); color: white; border-color: transparent; }
+
+        /* ===== FORMS ===== */
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary); }
+
+        .form-control {
+            width: 100%; padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 14px; font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+
+        /* ===== EMPTY STATE ===== */
+        .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+        .empty-state p { font-size: 15px; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .page-content { padding: 16px; }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <script>
+        // Apply saved theme IMMEDIATELY before paint
+        (function() {
+            var t = localStorage.getItem('dashTheme') || 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+
+    {% block sidebar %}
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="logo"><i class="fas fa-bolt"></i></div>
+            <div>
+                <h2>Live<em>Track</em></h2>
+                <small>Visitor Tracker & Chat</small>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-label">Main</div>
+            <a href="{% url 'dashboard:home' %}" class="nav-link {% block nav_dashboard %}{% endblock %}">
+                <i class="fas fa-th-large"></i> Dashboard
+            </a>
+            <a href="{% url 'dashboard:visitor_list' %}" class="nav-link {% block nav_visitors %}{% endblock %}">
+                <i class="fas fa-users"></i> Visitors
+            </a>
+
+            <div class="nav-label">Communication</div>
+            <a href="{% url 'dashboard:chat_list' %}?status=waiting" class="nav-link {% if request.path == '/dashboard/chats/' and request.GET.status == 'waiting' %}active{% endif %} {% block nav_waiting %}{% endblock %}">
+                <i class="fas fa-clock"></i> Waiting Chats
+                <span class="badge" id="waitingBadge" style="display:none;">0</span>
+            </a>
+            <a href="{% url 'dashboard:chat_list' %}?status=active" class="nav-link {% if request.path == '/dashboard/chats/' and request.GET.status == 'active' %}active{% endif %} {% block nav_active_chats %}{% endblock %}">
+                <i class="fas fa-comments"></i> Active Chats
+                <span class="badge" id="activeBadge" style="display:none;background:var(--primary-light);">0</span>
+            </a>
+            <a href="{% url 'dashboard:chat_list' %}" class="nav-link {% if request.path == '/dashboard/chats/' and request.GET.status != 'active' and request.GET.status != 'waiting' %}active{% endif %} {% block nav_all_chats %}{% endblock %}">
+                <i class="fas fa-inbox"></i> All Chats
+                <span class="badge" id="unreadBadge" style="display:none;">0</span>
+            </a>
+
+            <div class="nav-label">Tools</div>
+            <a href="{% url 'dashboard:offline_messages' %}" class="nav-link {% block nav_offline %}{% endblock %}">
+                <i class="fas fa-envelope"></i> Offline Messages
+            </a>
+            <a href="{% url 'dashboard:canned_responses' %}" class="nav-link {% block nav_canned %}{% endblock %}">
+                <i class="fas fa-reply-all"></i> Canned Responses
+            </a>
+            <a href="{% url 'dashboard:agent_stats' %}" class="nav-link {% block nav_stats %}{% endblock %}">
+                <i class="fas fa-chart-pie"></i> Agent Stats
+            </a>
+            <a href="{% url 'dashboard:chat_search' %}" class="nav-link">
+                <i class="fas fa-search"></i> Search Chats
+            </a>
+            <a href="{% url 'dashboard:analytics' %}" class="nav-link">
+                <i class="fas fa-chart-area"></i> Analytics
+            </a>
+            <a href="{% url 'dashboard:activity_log' %}" class="nav-link">
+                <i class="fas fa-history"></i> Activity Log
+            </a>
+            <a href="{% url 'dashboard:notification_center' %}" class="nav-link">
+                <i class="fas fa-bell"></i> Notifications
+            </a>
+
+            <div class="nav-label">Settings</div>
+            <a href="{% url 'dashboard:website_settings' %}" class="nav-link">
+                <i class="fas fa-palette"></i> Widget Settings
+            </a>
+            <a href="{% url 'dashboard:add_agent' %}" class="nav-link">
+                <i class="fas fa-user-plus"></i> Manage Agents
+            </a>
+            <a href="{% url 'dashboard:chat_labels' %}" class="nav-link">
+                <i class="fas fa-tags"></i> Chat Labels
+            </a>
+            <a href="{% url 'dashboard:saved_replies' %}" class="nav-link">
+                <i class="fas fa-bookmark"></i> My Saved Replies
+            </a>
+            <a href="{% url 'dashboard:webhooks' %}" class="nav-link">
+                <i class="fas fa-plug"></i> Webhooks
+            </a>
+            <a href="{% url 'dashboard:ban_list' %}" class="nav-link">
+                <i class="fas fa-ban"></i> Banned Visitors
+            </a>
+            {% if request.user.is_superuser %}
+            <a href="{% url 'admin:index' %}" class="nav-link" target="_blank">
+                <i class="fas fa-cog"></i> Admin Panel
+            </a>
+            {% endif %}
+        </nav>
+        <!-- Availability toggle -->
+        <div style="padding:8px 16px;border-top:1px solid var(--border);">
+            <button onclick="toggleMyAvailability()" id="availToggle" style="width:100%;padding:8px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;{% if request.user.agent_profile and request.user.agent_profile.is_available %}background:rgba(16,185,129,0.1);color:#10b981;{% else %}background:rgba(239,68,68,0.1);color:#ef4444;{% endif %}">
+                <i class="fas fa-circle" style="font-size:8px;" id="availDot"></i>
+                <span id="availText">{% if request.user.agent_profile and request.user.agent_profile.is_available %}Available{% else %}Away{% endif %}</span>
+            </button>
+        </div>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <a href="{% url 'dashboard:profile' %}" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:10px;flex:1;">
+                    <div class="user-avatar">{{ request.user.first_name|default:request.user.username|first|upper }}</div>
+                    <div class="user-details">
+                        <div class="name">{{ request.user.get_full_name|default:request.user.username }}</div>
+                        <div class="role">{% if request.user.agent_profile and request.user.agent_profile.role == 'owner' %}Owner{% else %}Agent{% endif %}</div>
+                    </div>
+                </a>
+                <a href="{% url 'core:logout' %}" title="Logout" style="color: var(--text-muted); font-size: 14px;">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+        </div>
+    </aside>
+    {% endblock %}
+
+    <main class="main-content">
+        {% block topbar %}
+        <div class="top-bar">
+            <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+            <div class="top-bar-actions">
+                {% block top_actions %}
+                <span style="color: var(--text-muted); font-size: 13px;">
+                    <i class="fas fa-circle" style="color: var(--success); font-size: 8px;"></i>
+                    <span id="liveOnlineCount">0</span> Online
+                </span>
+                <button onclick="toggleDashTheme()" id="themeToggle" style="background: var(--bg-hover); border: 1px solid var(--border); color: var(--text-secondary); width: 36px; height: 36px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s;" title="Toggle theme">
+                    <i class="fas fa-sun" id="themeIcon"></i>
+                </button>
+                {% endblock %}
+            </div>
+        </div>
+        {% endblock %}
+
+        <div class="page-content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <script>
+        // ===== THEME =====
+        function toggleDashTheme() {
+            var html = document.documentElement;
+            var isLight = html.getAttribute('data-theme') === 'light';
+            var newTheme = isLight ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('dashTheme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            var icon = document.getElementById('themeIcon');
+            if (icon) icon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        // Set icon on load
+        updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+
+        // ===== LIVE STATS =====
+        function updateBadges(data) {
+            var el = document.getElementById('liveOnlineCount');
+            if (el) el.textContent = data.online_visitors;
+            var badge = document.getElementById('waitingBadge');
+            if (badge) {
+                if (data.waiting_chats > 0) {
+                    badge.textContent = data.waiting_chats;
+                    badge.style.display = 'inline';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+            var activeBadge = document.getElementById('activeBadge');
+            if (activeBadge) {
+                if (data.active_only_chats > 0) {
+                    activeBadge.textContent = data.active_only_chats;
+                    activeBadge.style.display = 'inline';
+                } else {
+                    activeBadge.style.display = 'none';
+                }
+            }
+            var unreadBadge = document.getElementById('unreadBadge');
+            if (unreadBadge) {
+                if (data.unread_messages > 0) {
+                    unreadBadge.textContent = data.unread_messages;
+                    unreadBadge.style.display = 'inline';
+                } else {
+                    unreadBadge.style.display = 'none';
+                }
+            }
+        }
+
+        function refreshStats() {
+            fetch('/dashboard/api/stats/')
+                .then(r => r.json())
+                .then(updateBadges)
+                .catch(function() {});
+        }
+        refreshStats();
+
+        // ===== REAL-TIME WEBSOCKET FOR BADGES =====
+        var wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        var dashboardSocket = null;
+        var wsReconnectTimer = null;
+        var wsReconnectDelay = 1000;
+
+        function connectDashboardWS() {
+            dashboardSocket = new WebSocket(wsScheme + '://' + window.location.host + '/ws/dashboard/');
+
+            dashboardSocket.onopen = function() {
+                wsReconnectDelay = 1000;
+                // Stop polling when WebSocket is connected
+                if (window._statsPollInterval) {
+                    clearInterval(window._statsPollInterval);
+                    window._statsPollInterval = null;
+                }
+            };
+
+            dashboardSocket.onmessage = function(e) {
+                var data = JSON.parse(e.data);
+                if (data.type === 'new_message_notify' || data.type === 'dashboard_update') {
+                    // Fetch fresh stats immediately on any notification
+                    refreshStats();
+                }
+            };
+
+            dashboardSocket.onclose = function() {
+                // Fallback to polling when WebSocket disconnects
+                if (!window._statsPollInterval) {
+                    window._statsPollInterval = setInterval(refreshStats, 10000);
+                }
+                // Reconnect with backoff
+                wsReconnectTimer = setTimeout(function() {
+                    wsReconnectDelay = Math.min(wsReconnectDelay * 2, 30000);
+                    connectDashboardWS();
+                }, wsReconnectDelay);
+            };
+
+            dashboardSocket.onerror = function() {
+                dashboardSocket.close();
+            };
+        }
+
+        connectDashboardWS();
+        // Start polling as fallback until WebSocket connects
+        window._statsPollInterval = setInterval(refreshStats, 10000);
+
+        // Agent availability toggle
+        function toggleMyAvailability() {
+            fetch('/dashboard/settings/agents/{{ request.user.id }}/toggle/', {
+                method: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'ok') {
+                    var btn = document.getElementById('availToggle');
+                    var txt = document.getElementById('availText');
+                    if (data.is_available) {
+                        btn.style.background = 'rgba(16,185,129,0.1)';
+                        btn.style.color = '#10b981';
+                        txt.textContent = 'Available';
+                    } else {
+                        btn.style.background = 'rgba(239,68,68,0.1)';
+                        btn.style.color = '#ef4444';
+                        txt.textContent = 'Away';
+                    }
+                }
+            });
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

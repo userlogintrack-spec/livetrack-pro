@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In | LiveTrack</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;min-height:100vh;display:flex;background:#fafbff;}
+
+        /* Left Panel - Branding */
+        .auth-left{
+            width:45%;min-height:100vh;
+            background:linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#4338ca 100%);
+            display:flex;flex-direction:column;justify-content:center;
+            padding:60px;position:relative;overflow:hidden;
+        }
+        .auth-left::before{
+            content:'';position:absolute;width:500px;height:500px;
+            background:radial-gradient(circle,rgba(129,140,248,0.15) 0%,transparent 70%);
+            top:-100px;right:-150px;border-radius:50%;
+        }
+        .auth-left::after{
+            content:'';position:absolute;width:400px;height:400px;
+            background:radial-gradient(circle,rgba(167,139,250,0.1) 0%,transparent 70%);
+            bottom:-80px;left:-100px;border-radius:50%;
+        }
+        .auth-left .brand{position:relative;z-index:1;}
+        .auth-left .logo{
+            width:48px;height:48px;background:rgba(255,255,255,0.15);
+            border-radius:14px;display:flex;align-items:center;justify-content:center;
+            font-size:22px;color:white;margin-bottom:32px;backdrop-filter:blur(10px);
+            border:1px solid rgba(255,255,255,0.1);
+        }
+        .auth-left h1{font-size:36px;font-weight:800;color:white;line-height:1.2;margin-bottom:16px;letter-spacing:-0.5px;}
+        .auth-left h1 span{background:linear-gradient(135deg,#a78bfa,#c4b5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+        .auth-left p{color:rgba(255,255,255,0.65);font-size:16px;line-height:1.7;max-width:380px;}
+        .auth-left .features{margin-top:40px;display:flex;flex-direction:column;gap:16px;position:relative;z-index:1;}
+        .auth-left .feat{display:flex;align-items:center;gap:12px;color:rgba(255,255,255,0.8);font-size:14px;}
+        .auth-left .feat i{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:13px;color:#a78bfa;flex-shrink:0;}
+        .auth-left .trust{margin-top:48px;position:relative;z-index:1;}
+        .auth-left .trust p{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.35);margin-bottom:12px;}
+        .auth-left .trust-logos{display:flex;gap:24px;align-items:center;opacity:0.4;}
+        .auth-left .trust-logos span{font-size:20px;color:white;}
+
+        /* Right Panel - Form */
+        .auth-right{
+            flex:1;display:flex;align-items:center;justify-content:center;
+            padding:40px;background:white;
+        }
+        .auth-form-wrap{width:100%;max-width:400px;}
+        .auth-form-wrap h2{font-size:26px;font-weight:700;color:#1e1b4b;margin-bottom:6px;}
+        .auth-form-wrap .subtitle{font-size:14px;color:#6b7280;margin-bottom:28px;}
+        .form-group{margin-bottom:18px;}
+        .form-group label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;}
+        .form-control{
+            width:100%;padding:12px 16px;background:#f9fafb;
+            border:1.5px solid #e5e7eb;border-radius:10px;color:#111827;
+            font-size:14px;font-family:inherit;transition:all .2s;
+        }
+        .form-control:focus{outline:none;border-color:#6366f1;background:white;box-shadow:0 0 0 3px rgba(99,102,241,0.1);}
+        .form-control::placeholder{color:#9ca3af;}
+        .btn-submit{
+            width:100%;padding:13px;
+            background:linear-gradient(135deg,#6366f1,#4f46e5);
+            color:white;border:none;border-radius:10px;
+            font-size:15px;font-weight:600;cursor:pointer;
+            font-family:inherit;transition:all .2s;
+            box-shadow:0 4px 14px rgba(99,102,241,0.3);
+            display:flex;align-items:center;justify-content:center;gap:8px;
+        }
+        .btn-submit:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,0.4);}
+        .divider{display:flex;align-items:center;gap:16px;margin:24px 0;color:#d1d5db;font-size:12px;text-transform:uppercase;letter-spacing:1px;}
+        .divider::before,.divider::after{content:'';flex:1;height:1px;background:#e5e7eb;}
+        .auth-footer{text-align:center;margin-top:24px;font-size:14px;color:#6b7280;}
+        .auth-footer a{color:#6366f1;text-decoration:none;font-weight:600;}
+        .auth-footer a:hover{text-decoration:underline;}
+        .alert{padding:12px 16px;border-radius:10px;margin-bottom:20px;font-size:13px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;display:flex;align-items:center;gap:8px;}
+        .alert i{font-size:14px;}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+        @media(max-width:900px){
+            .auth-left{display:none;}
+            .auth-right{padding:24px;}
+            body{background:white;}
+        }
+    </style>
+</head>
+<body>
+    <!-- Left Panel -->
+    <div class="auth-left">
+        <div class="brand">
+            <div class="logo"><i class="fas fa-bolt"></i></div>
+            <h1>Welcome back to<br><span>LiveTrack</span></h1>
+            <p>Sign in to access your dashboard, manage conversations, and engage with your visitors in real-time.</p>
+            <div class="features">
+                <div class="feat"><i class="fas fa-comments"></i> Real-time live chat with visitors</div>
+                <div class="feat"><i class="fas fa-chart-line"></i> Analytics dashboard with insights</div>
+                <div class="feat"><i class="fas fa-users"></i> Multi-agent team collaboration</div>
+                <div class="feat"><i class="fas fa-plug"></i> Webhooks & integrations</div>
+            </div>
+            <div class="trust">
+                <p>Trusted by teams worldwide</p>
+                <div class="trust-logos">
+                    <span><i class="fas fa-building"></i></span>
+                    <span><i class="fas fa-store"></i></span>
+                    <span><i class="fas fa-laptop-code"></i></span>
+                    <span><i class="fas fa-hospital"></i></span>
+                    <span><i class="fas fa-graduation-cap"></i></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="auth-right">
+        <div class="auth-form-wrap">
+            <h2>Sign in</h2>
+            <p class="subtitle">Enter your credentials to access your dashboard</p>
+
+            {% if messages %}
+            {% for message in messages %}
+            <div class="alert"><i class="fas fa-exclamation-circle"></i> {{ message }}</div>
+            {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="username" class="form-control" placeholder="your-username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;justify-content:space-between;align-items:center;">
+                        Password
+                        <a href="{% url 'core:password_reset' %}" style="font-size:12px;color:#6366f1;text-decoration:none;font-weight:500;">Forgot password?</a>
+                    </label>
+                    <input type="password" name="password" class="form-control" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="btn-submit">
+                    <i class="fas fa-arrow-right"></i> Sign In
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                Don't have an account? <a href="{% url 'core:register' %}">Get Started Free</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

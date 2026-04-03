@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Visitor #{{ visitor.id }}{% endblock %}
+{% block nav_visitors %}active{% endblock %}
+{% block page_title %}Visitor Details{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'dashboard:visitor_list' %}" class="btn btn-sm btn-secondary">
+    <i class="fas fa-arrow-left"></i> Back to Visitors
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="margin-bottom: 24px;">
+    <!-- Visitor Profile -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-user" style="color: var(--primary-light);"></i> Visitor Profile</h3>
+            <span class="status {% if visitor.is_online %}status-online{% else %}status-offline{% endif %}">
+                <span class="dot"></span>
+                {% if visitor.is_online %}Online{% else %}Offline{% endif %}
+            </span>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">IP Address</div>
+                    <div style="font-weight: 600; font-size: 15px;">{{ visitor.ip_address }}</div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Session Key</div>
+                    <div style="font-size: 12px; font-family: monospace; color: var(--text-secondary);">{{ visitor.session_key|truncatechars:20 }}</div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Browser</div>
+                    <div style="font-weight: 500;">{{ visitor.browser }}</div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Operating System</div>
+                    <div style="font-weight: 500;">{{ visitor.os }}</div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Device Type</div>
+                    <div style="font-weight: 500;">
+                        {% if visitor.device_type == "desktop" %}<i class="fas fa-desktop"></i>
+                        {% elif visitor.device_type == "mobile" %}<i class="fas fa-mobile-alt"></i>
+                        {% elif visitor.device_type == "tablet" %}<i class="fas fa-tablet-alt"></i>
+                        {% endif %}
+                        {{ visitor.device_type|title }}
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Traffic Source</div>
+                    <div><span class="status status-active">{{ visitor.referrer_source }}</span></div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">First Visit</div>
+                    <div style="font-weight: 500;">{{ visitor.first_visit|date:"M d, Y H:i" }}</div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Last Seen</div>
+                    <div style="font-weight: 500;">{{ visitor.last_seen|timesince }} ago</div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Total Visits</div>
+                    <div style="font-weight: 700; font-size: 20px; color: var(--primary-light);">{{ visitor.total_visits }}</div>
+                </div>
+            </div>
+            {% if visitor.referrer %}
+            <div style="margin-top: 16px;">
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Referrer URL</div>
+                <div style="font-size: 12px; color: var(--primary-light); word-break: break-all;">{{ visitor.referrer }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Chat History -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-comments" style="color: var(--success);"></i> Chat History</h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Room</th>
+                        <th>Status</th>
+                        <th>Agent</th>
+                        <th>Messages</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for chat in chat_rooms %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'dashboard:chat_room' chat.room_id %}" style="color: var(--primary-light); text-decoration: none;">
+                                #{{ chat.room_id|truncatechars:8 }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="status status-{{ chat.status }}">
+                                <span class="dot"></span> {{ chat.get_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ chat.agent.get_full_name|default:"-" }}</td>
+                        <td>{{ chat.message_count }}</td>
+                        <td><small>{{ chat.created_at|date:"M d, H:i" }}</small></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state" style="padding: 24px;">
+                                <p>No chats from this visitor</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Page View History -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-file-alt" style="color: var(--warning);"></i> Page View History</h3>
+        <span style="font-size: 13px; color: var(--text-muted);">{{ page_views.count }} pages</span>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Page URL</th>
+                    <th>Title</th>
+                    <th>Visited At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pv in page_views %}
+                <tr>
+                    <td style="max-width: 400px; word-break: break-all;">
+                        <span style="color: var(--primary-light); font-size: 13px;">{{ pv.url }}</span>
+                    </td>
+                    <td>{{ pv.page_title|default:"-" }}</td>
+                    <td><small>{{ pv.timestamp|date:"M d, Y H:i:s" }}</small></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3">
+                        <div class="empty-state">
+                            <p>No page views recorded</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,3517 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Chat #{{ room.room_id }}{% endblock %}
+{% block page_title %}Chat with {{ room.visitor_name }}{% endblock %}
+
+{% block top_actions %}
+<div style="display: flex; gap: 8px; align-items: center;">
+    <span class="status status-{{ room.status }}">
+        <span class="dot"></span> {{ room.get_status_display }}
+    </span>
+    {% if room.status != 'closed' %}
+    <button onclick="closeChat()" class="btn btn-sm btn-danger">
+        <i class="fas fa-times-circle"></i> End Chat
+    </button>
+    {% endif %}
+    <a href="{% url 'dashboard:chat_list' %}" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) 370px;
+        gap: 16px;
+        height: calc(100vh - 140px);
+        position: relative;
+    }
+    .chat-layout.panel-closed {
+        grid-template-columns: 1fr;
+    }
+    .chat-layout.panel-closed .visitor-panel {
+        display: none;
+    }
+
+    /* ===== CHAT PANEL ===== */
+    .chat-panel {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    /* Chat Header Bar - 2 rows */
+    .chat-header-bar {
+        border-bottom: 1px solid var(--border);
+        background: rgba(99, 102, 241, 0.02);
+    }
+    .chat-header-row1 {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 16px 6px;
+    }
+    .chat-header-row2 {
+        display: flex; align-items: center; gap: 2px;
+        padding: 0 16px 8px; flex-wrap: wrap;
+    }
+
+    .chat-header-bar .chat-with {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1; min-width: 0;
+    }
+
+    .chat-avatar {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-weight: 700; font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .chat-user-info .name {
+        font-weight: 600; font-size: 14px;
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .chat-user-info .email { font-size: 11px; color: var(--text-muted); }
+
+    .chat-actions {
+        display: contents; /* buttons flow into row2 */
+    }
+
+    .chat-action-btn {
+        width: 30px; height: 30px;
+        border-radius: 8px;
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px;
+        transition: all 0.15s;
+        position: relative;
+    }
+
+    .chat-action-btn:hover {
+        background: rgba(99,102,241,0.08);
+        color: var(--primary);
+        border-color: rgba(99,102,241,0.15);
+    }
+
+    .chat-action-btn .tooltip {
+        display: none;
+        position: absolute;
+        bottom: -32px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        white-space: nowrap;
+        border: 1px solid var(--border);
+        z-index: 10;
+    }
+
+    .chat-action-btn:hover .tooltip { display: block; }
+
+    /* Messages Area */
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        scroll-behavior: smooth;
+    }
+
+    .chat-messages::-webkit-scrollbar { width: 6px; }
+    .chat-messages::-webkit-scrollbar-track { background: transparent; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* Date separator */
+    .date-separator {
+        text-align: center;
+        margin: 16px 0;
+        position: relative;
+    }
+
+    .date-separator::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: var(--border);
+    }
+
+    .date-separator span {
+        background: var(--bg-card);
+        padding: 0 16px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        position: relative;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Message bubbles */
+    .message {
+        display: flex;
+        flex-direction: column;
+        max-width: 70%;
+        animation: msgFadeIn 0.3s ease;
+    }
+
+    @keyframes msgFadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.visitor { align-self: flex-start; }
+    .message.agent { align-self: flex-end; }
+    .message.system { align-self: center; max-width: 85%; }
+
+    .msg-sender {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-bottom: 3px;
+        padding: 0 8px;
+    }
+
+    .message.agent .msg-sender { text-align: right; }
+
+    .bubble {
+        padding: 12px 18px;
+        border-radius: 18px;
+        font-size: 14px;
+        line-height: 1.6;
+        word-break: break-word;
+        position: relative;
+    }
+
+    .message.visitor .bubble {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+        border-bottom-left-radius: 4px;
+    }
+
+    .message.agent .bubble {
+        background: linear-gradient(135deg, var(--primary), #7c3aed);
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .message.system .bubble {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--warning);
+        font-size: 12px;
+        text-align: center;
+        border-radius: 10px;
+        padding: 8px 16px;
+    }
+
+    .message.whisper { align-self: flex-end; max-width: 70%; }
+    .message.whisper .bubble {
+        background: rgba(245, 158, 11, 0.1);
+        color: #92400e;
+        border: 1px dashed rgba(245, 158, 11, 0.4);
+        font-size: 13px;
+        border-radius: 14px;
+        border-bottom-right-radius: 4px;
+        padding: 10px 16px;
+    }
+    .message.whisper .msg-sender { color: var(--warning); text-align: right; }
+    .message.whisper .msg-time { text-align: right; }
+
+    .msg-time {
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-top: 3px;
+        padding: 0 8px;
+    }
+
+    .message.agent .msg-time { text-align: right; }
+
+    /* File message */
+    .file-bubble {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        color: var(--text-primary);
+        transition: all 0.2s;
+        max-width: 320px;
+        position: relative;
+    }
+
+    .file-bubble:hover {
+        border-color: var(--primary);
+        background: rgba(99, 102, 241, 0.04);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+
+    .file-icon {
+        width: 46px; height: 46px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    .file-icon.pdf { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+    .file-icon.doc { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+    .file-icon.xls { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+    .file-icon.img { background: rgba(168, 85, 247, 0.12); color: #a855f7; }
+    .file-icon.zip { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+    .file-icon.txt { background: rgba(100, 116, 139, 0.12); color: #64748b; }
+    .file-icon.other { background: rgba(100, 116, 139, 0.1); color: #64748b; }
+
+    .file-info { flex: 1; min-width: 0; }
+    .file-info .file-name {
+        font-size: 13px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 200px;
+    }
+
+    .file-info .file-size { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .file-dl-icon {
+        width: 32px; height: 32px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(99, 102, 241, 0.08); color: var(--primary);
+        font-size: 13px; flex-shrink: 0;
+    }
+    .file-bubble:hover .file-dl-icon { background: var(--primary); color: white; }
+
+    .img-preview {
+        max-width: 280px;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        position: relative;
+        cursor: pointer;
+    }
+
+    .img-preview img {
+        width: 100%;
+        display: block;
+        transition: transform 0.3s;
+    }
+
+    .img-preview:hover img { transform: scale(1.03); }
+
+    .img-preview .img-overlay {
+        position: absolute; inset: 0;
+        background: rgba(0,0,0,0.3);
+        display: flex; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.2s;
+        color: white; font-size: 22px;
+    }
+    .img-preview:hover .img-overlay { opacity: 1; }
+
+    /* Lightbox */
+    .lightbox {
+        position: fixed; inset: 0; z-index: 9999;
+        background: rgba(0,0,0,0.85);
+        display: none; align-items: center; justify-content: center;
+        cursor: zoom-out;
+    }
+    .lightbox.show { display: flex; }
+    .lightbox img {
+        max-width: 90vw; max-height: 90vh;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .lightbox-close {
+        position: absolute; top: 20px; right: 20px;
+        width: 40px; height: 40px; border-radius: 50%;
+        background: rgba(255,255,255,0.15); border: none;
+        color: white; font-size: 18px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,0.3); }
+    .lightbox-dl {
+        position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+        padding: 10px 24px; border-radius: 10px;
+        background: var(--primary); color: white; border: none;
+        font-size: 14px; font-weight: 600; cursor: pointer;
+        text-decoration: none; display: flex; align-items: center; gap: 8px;
+    }
+    .lightbox-dl:hover { opacity: 0.9; }
+
+    /* Typing indicator */
+    .typing-indicator {
+        display: none;
+        padding: 8px 20px;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .typing-indicator.show { display: flex; }
+
+    .typing-dots {
+        display: flex;
+        gap: 4px;
+    }
+
+    .typing-dots span {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: var(--primary-light);
+        animation: typingBounce 1.4s infinite;
+    }
+
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingBounce {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+        30% { transform: translateY(-6px); opacity: 1; }
+    }
+
+    .typing-text {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-style: italic;
+    }
+
+    #exportMenu.show { display: block !important; }
+
+    /* Drag and drop upload */
+    .drop-overlay {
+        position: absolute; inset: 0; z-index: 50;
+        background: rgba(99,102,241,0.08);
+        border: 3px dashed var(--primary);
+        border-radius: 16px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .drop-overlay.show { display: flex; }
+    .drop-overlay i { font-size: 36px; color: var(--primary); opacity: 0.6; }
+    .drop-overlay span { font-size: 14px; font-weight: 600; color: var(--primary); }
+
+    /* Message reactions */
+    .msg-reactions {
+        display: flex;
+        gap: 4px;
+        padding: 2px 8px;
+        margin-top: 2px;
+    }
+    .msg-reaction {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background: rgba(99,102,241,0.08);
+        font-size: 12px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 0.15s;
+    }
+    .msg-reaction:hover { border-color: var(--primary); background: rgba(99,102,241,0.15); }
+    .msg-reaction.active { border-color: var(--primary); background: rgba(99,102,241,0.2); }
+    .react-btn {
+        opacity: 0;
+        transition: opacity 0.2s;
+        position: absolute;
+        right: -28px;
+        top: 4px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        cursor: pointer;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+    }
+    .message:hover .react-btn { opacity: 1; }
+    .react-picker {
+        display: none;
+        position: absolute;
+        right: -8px;
+        top: -32px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 4px 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        z-index: 10;
+        white-space: nowrap;
+    }
+    .react-picker.show { display: flex; gap: 2px; }
+    .react-emoji {
+        cursor: pointer;
+        font-size: 16px;
+        padding: 2px 4px;
+        border-radius: 6px;
+        border: none;
+        background: none;
+        transition: transform 0.15s;
+    }
+    .react-emoji:hover { transform: scale(1.3); }
+
+    /* ===== CUSTOM MODAL DIALOG ===== */
+    .modal-overlay {
+        position: fixed; inset: 0; z-index: 9999;
+        background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+        display: none; align-items: center; justify-content: center;
+        animation: modalFadeIn 0.2s ease;
+    }
+    .modal-overlay.show { display: flex; }
+    @keyframes modalFadeIn { from{opacity:0;} to{opacity:1;} }
+    .modal-box {
+        background: var(--bg-card); border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        width: 100%; max-width: 420px; overflow: hidden;
+        animation: modalSlideUp 0.25s cubic-bezier(0.16,1,0.3,1);
+    }
+    @keyframes modalSlideUp { from{transform:translateY(20px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+    .modal-header {
+        padding: 20px 24px 0; display: flex; align-items: center; gap: 12px;
+    }
+    .modal-icon {
+        width: 40px; height: 40px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px; flex-shrink: 0;
+    }
+    .modal-icon.danger { background: rgba(239,68,68,0.1); color: #ef4444; }
+    .modal-icon.info { background: rgba(99,102,241,0.1); color: #6366f1; }
+    .modal-icon.warning { background: rgba(245,158,11,0.1); color: #f59e0b; }
+    .modal-icon.success { background: rgba(16,185,129,0.1); color: #10b981; }
+    .modal-header h3 { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+    .modal-body { padding: 12px 24px 20px; }
+    .modal-body p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-top: 4px; }
+    .modal-body input, .modal-body select {
+        width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
+        border-radius: 10px; font-size: 14px; font-family: inherit;
+        background: var(--bg-primary); color: var(--text-primary);
+        margin-top: 12px; outline: none; transition: border-color 0.2s;
+    }
+    .modal-body input:focus, .modal-body select:focus { border-color: var(--primary); }
+    .modal-footer {
+        padding: 12px 24px 20px; display: flex; gap: 8px; justify-content: flex-end;
+    }
+    .modal-btn {
+        padding: 9px 20px; border-radius: 10px; font-size: 13px;
+        font-weight: 600; cursor: pointer; font-family: inherit; border: none;
+        transition: all 0.15s;
+    }
+    .modal-btn.cancel { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border); }
+    .modal-btn.cancel:hover { background: var(--bg-hover); }
+    .modal-btn.confirm { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(99,102,241,0.25); }
+    .modal-btn.confirm:hover { transform: translateY(-1px); }
+    .modal-btn.danger { background: #ef4444; color: white; }
+    .modal-btn.danger:hover { background: #dc2626; }
+
+    /* Visitor name clickable */
+    .chat-user-info .name {
+        cursor: pointer; transition: color 0.2s;
+    }
+    .chat-user-info .name:hover { color: var(--primary); }
+
+    /* Visitor Screen Share Viewer */
+    .screen-share-viewer {
+        display: none;
+        position: fixed; inset: 0; z-index: 9998;
+        background: rgba(0,0,0,0.92);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .screen-share-viewer.show { display: flex; }
+    .screen-share-viewer video {
+        max-width: 90vw;
+        max-height: 80vh;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .screen-share-toolbar {
+        display: flex; gap: 10px; margin-top: 16px;
+        align-items: center;
+    }
+    .ss-toolbar-btn {
+        padding: 10px 20px; border-radius: 10px;
+        border: none; cursor: pointer; font-size: 13px;
+        font-weight: 600; font-family: inherit;
+        display: flex; align-items: center; gap: 6px;
+        transition: all 0.2s;
+    }
+    .ss-toolbar-btn.danger { background: #ef4444; color: white; }
+    .ss-toolbar-btn.danger:hover { background: #dc2626; }
+    .ss-toolbar-btn.secondary { background: rgba(255,255,255,0.15); color: white; }
+    .ss-toolbar-btn.secondary:hover { background: rgba(255,255,255,0.25); }
+    .screen-share-label {
+        color: rgba(255,255,255,0.6); font-size: 12px;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .screen-share-label .rec-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #ef4444; animation: recBlink 1s infinite;
+    }
+    @keyframes recBlink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+    /* Screen share request banner */
+    .ss-request-bar {
+        display: none; padding: 10px 16px;
+        background: rgba(99,102,241,0.06);
+        border-bottom: 2px solid var(--primary);
+        align-items: center; gap: 10px; font-size: 13px;
+    }
+    .ss-request-bar.show { display: flex; }
+
+    /* Co-browse live URL tracker */
+    .cobrowse-bar {
+        display: none; padding: 6px 14px;
+        background: rgba(16,185,129,0.05);
+        border-bottom: 1px solid rgba(16,185,129,0.15);
+        font-size: 11px; color: #10b981;
+        align-items: center; gap: 6px;
+    }
+    .cobrowse-bar.show { display: flex; }
+
+    /* Typing Preview */
+    .typing-preview-text {
+        font-size: 11px; color: var(--text-muted); font-style: italic;
+        padding: 2px 20px; max-width: 80%; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; opacity: 0.7;
+    }
+
+    /* Read Receipts */
+    .read-receipt {
+        font-size: 10px; color: var(--primary); padding: 0 8px;
+        display: flex; align-items: center; gap: 3px;
+    }
+    .read-receipt i { font-size: 9px; }
+
+    /* Agent Collision Warning */
+    .collision-warning {
+        display: none; padding: 6px 14px;
+        background: rgba(245,158,11,0.08); border-bottom: 1px solid rgba(245,158,11,0.2);
+        font-size: 11px; color: var(--warning); align-items: center; gap: 6px;
+    }
+    .collision-warning.show { display: flex; }
+
+    /* Pinned Message */
+    .pinned-msg {
+        padding: 8px 14px; background: rgba(99,102,241,0.05);
+        border-left: 3px solid var(--primary); border-radius: 0 8px 8px 0;
+        font-size: 12px; margin: 4px 0; display: flex; align-items: center;
+        gap: 8px; cursor: pointer;
+    }
+    .pinned-msg i { color: var(--primary); }
+    .pinned-msg:hover { background: rgba(99,102,241,0.1); }
+    .pin-btn {
+        opacity: 0; position: absolute; left: -24px; top: 4px;
+        width: 20px; height: 20px; border-radius: 50%;
+        border: 1px solid var(--border); background: var(--bg-card);
+        cursor: pointer; font-size: 9px; display: flex;
+        align-items: center; justify-content: center; color: var(--text-muted);
+    }
+    .message:hover .pin-btn { opacity: 1; }
+    .pin-btn:hover { color: var(--primary); border-color: var(--primary); }
+
+    /* Returning Visitor Badge */
+    .returning-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 8px; border-radius: 8px; font-size: 10px;
+        font-weight: 600; background: rgba(99,102,241,0.1);
+        color: var(--primary); margin-left: 6px;
+    }
+
+    /* Voice Note */
+    .voice-note {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 14px; background: rgba(99,102,241,0.06);
+        border: 1px solid rgba(99,102,241,0.15); border-radius: 14px;
+        max-width: 260px;
+    }
+    .voice-note .vn-play {
+        width: 32px; height: 32px; border-radius: 50%;
+        background: var(--primary); color: white; border: none;
+        cursor: pointer; display: flex; align-items: center;
+        justify-content: center; font-size: 12px; flex-shrink: 0;
+    }
+    .voice-note .vn-wave {
+        flex: 1; height: 24px; display: flex; align-items: center; gap: 2px;
+    }
+    .voice-note .vn-wave span {
+        width: 3px; border-radius: 2px; background: var(--primary);
+        opacity: 0.4;
+    }
+    .voice-note .vn-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+
+    /* Chat Summary */
+    .chat-summary-card {
+        padding: 14px; background: rgba(16,185,129,0.05);
+        border: 1px solid rgba(16,185,129,0.15); border-radius: 12px;
+        margin: 8px 0;
+    }
+    .chat-summary-card h4 { font-size: 12px; font-weight: 700; color: #10b981; margin-bottom: 6px; }
+    .chat-summary-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+    /* AI Smart Reply Suggestions */
+    .smart-replies {
+        display: none; padding: 6px 14px; gap: 6px; flex-wrap: wrap;
+        border-top: 1px solid rgba(16,185,129,0.15);
+        background: rgba(16,185,129,0.03);
+        align-items: center;
+    }
+    .smart-replies.show { display: flex; }
+    .smart-replies .sr-label {
+        font-size: 10px; font-weight: 700; color: #10b981;
+        text-transform: uppercase; letter-spacing: 0.5px;
+        display: flex; align-items: center; gap: 4px; margin-right: 4px;
+    }
+    .smart-reply-chip {
+        padding: 5px 12px; border-radius: 16px; font-size: 11px;
+        border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.06);
+        color: #065f46; cursor: pointer; font-family: inherit;
+        transition: all 0.15s; white-space: nowrap;
+    }
+    .smart-reply-chip:hover {
+        background: #10b981; color: white; border-color: #10b981;
+        transform: translateY(-1px); box-shadow: 0 2px 8px rgba(16,185,129,0.25);
+    }
+
+    /* Visitor Sentiment Badge */
+    .sentiment-badge {
+        display: inline-flex; align-items: center; gap: 3px;
+        font-size: 10px; padding: 2px 7px; border-radius: 10px;
+        font-weight: 600; margin-left: 6px;
+    }
+    .sentiment-positive { background: rgba(16,185,129,0.1); color: #10b981; }
+    .sentiment-neutral { background: rgba(100,116,139,0.1); color: #64748b; }
+    .sentiment-negative { background: rgba(239,68,68,0.1); color: #ef4444; }
+
+    /* SLA Breach Flash */
+    .sla-breach-bar {
+        display: none; padding: 8px 16px;
+        background: rgba(239,68,68,0.08); border-bottom: 2px solid #ef4444;
+        font-size: 12px; font-weight: 600; color: #ef4444;
+        align-items: center; gap: 8px;
+        animation: slaPulse 2s infinite;
+    }
+    .sla-breach-bar.show { display: flex; }
+    @keyframes slaPulse {
+        0%, 100% { background: rgba(239,68,68,0.05); }
+        50% { background: rgba(239,68,68,0.15); }
+    }
+
+    /* Hot Lead Badge */
+    .hot-lead-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 10px; border-radius: 8px; font-size: 10px;
+        font-weight: 700; background: linear-gradient(135deg,#f59e0b,#ef4444);
+        color: white; animation: hotPulse 2s infinite;
+    }
+    @keyframes hotPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+        50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+    }
+
+    /* Agent Leaderboard */
+    .leaderboard-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.04);
+    }
+    .leaderboard-rank {
+        width: 24px; height: 24px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; font-weight: 800; flex-shrink: 0;
+    }
+    .rank-1 { background: linear-gradient(135deg,#f59e0b,#fbbf24); color: white; }
+    .rank-2 { background: linear-gradient(135deg,#94a3b8,#cbd5e1); color: white; }
+    .rank-3 { background: linear-gradient(135deg,#d97706,#b45309); color: white; }
+    .rank-other { background: var(--bg-primary); color: var(--text-muted); }
+
+    /* Scheduled Message */
+    .scheduled-msg {
+        padding: 6px 12px; border-radius: 8px;
+        background: rgba(99,102,241,0.06); border: 1px dashed rgba(99,102,241,0.3);
+        font-size: 11px; color: var(--primary); display: flex;
+        align-items: center; gap: 6px; margin: 4px 8px;
+    }
+
+    /* Canned Response Popup */
+    .canned-popup {
+        display: none;
+        position: absolute;
+        bottom: 100%;
+        left: 0; right: 0;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 -8px 30px rgba(0,0,0,0.1);
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 20;
+        margin-bottom: 4px;
+    }
+    .canned-popup.show { display: block; }
+    .canned-popup-header {
+        padding: 8px 14px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(99,102,241,0.03);
+    }
+    .canned-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(0,0,0,0.03);
+        transition: background 0.15s;
+    }
+    .canned-item:hover { background: rgba(99,102,241,0.06); }
+    .canned-item:last-child { border-bottom: none; }
+    .canned-item .ci-title { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+    .canned-item .ci-shortcut { font-size: 10px; color: var(--primary); font-family: monospace; }
+    .canned-item .ci-preview { font-size: 11px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Reply / Whisper Tabs */
+    .input-mode-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid var(--border);
+        background: rgba(99, 102, 241, 0.02);
+    }
+    .input-mode-tab {
+        padding: 10px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        background: none;
+        color: var(--text-muted);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: inherit;
+    }
+    .input-mode-tab:hover { color: var(--text-primary); }
+    .input-mode-tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
+    .input-mode-tab.whisper-tab.active {
+        color: var(--warning);
+        border-bottom-color: var(--warning);
+    }
+    .whisper-notice {
+        padding: 6px 14px;
+        background: rgba(245, 158, 11, 0.08);
+        font-size: 11px;
+        color: var(--warning);
+        display: none;
+        align-items: center;
+        gap: 6px;
+    }
+    .whisper-notice.show { display: flex; }
+
+    /* Page navigation event */
+    .page-event {
+        align-self: center;
+        max-width: 90%;
+        padding: 6px 14px;
+        background: rgba(16, 185, 129, 0.08);
+        border-left: 3px solid #10b981;
+        border-radius: 0 8px 8px 0;
+        font-size: 12px;
+        color: var(--text-muted);
+        margin: 4px 0;
+    }
+    .page-event a {
+        color: #10b981;
+        text-decoration: underline;
+    }
+    .page-event i {
+        color: #10b981;
+        margin-right: 4px;
+    }
+
+    /* Input area */
+    .chat-input-area {
+        padding: 12px 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .input-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .toolbar-btn {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .toolbar-btn:hover {
+        background: var(--bg-hover);
+        color: var(--primary-light);
+        border-color: var(--border);
+    }
+
+    .toolbar-btn.active {
+        background: rgba(99, 102, 241, 0.15);
+        color: var(--primary-light);
+    }
+
+    .toolbar-sep {
+        width: 1px;
+        height: 24px;
+        background: var(--border);
+        margin: 0 4px;
+    }
+
+    .input-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .chat-input-field {
+        flex: 1;
+        padding: 12px 18px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        color: var(--text-primary);
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+
+    .chat-input-field:focus { border-color: var(--primary); }
+
+    .send-btn {
+        width: 46px; height: 46px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), #7c3aed);
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 17px;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .send-btn:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4); }
+
+    .chat-closed-bar {
+        padding: 16px;
+        text-align: center;
+        color: var(--text-muted);
+        border-top: 1px solid var(--border);
+        background: rgba(100, 116, 139, 0.05);
+        font-size: 13px;
+    }
+
+    /* Quick replies */
+    .quick-replies {
+        display: none;
+        padding: 10px 14px;
+        gap: 8px;
+        flex-wrap: wrap;
+        border-top: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(99, 102, 241, 0.07), rgba(99, 102, 241, 0.02));
+        align-items: center;
+    }
+
+    .quick-replies.show { display: flex; }
+
+    .qr-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--text-muted);
+        margin-right: 4px;
+    }
+
+    .quick-reply-chip {
+        padding: 7px 12px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(99, 102, 241, 0.22);
+        color: var(--text-primary);
+        font-size: 12px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.18s;
+    }
+
+    .quick-reply-chip:hover {
+        border-color: var(--primary-light);
+        color: var(--primary-dark);
+        background: rgba(99, 102, 241, 0.16);
+        transform: translateY(-1px);
+    }
+
+    /* Emoji picker */
+    .emoji-wrap {
+        position: relative;
+    }
+
+    .emoji-picker {
+        display: none;
+        position: absolute;
+        bottom: 52px;
+        left: 0;
+        width: 312px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: 0 18px 42px rgba(2, 6, 23, 0.2);
+        z-index: 70;
+        overflow: hidden;
+    }
+
+    .emoji-picker::after {
+        content: '';
+        position: absolute;
+        left: 16px;
+        bottom: -8px;
+        width: 14px;
+        height: 14px;
+        transform: rotate(45deg);
+        background: var(--bg-card);
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .emoji-picker.show { display: block; }
+
+    .emoji-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+    }
+
+    .emoji-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    .emoji-close {
+        border: none;
+        background: transparent;
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+    }
+
+    .emoji-close:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .emoji-grid {
+        max-height: 184px;
+        overflow-y: auto;
+        padding: 10px;
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 6px;
+    }
+
+    .emoji-grid::-webkit-scrollbar { width: 6px; }
+    .emoji-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    .emoji-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        font-size: 20px;
+        cursor: pointer;
+        border-radius: 9px;
+        transition: transform 0.16s ease, background 0.16s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .emoji-btn:hover {
+        background: var(--bg-hover);
+        transform: scale(1.12);
+    }
+
+    /* ===== VISITOR PANEL ===== */
+    .visitor-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow: hidden;
+        padding-right: 4px;
+    }
+
+    .visitor-panel::-webkit-scrollbar { width: 4px; }
+    .visitor-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .side-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        background: rgba(99, 102, 241, 0.06);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        border-radius: 12px;
+        padding: 5px;
+        position: sticky;
+        top: 0;
+        z-index: 8;
+        backdrop-filter: blur(8px);
+    }
+
+    .side-tab-btn {
+        border: none;
+        background: transparent;
+        border-radius: 9px;
+        padding: 8px 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all .2s;
+    }
+
+    .side-tab-btn.active {
+        background: #fff;
+        color: var(--primary-dark);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.16);
+    }
+
+    .side-tab-panes {
+        overflow-y: auto;
+        max-height: calc(100vh - 360px);
+        padding-right: 2px;
+    }
+
+    .side-tab-panes::-webkit-scrollbar { width: 6px; }
+    .side-tab-panes::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    .side-tab-pane {
+        display: none;
+        gap: 12px;
+        flex-direction: column;
+    }
+
+    .side-tab-pane.active {
+        display: flex;
+    }
+
+    .info-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .info-card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary), rgba(6, 182, 212, 0.8));
+        opacity: 0.85;
+    }
+
+    .info-card-header {
+        padding: 14px 16px 12px;
+        border-bottom: 1px solid var(--border);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(180deg, rgba(99, 102, 241, 0.07), rgba(99, 102, 241, 0.02));
+    }
+
+    .info-card-body { padding: 14px 16px; }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        font-size: 13px;
+        border: 1px solid rgba(99, 102, 241, 0.14);
+        border-radius: 10px;
+        background: rgba(99, 102, 241, 0.03);
+        margin-bottom: 8px;
+    }
+
+    .info-row:last-child { margin-bottom: 0; }
+    .info-row .label { color: var(--text-muted); font-size: 11px; letter-spacing: 0.2px; }
+    .info-row .value {
+        font-weight: 700;
+        text-align: right;
+        max-width: 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--text-primary);
+    }
+
+    /* Visitor profile card */
+    .visitor-profile-card {
+        text-align: center;
+        padding: 22px 16px 18px;
+        background: radial-gradient(circle at top, rgba(99, 102, 241, 0.13), rgba(99, 102, 241, 0.02) 58%, transparent 70%);
+    }
+
+    .visitor-big-avatar {
+        width: 62px; height: 62px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        display: inline-flex; align-items: center; justify-content: center;
+        color: white; font-weight: 800; font-size: 24px;
+        margin-bottom: 10px;
+        box-shadow: 0 10px 24px rgba(99, 102, 241, 0.4);
+        border: 4px solid rgba(255, 255, 255, 0.85);
+    }
+
+    .visitor-profile-card .vname { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+    .visitor-profile-card .vemail,
+    .visitor-profile-card .vip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin: 4px 4px 0;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(99, 102, 241, 0.16);
+        background: rgba(255, 255, 255, 0.7);
+    }
+    .visitor-profile-card .vip { font-family: monospace; }
+
+    .profile-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .profile-stat {
+        background: rgba(99, 102, 241, 0.08);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        border-radius: 10px;
+        padding: 8px;
+        text-align: center;
+    }
+
+    .profile-stat .num {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--primary-dark);
+        line-height: 1.1;
+    }
+
+    .profile-stat .txt {
+        margin-top: 2px;
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .quick-actions {
+        display: grid;
+        gap: 8px;
+    }
+
+    .qa-row {
+        display: flex;
+        gap: 8px;
+    }
+
+    .qa-btn {
+        flex: 1;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        background: rgba(99, 102, 241, 0.06);
+        color: var(--text-primary);
+        border-radius: 10px;
+        padding: 9px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .qa-btn:hover {
+        border-color: var(--primary-light);
+    }
+
+    .qa-btn.danger {
+        border-color: rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.08);
+        color: #b91c1c;
+    }
+
+    .qa-btn.success {
+        border-color: rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.1);
+        color: #047857;
+    }
+
+    .qa-tag {
+        display: flex;
+        gap: 8px;
+    }
+
+    .qa-tag input {
+        flex: 1;
+        padding: 9px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        background: rgba(99, 102, 241, 0.03);
+        font-size: 12px;
+        color: var(--text-primary);
+    }
+
+    .qa-transfer {
+        display: flex;
+        gap: 8px;
+    }
+
+    .qa-transfer select {
+        flex: 1;
+        padding: 9px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        background: rgba(99, 102, 241, 0.03);
+        font-size: 12px;
+        color: var(--text-primary);
+    }
+
+    .page-item {
+        padding: 9px 10px;
+        border: 1px solid rgba(99, 102, 241, 0.14);
+        border-radius: 10px;
+        background: rgba(99, 102, 241, 0.03);
+        font-size: 12px;
+        margin-bottom: 8px;
+    }
+    .page-item:last-child { margin-bottom: 0; }
+    .page-item .url { color: var(--primary-light); word-break: break-all; }
+    .page-item .time { color: var(--text-muted); font-size: 11px; }
+
+    /* ===== INTERNAL NOTES (COLLABORATE) ===== */
+    .notes-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 320px;
+        overflow-y: auto;
+        padding: 2px;
+    }
+    .note-item {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(245, 158, 11, 0.06);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+    .note-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+    .note-agent {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--warning);
+    }
+    .note-time {
+        font-size: 10px;
+        color: var(--text-muted);
+    }
+    .note-content {
+        font-size: 12px;
+        color: var(--text-primary);
+        line-height: 1.5;
+    }
+    .note-input-area {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    .note-input-area textarea {
+        flex: 1;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 10px;
+        padding: 9px 10px;
+        font-size: 12px;
+        font-family: inherit;
+        resize: none;
+        background: rgba(245, 158, 11, 0.03);
+        color: var(--text-primary);
+        min-height: 60px;
+    }
+    .note-input-area textarea:focus {
+        outline: none;
+        border-color: var(--warning);
+    }
+    .note-send-btn {
+        border: 0;
+        border-radius: 10px;
+        padding: 8px 14px;
+        cursor: pointer;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        align-self: flex-end;
+    }
+    .note-send-btn:hover {
+        opacity: 0.9;
+    }
+    .transfer-banner {
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: rgba(99, 102, 241, 0.08);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        font-size: 12px;
+        color: var(--primary-light);
+        text-align: center;
+        margin: 8px 0;
+    }
+    .transfer-banner i {
+        margin-right: 6px;
+    }
+    .collab-badge {
+        display: inline-block;
+        background: var(--warning);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 8px;
+        margin-left: 4px;
+        vertical-align: middle;
+    }
+
+    .pages-list {
+        max-height: 240px;
+        overflow-y: auto;
+        padding-right: 2px;
+    }
+    .pages-list::-webkit-scrollbar { width: 5px; }
+    .pages-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+
+    /* Screen share notice */
+    .screen-share-notice {
+        display: none;
+        padding: 12px 20px;
+        background: rgba(16, 185, 129, 0.1);
+        border-top: 1px solid rgba(16, 185, 129, 0.2);
+        color: var(--success);
+        font-size: 13px;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .screen-share-notice.show { display: flex; }
+
+    /* Notification sound */
+    .sound-toggle {
+        position: relative;
+    }
+
+    /* Hidden file input */
+    #fileInput, #imgInput { display: none; }
+
+    /* Visual polish */
+    .chat-layout {
+        align-items: stretch;
+    }
+    .chat-panel {
+        box-shadow: 0 14px 40px rgba(2, 6, 23, 0.08);
+    }
+    .chat-messages {
+        background:
+            radial-gradient(circle at top right, rgba(99, 102, 241, 0.06), transparent 38%),
+            radial-gradient(circle at bottom left, rgba(6, 182, 212, 0.05), transparent 42%);
+    }
+    .chat-input-area {
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(10px);
+        position: sticky;
+        bottom: 0;
+    }
+    .chat-input-field {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+    .visitor-panel .info-card {
+        box-shadow: 0 8px 24px rgba(2, 6, 23, 0.06);
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+        .chat-layout {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
+        .visitor-panel {
+            order: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 560px;
+            overflow: hidden;
+            padding-right: 0;
+        }
+        .side-tab-panes {
+            max-height: 430px;
+        }
+        .visitor-profile-card {
+            padding: 14px 14px 12px;
+        }
+        .visitor-big-avatar {
+            width: 52px;
+            height: 52px;
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+        .visitor-profile-card .vname {
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+        .info-card-header {
+            padding: 11px 13px 10px;
+            font-size: 10px;
+        }
+        .info-card-body {
+            padding: 10px 12px;
+        }
+        .info-row {
+            padding: 7px 9px;
+            font-size: 12px;
+        }
+        .info-row .label {
+            font-size: 10px;
+        }
+    }
+
+    @media (max-width: 860px) {
+        .chat-layout {
+            gap: 10px;
+            height: auto;
+        }
+        .chat-header-bar {
+            padding: 10px 12px;
+        }
+        .chat-actions {
+            gap: 4px;
+        }
+        .chat-action-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        .message {
+            max-width: 86%;
+        }
+        .bubble {
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+        .chat-input-area {
+            padding: 10px 12px;
+            gap: 8px;
+        }
+        .send-btn {
+            width: 42px;
+            height: 42px;
+            font-size: 15px;
+        }
+        .visitor-panel { display: flex; max-height: none; }
+        .side-tabs {
+            position: static;
+        }
+        .side-tab-panes {
+            max-height: 340px;
+        }
+        .chat-messages {
+            padding: 12px;
+        }
+        .emoji-picker {
+            left: -112px;
+            width: 286px;
+        }
+        .emoji-grid {
+            grid-template-columns: repeat(7, 1fr);
+        }
+        .pages-list {
+            max-height: 180px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+    <!-- ===== CHAT PANEL ===== -->
+    <div class="chat-panel" style="position:relative;" id="chatPanel">
+        <div class="drop-overlay" id="dropOverlay">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <span>Drop file to send</span>
+        </div>
+        <!-- Header Row 1: Visitor Info + Timer -->
+        <div class="chat-header-bar">
+            <div class="chat-header-row1">
+                <div class="chat-with">
+                    <div class="chat-avatar" onclick="toggleVisitorPanel()" style="cursor:pointer;">{{ room.visitor_name|first|upper }}</div>
+                    <div class="chat-user-info" onclick="toggleVisitorPanel()" style="cursor:pointer;">
+                        <div class="name">
+                            {{ room.visitor_name }}
+                            {% if visitor.total_visits > 1 %}<span class="returning-badge"><i class="fas fa-redo"></i> {{ visitor.total_visits }}x</span>{% endif %}
+                            {% if visitor.score >= 70 %}<span style="padding:2px 6px;border-radius:6px;font-size:9px;font-weight:700;background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;"><i class="fas fa-fire"></i> Hot</span>{% elif visitor.score >= 30 %}<span style="padding:2px 6px;border-radius:6px;font-size:9px;font-weight:700;background:rgba(245,158,11,0.12);color:#f59e0b;">Warm</span>{% endif %}
+                        </div>
+                        <div class="email">{{ room.visitor_email|default:"No email" }}{% if visitor.page_views.first %} · <span id="visitorCurrentPage" style="color:var(--primary-light);font-size:10px;">{{ visitor.page_views.first.url|truncatechars:35 }}</span>{% endif %}</div>
+                    </div>
+                </div>
+                {% if room.status != 'closed' %}
+                <div id="chatTimer" style="padding:3px 10px;background:rgba(16,185,129,0.08);border-radius:6px;font-size:11px;font-weight:600;color:#10b981;display:flex;align-items:center;gap:4px;font-family:monospace;">
+                    <span id="timerValue">00:00</span>
+                </div>
+                {% endif %}
+            </div>
+            <!-- Header Row 2: Action Buttons (compact) -->
+            <div class="chat-header-row2">
+                <div class="chat-actions">
+                    {% if room.status != 'closed' %}
+                    <button class="chat-action-btn" onclick="requestVisitorScreenShare()" id="ssRequestBtn" title="View visitor's screen"><i class="fas fa-tv"></i></button>
+                    {% endif %}
+                    <button class="chat-action-btn" onclick="toggleChatSearch()" title="Search (Ctrl+F)"><i class="fas fa-search"></i></button>
+                    <button class="chat-action-btn" onclick="toggleSound()" id="soundBtn" title="Sound"><i class="fas fa-volume-up" id="soundIcon"></i></button>
+                    <button class="chat-action-btn" onclick="toggleQuickReplies()" title="Quick replies"><i class="fas fa-bolt"></i></button>
+                    <span style="width:1px;height:18px;background:var(--border);margin:0 2px;"></span>
+                    <div style="position:relative;" id="exportWrap">
+                        <button class="chat-action-btn" onclick="document.getElementById('exportMenu').classList.toggle('show')" title="Export"><i class="fas fa-download"></i></button>
+                        <div id="exportMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);min-width:180px;z-index:20;overflow:hidden;">
+                            <button onclick="downloadTranscript()" style="width:100%;padding:10px 14px;border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px;font-family:inherit;color:var(--text-primary);text-align:left;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"><i class="fas fa-file-alt" style="color:var(--text-muted);width:16px;"></i> Text</button>
+                            <button onclick="window.open('/dashboard/chats/'+roomId+'/export-html/')" style="width:100%;padding:10px 14px;border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px;font-family:inherit;color:var(--text-primary);text-align:left;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"><i class="fas fa-file-code" style="color:var(--info);width:16px;"></i> HTML</button>
+                            <button onclick="emailTranscript()" style="width:100%;padding:10px 14px;border:none;border-top:1px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px;font-family:inherit;color:var(--text-primary);text-align:left;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"><i class="fas fa-envelope" style="color:var(--primary);width:16px;"></i> Email</button>
+                        </div>
+                    </div>
+                    <button class="chat-action-btn" onclick="bookmarkChat()" id="bookmarkBtn" title="Bookmark" style="color:{% if room.is_bookmarked %}var(--warning){% else %}inherit{% endif %};"><i class="fas fa-bookmark"></i></button>
+                    {% if room.status != 'closed' %}
+                    <button class="chat-action-btn" onclick="snoozeChat()" title="Snooze"><i class="fas fa-moon"></i></button>
+                    {% endif %}
+                    {% if room.status != 'closed' and room.agent != request.user %}
+                    <span style="width:1px;height:18px;background:var(--border);margin:0 2px;"></span>
+                    <button class="chat-action-btn" onclick="takeoverChat()" title="Take over" style="color:var(--warning);"><i class="fas fa-hand-paper"></i></button>
+                    {% endif %}
+                    {% if room.status != 'closed' %}
+                    <span style="width:1px;height:18px;background:var(--border);margin:0 2px;"></span>
+                    <button class="chat-action-btn" onclick="closeChat()" title="End chat" style="color:var(--danger);"><i class="fas fa-phone-slash"></i></button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen share notice -->
+        <div class="screen-share-notice" id="screenShareNotice">
+            <i class="fas fa-desktop"></i>
+            <span>Screen sharing is active</span>
+            <button onclick="stopScreenShare()" style="margin-left: auto; background: var(--danger); color: white; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Stop</button>
+        </div>
+
+        <!-- In-Chat Search -->
+        <div id="chatSearchBar" style="display:none;padding:8px 16px;background:rgba(99,102,241,0.03);border-bottom:1px solid var(--border);display:none;align-items:center;gap:8px;">
+            <i class="fas fa-search" style="color:var(--text-muted);font-size:12px;"></i>
+            <input type="text" id="chatSearchInput" placeholder="Search in this chat..." oninput="searchInChat(this.value)" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text-primary);outline:none;">
+            <span id="chatSearchCount" style="font-size:11px;color:var(--text-muted);"></span>
+            <button onclick="closeChatSearch()" style="border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:14px;"><i class="fas fa-times"></i></button>
+        </div>
+
+        <!-- Quick replies -->
+        <div class="quick-replies" id="quickReplies">
+            <span class="qr-label"><i class="fas fa-bolt"></i> Quick Replies</span>
+            <button class="quick-reply-chip" data-text="Hello! How can I help you today?" onclick="sendQuickReply(this)">Greeting</button>
+            <button class="quick-reply-chip" data-text="Thanks for reaching out. Let me check this for you." onclick="sendQuickReply(this)">Checking</button>
+            <button class="quick-reply-chip" data-text="Could you please share a screenshot or exact error message?" onclick="sendQuickReply(this)">Ask Details</button>
+            <button class="quick-reply-chip" data-text="I understand. I am escalating this to the concerned team now." onclick="sendQuickReply(this)">Escalate</button>
+            <button class="quick-reply-chip" data-text="This issue is fixed now. Please refresh once and confirm." onclick="sendQuickReply(this)">Resolved</button>
+            <button class="quick-reply-chip" data-text="Thank you for your patience. Is there anything else I can help you with?" onclick="sendQuickReply(this)">Close</button>
+        </div>
+
+        <!-- Screen Share Request Bar -->
+        <div class="ss-request-bar" id="ssRequestBar">
+            <i class="fas fa-desktop" style="color:var(--primary);font-size:16px;"></i>
+            <span style="flex:1;"><strong>Screen share requested.</strong> Waiting for visitor to share their screen...</span>
+            <button onclick="cancelScreenShareRequest()" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i> Cancel</button>
+        </div>
+
+        <!-- Co-Browse Bar (live URL tracking) -->
+        <div class="cobrowse-bar" id="cobrowseBar">
+            <i class="fas fa-eye"></i>
+            <span>Visitor is on:</span>
+            <a id="cobrowseUrl" href="#" target="_blank" style="color:#10b981;text-decoration:underline;font-weight:600;"></a>
+            <span id="cobrowseTime" style="margin-left:auto;color:rgba(16,185,129,0.6);"></span>
+        </div>
+
+        <!-- Agent Collision Warning -->
+        <div class="collision-warning" id="collisionWarning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="collisionText">Another agent is also typing in this chat</span>
+        </div>
+
+        <!-- Pinned Messages -->
+        <div id="pinnedArea"></div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="chatMessages">
+            {% for msg in messages %}
+            <div class="message {{ msg.sender_type }}">
+                <div class="msg-sender">{{ msg.sender_name }}</div>
+                {% if msg.msg_type == 'image' and msg.file %}
+                <div class="img-preview" onclick="openLightbox('{{ msg.file.url }}', '{{ msg.file_name }}')">
+                    <img src="{{ msg.file.url }}" alt="{{ msg.file_name }}">
+                    <div class="img-overlay"><i class="fas fa-search-plus"></i></div>
+                </div>
+                {% elif msg.msg_type == 'file' and msg.file %}
+                <a href="{{ msg.file.url }}" class="file-bubble" target="_blank" download>
+                    <div class="file-icon {% if '.pdf' in msg.file_name %}pdf{% elif '.doc' in msg.file_name or '.docx' in msg.file_name %}doc{% elif '.xls' in msg.file_name or '.xlsx' in msg.file_name or '.csv' in msg.file_name %}xls{% elif '.zip' in msg.file_name or '.rar' in msg.file_name %}zip{% elif '.txt' in msg.file_name %}txt{% else %}other{% endif %}">
+                        <i class="fas {% if '.pdf' in msg.file_name %}fa-file-pdf{% elif '.doc' in msg.file_name or '.docx' in msg.file_name %}fa-file-word{% elif '.xls' in msg.file_name or '.xlsx' in msg.file_name or '.csv' in msg.file_name %}fa-file-excel{% elif '.zip' in msg.file_name or '.rar' in msg.file_name %}fa-file-archive{% elif '.txt' in msg.file_name %}fa-file-alt{% else %}fa-file{% endif %}"></i>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name">{{ msg.file_name }}</div>
+                        <div class="file-size">Click to download</div>
+                    </div>
+                    <div class="file-dl-icon"><i class="fas fa-download"></i></div>
+                </a>
+                {% else %}
+                <div class="bubble">{{ msg.content }}</div>
+                {% endif %}
+                <div class="msg-time">{{ msg.timestamp|date:"h:i A" }}</div>
+            </div>
+            {% empty %}
+            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <i class="fas fa-comments" style="font-size: 36px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>
+                <p style="font-size: 14px;">No messages yet. Start the conversation!</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Typing indicator -->
+        <div class="typing-indicator" id="typingIndicator">
+            <div class="typing-dots">
+                <span></span><span></span><span></span>
+            </div>
+            <span class="typing-text">{{ room.visitor_name }} is typing...</span>
+        </div>
+
+        <!-- AI Smart Reply Suggestions -->
+        <div class="smart-replies" id="smartReplies">
+            <span class="sr-label"><i class="fas fa-magic"></i> AI</span>
+            <div id="smartReplyChips"></div>
+        </div>
+
+        <!-- SLA Breach Alert -->
+        <div class="sla-breach-bar" id="slaBreachBar">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>SLA Breach! This chat has been waiting too long.</span>
+        </div>
+
+        <!-- Reply / Whisper Tabs -->
+        {% if room.status != 'closed' %}
+        <div class="input-mode-tabs">
+            <button class="input-mode-tab active" id="replyTab" onclick="switchInputMode('reply')">
+                <i class="fas fa-reply"></i> Reply
+            </button>
+            <button class="input-mode-tab whisper-tab" id="whisperTab" onclick="switchInputMode('whisper')">
+                <i class="fas fa-user-secret"></i> Whisper
+            </button>
+        </div>
+        <div class="whisper-notice" id="whisperNotice">
+            <i class="fas fa-eye-slash"></i> Whisper mode — only agents can see this message
+        </div>
+        {% endif %}
+
+        <!-- Input area -->
+        {% if room.status != 'closed' %}
+        <div class="chat-input-area">
+            <div class="input-toolbar">
+                <button class="toolbar-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <button class="toolbar-btn" onclick="document.getElementById('imgInput').click()" title="Send image">
+                    <i class="fas fa-image"></i>
+                </button>
+                <div class="toolbar-sep"></div>
+                <div class="emoji-wrap">
+                    <button class="toolbar-btn" onclick="toggleEmoji()" id="emojiBtn" title="Emoji">
+                        <i class="fas fa-smile"></i>
+                    </button>
+                    <div class="emoji-picker" id="emojiPicker">
+                        <div class="emoji-head">
+                            <span class="emoji-title">Quick Emoji</span>
+                            <button type="button" class="emoji-close" onclick="closeEmojiPicker()" aria-label="Close emoji picker">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="emoji-grid">
+                            <button class="emoji-btn" onclick="insertEmoji(this)">😊</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">😂</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">❤️</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">👍</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">🎉</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">🔥</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">✅</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">⭐</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">💯</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">🙏</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">👋</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">😍</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">🤔</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">😢</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">👏</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">🚀</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">💡</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">📎</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">📞</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">💬</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">✨</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">🎯</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">⚡</button>
+                            <button class="emoji-btn" onclick="insertEmoji(this)">🤝</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="toolbar-sep"></div>
+                <button class="toolbar-btn" onclick="toggleQuickReplies()" title="Quick replies">
+                    <i class="fas fa-bolt"></i>
+                </button>
+                <div class="toolbar-sep"></div>
+                <button class="toolbar-btn" onclick="toggleVoiceNote()" id="voiceBtn" title="Record voice note">
+                    <i class="fas fa-microphone"></i>
+                </button>
+            </div>
+            <div class="input-row" style="position:relative;">
+                <!-- Canned response popup -->
+                <div class="canned-popup" id="cannedPopup">
+                    <div class="canned-popup-header"><i class="fas fa-bolt"></i> Canned Responses (type / to search)</div>
+                    <div id="cannedList">
+                        {% for cr in canned_responses %}
+                        <div class="canned-item" onclick="useCanned('{{ cr.message|escapejs }}')">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span class="ci-title">{{ cr.title }}</span>
+                                {% if cr.shortcut %}<span class="ci-shortcut">/{{ cr.shortcut }}</span>{% endif %}
+                            </div>
+                            <div class="ci-preview">{{ cr.message|truncatechars:80 }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <input type="text" class="chat-input-field" id="chatInput"
+                       placeholder="Type your message... (/ for canned responses)"
+                       autocomplete="off"
+                       onkeydown="handleKeyDown(event)"
+                       oninput="handleInputChange(this)">
+                <button class="send-btn" onclick="sendMessage()" title="Send now (Enter)">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+                <button onclick="scheduleMessage()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Schedule message">
+                    <i class="fas fa-clock"></i>
+                </button>
+            </div>
+        </div>
+        <input type="file" id="fileInput" onchange="uploadFile(this, 'file')" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar">
+        <input type="file" id="imgInput" onchange="uploadFile(this, 'image')" accept="image/*">
+        {% elif room.status == 'waiting' and manual_assign %}
+        <div style="padding:16px;text-align:center;border-top:1px solid var(--border);background:rgba(99,102,241,0.03);">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">This chat is waiting for an agent to join.</p>
+            <a href="?join=1" class="btn btn-primary" style="padding:10px 30px;"><i class="fas fa-hand-point-up"></i> Join This Chat</a>
+        </div>
+        {% else %}
+        <div class="chat-closed-bar">
+            <i class="fas fa-lock"></i> This chat has been closed &middot; {{ room.closed_at|date:"M d, Y h:i A" }}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===== VISITOR PANEL ===== -->
+    <div class="visitor-panel">
+        <!-- Profile Card -->
+        <div class="info-card">
+            <div class="visitor-profile-card">
+                <div class="visitor-big-avatar">{{ room.visitor_name|first|upper }}</div>
+                <div class="vname">{{ room.visitor_name }}</div>
+                <div class="vemail"><i class="fas fa-envelope"></i> {{ room.visitor_email|default:"No email" }}</div>
+                <div class="vip"><i class="fas fa-globe"></i> {{ visitor.ip_address }}</div>
+                <div class="profile-stats">
+                    <div class="profile-stat">
+                        <div class="num">{{ visitor.total_visits }}</div>
+                        <div class="txt">Visits</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="num">{{ room.message_count }}</div>
+                        <div class="txt">Messages</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="side-tabs">
+            <button type="button" class="side-tab-btn active" id="sideTabOverviewBtn" onclick="openSideTab('overview')">
+                <i class="fas fa-id-card"></i> Overview
+            </button>
+            <button type="button" class="side-tab-btn" id="sideTabActionsBtn" onclick="openSideTab('actions')">
+                <i class="fas fa-bolt"></i> Actions
+            </button>
+            <button type="button" class="side-tab-btn" id="sideTabJourneyBtn" onclick="openSideTab('journey')">
+                <i class="fas fa-route"></i> Journey
+            </button>
+            <button type="button" class="side-tab-btn" id="sideTabCollabBtn" onclick="openSideTab('collab')">
+                <i class="fas fa-users"></i> Collab <span class="collab-badge" id="collabCount" style="display:none;">0</span>
+            </button>
+        </div>
+
+        <div class="side-tab-panes">
+            <div class="side-tab-pane active" id="sideTabOverview">
+                <!-- Visitor Details -->
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-user" style="color: var(--primary-light);"></i> Visitor Details</div>
+                    <div class="info-card-body">
+                        <div class="info-row"><span class="label">Browser</span><span class="value">{{ visitor.browser }}</span></div>
+                        <div class="info-row"><span class="label">OS</span><span class="value">{{ visitor.os }}</span></div>
+                        <div class="info-row"><span class="label">Device</span><span class="value">{{ visitor.device_type|title }}</span></div>
+                        <div class="info-row"><span class="label">Source</span><span class="value"><span class="status status-active">{{ visitor.referrer_source }}</span></span></div>
+                        <div class="info-row"><span class="label">Country</span><span class="value">{{ visitor.country|default:"-" }}</span></div>
+                        <div class="info-row"><span class="label">City</span><span class="value">{{ visitor.city|default:"-" }}</span></div>
+                        <div class="info-row"><span class="label">First Visit</span><span class="value">{{ visitor.first_visit|date:"M d, Y H:i" }}</span></div>
+                        <div class="info-row"><span class="label">Last Seen</span><span class="value">{{ visitor.last_seen|date:"M d, Y H:i" }}</span></div>
+                        <div class="info-row"><span class="label">Session</span><span class="value">{{ visitor.session_key|truncatechars:18 }}</span></div>
+                    </div>
+                </div>
+
+                <!-- Chat Info -->
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-info-circle" style="color: var(--accent);"></i> Chat Info</div>
+                    <div class="info-card-body">
+                        <div class="info-row"><span class="label">Room</span><span class="value" style="font-size: 11px; font-family: monospace;">{{ room.room_id }}</span></div>
+                        <div class="info-row"><span class="label">Status</span><span class="value">{{ room.status|title }}</span></div>
+                        <div class="info-row"><span class="label">Priority</span><span class="value">{{ room.priority|title }}</span></div>
+                        <div class="info-row"><span class="label">Subject</span><span class="value">{{ room.subject|default:"-" }}</span></div>
+                        <div class="info-row"><span class="label">Agent</span><span class="value">{{ room.agent.get_full_name|default:room.agent.username|default:"Unassigned" }}</span></div>
+                        <div class="info-row"><span class="label">Started</span><span class="value">{{ room.created_at|date:"M d, Y H:i" }}</span></div>
+                        <div class="info-row"><span class="label">Closed</span><span class="value">{{ room.closed_at|date:"M d, Y H:i"|default:"-" }}</span></div>
+                        <div class="info-row"><span class="label">Messages</span><span class="value">{{ room.message_count }}</span></div>
+                        <div class="info-row"><span class="label">Rating</span><span class="value">{{ room.rating|default:"-" }}</span></div>
+                        <div class="info-row"><span class="label">Tags</span><span class="value">{{ room.tags|default:"-" }}</span></div>
+                    </div>
+                </div>
+
+                <!-- Technical Details -->
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-shield-alt" style="color: var(--info);"></i> Technical Details</div>
+                    <div class="info-card-body">
+                        <div class="info-row"><span class="label">IP</span><span class="value">{{ visitor.ip_address }}</span></div>
+                        <div class="info-row"><span class="label">Referrer</span><span class="value">{{ visitor.referrer|default:"Direct" }}</span></div>
+                        <div class="info-row"><span class="label">User Agent</span><span class="value">{{ visitor.user_agent|truncatechars:55 }}</span></div>
+                    </div>
+                </div>
+
+                <!-- Previous Chats -->
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-history" style="color: var(--warning);"></i> Previous Chats</div>
+                    <div class="info-card-body" style="max-height:160px;overflow-y:auto;">
+                        {% for prev in visitor.chat_rooms.all %}
+                        {% if prev.room_id != room.room_id %}
+                        <a href="{% url 'dashboard:chat_room' prev.room_id %}" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.04);text-decoration:none;color:inherit;font-size:12px;">
+                            <div>
+                                <span style="font-weight:600;">#{{ prev.room_id|truncatechars:8 }}</span>
+                                <span class="status status-{{ prev.status }}" style="font-size:10px;margin-left:4px;"><span class="dot"></span>{{ prev.status }}</span>
+                            </div>
+                            <span style="color:var(--text-muted);font-size:10px;">{{ prev.created_at|timesince }} ago</span>
+                        </a>
+                        {% endif %}
+                        {% endfor %}
+                        {% if visitor.chat_rooms.count <= 1 %}
+                        <p style="color:var(--text-muted);font-size:12px;text-align:center;padding:4px 0;">No previous chats</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-tab-pane" id="sideTabActions">
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-bolt" style="color: var(--warning);"></i> Quick Actions</div>
+                    <div class="info-card-body quick-actions">
+                        <div class="qa-row">
+                            <button class="qa-btn" onclick="copyVisitorIp()"><i class="fas fa-copy"></i> Copy IP</button>
+                            {% if visitor.is_banned %}
+                            <button class="qa-btn success" id="banVisitorBtn" onclick="toggleBanVisitor(false)"><i class="fas fa-user-check"></i> Unban</button>
+                            {% else %}
+                            <button class="qa-btn danger" id="banVisitorBtn" onclick="toggleBanVisitor(true)"><i class="fas fa-user-slash"></i> Ban</button>
+                            {% endif %}
+                        </div>
+                        <div class="qa-tag">
+                            <input type="text" id="chatTagsInput" value="{{ room.tags }}" placeholder="Add tags (comma separated)">
+                            <button class="qa-btn" onclick="saveChatTags()"><i class="fas fa-tag"></i> Save</button>
+                        </div>
+                        <div class="qa-transfer">
+                            <select id="transferAgentId">
+                                <option value="">Transfer to agent...</option>
+                                {% for agent in available_agents %}
+                                <option value="{{ agent.id }}">{{ agent.get_full_name|default:agent.username }}</option>
+                                {% endfor %}
+                            </select>
+                            <button class="qa-btn" onclick="transferChat()"><i class="fas fa-share"></i> Transfer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-tab-pane" id="sideTabJourney">
+                <!-- Visitor Notes -->
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-sticky-note" style="color: var(--primary);"></i> Visitor Notes</div>
+                    <div class="info-card-body">
+                        <div id="visitorNotesList">
+                            {% for note in visitor_notes %}
+                            <div style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.04);font-size:12px;">
+                                <div style="color:var(--text-muted);font-size:10px;">{{ note.agent.get_full_name|default:note.agent.username }} - {{ note.created_at|timesince }} ago</div>
+                                <div style="margin-top:2px;">{{ note.content }}</div>
+                            </div>
+                            {% empty %}
+                            <p style="color:var(--text-muted);font-size:12px;text-align:center;padding:4px 0;">No notes yet</p>
+                            {% endfor %}
+                        </div>
+                        {% if room.status != 'closed' %}
+                        <div style="display:flex;gap:6px;margin-top:8px;">
+                            <input type="text" id="visitorNoteInput" placeholder="Add a note about this visitor..." style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;background:var(--bg-primary);color:var(--text-primary);">
+                            <button onclick="addVisitorNote()" style="border:none;background:var(--primary);color:white;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;"><i class="fas fa-plus"></i></button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Pages Visited -->
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-file-alt" style="color: var(--warning);"></i> Pages Visited</div>
+                    <div class="info-card-body pages-list">
+                        {% for pv in visitor_pages %}
+                        <div class="page-item">
+                            <div class="url">{{ pv.url|truncatechars:58 }}</div>
+                            <div class="time">{{ pv.timestamp|date:"M d, H:i:s" }}</div>
+                        </div>
+                        {% empty %}
+                        <p style="color: var(--text-muted); font-size: 12px; text-align: center; padding: 8px 0;">No pages tracked</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-tab-pane" id="sideTabCollab">
+                <!-- Transfer Info -->
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-exchange-alt" style="color: var(--primary-light);"></i> Transfer Chat</div>
+                    <div class="info-card-body">
+                        <div class="info-row">
+                            <span class="label">Current Agent</span>
+                            <span class="value" id="currentAgentName">{{ room.agent.get_full_name|default:room.agent.username|default:"Unassigned" }}</span>
+                        </div>
+                        {% if room.status != 'closed' %}
+                        <div class="qa-transfer" style="margin-top: 8px;">
+                            <select id="transferAgentId2">
+                                <option value="">Transfer to...</option>
+                                {% for agent in available_agents %}
+                                <option value="{{ agent.id }}">{{ agent.get_full_name|default:agent.username }}</option>
+                                {% endfor %}
+                            </select>
+                            <button class="qa-btn" onclick="transferChat()"><i class="fas fa-share"></i> Transfer</button>
+                        </div>
+                        {% endif %}
+                        <div id="transferHistory"></div>
+                    </div>
+                </div>
+
+                <!-- Internal Notes -->
+                <div class="info-card">
+                    <div class="info-card-header"><i class="fas fa-sticky-note" style="color: var(--warning);"></i> Internal Notes <small style="color:var(--text-muted);font-weight:400;">(agents only)</small></div>
+                    <div class="info-card-body">
+                        <div class="notes-list" id="internalNotesList">
+                            {% for note in internal_notes %}
+                            <div class="note-item">
+                                <div class="note-header">
+                                    <span class="note-agent"><i class="fas fa-user-shield"></i> {{ note.agent.get_full_name|default:note.agent.username }}</span>
+                                    <span class="note-time">{{ note.created_at|timesince }} ago</span>
+                                </div>
+                                <div class="note-content">{{ note.content }}</div>
+                            </div>
+                            {% empty %}
+                            <p id="noNotesMsg" style="color: var(--text-muted); font-size: 12px; text-align: center; padding: 8px 0;">No internal notes yet</p>
+                            {% endfor %}
+                        </div>
+                        {% if room.status != 'closed' %}
+                        <div class="note-input-area">
+                            <textarea id="internalNoteInput" placeholder="Write an internal note (only agents can see this)..." rows="2"></textarea>
+                        </div>
+                        <button class="note-send-btn" onclick="sendInternalNote()" style="margin-top: 8px; width: 100%;"><i class="fas fa-paper-plane"></i> Add Note</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Modal Dialog -->
+<div class="modal-overlay" id="customModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div class="modal-icon info" id="modalIcon"><i class="fas fa-info-circle" id="modalIconI"></i></div>
+            <h3 id="modalTitle">Confirm</h3>
+        </div>
+        <div class="modal-body">
+            <p id="modalMessage">Are you sure?</p>
+            <input type="text" id="modalInput" style="display:none;" placeholder="">
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn cancel" onclick="modalResolve(null)">Cancel</button>
+            <button class="modal-btn confirm" id="modalConfirmBtn" onclick="modalResolve(true)">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- Visitor Screen Share Viewer -->
+<div class="screen-share-viewer" id="screenShareViewer">
+    <div class="screen-share-label"><span class="rec-dot"></span> Viewing visitor's screen</div>
+    <video id="remoteScreenVideo" autoplay playsinline style="margin-top:12px;"></video>
+    <div class="screen-share-toolbar">
+        <button class="ss-toolbar-btn secondary" onclick="toggleScreenShareFullscreen()"><i class="fas fa-expand"></i> Fullscreen</button>
+        <button class="ss-toolbar-btn secondary" onclick="screenshotRemoteScreen()"><i class="fas fa-camera"></i> Screenshot</button>
+        <button class="ss-toolbar-btn danger" onclick="stopViewingScreen()"><i class="fas fa-times"></i> Stop Viewing</button>
+    </div>
+</div>
+
+<!-- Image Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+    <button class="lightbox-close" onclick="closeLightbox()"><i class="fas fa-times"></i></button>
+    <img id="lightboxImg" src="" alt="">
+    <a id="lightboxDl" href="" download class="lightbox-dl"><i class="fas fa-download"></i> Download</a>
+</div>
+
+<!-- Notification sound -->
+<audio id="notifSound" preload="auto">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6YkYOAe3l9hY6Xnp6XjYN9eHl+h5CZnp6WjIN8d3h9hpCZnp6WjYR9eHl+hpCZnZyUi4J7d3h+hZCYnZyUjIN8eHl+hpCYnZyVjIR9eHp/h5GZnp6WjYR9eHl+hpCZnp6WjYR9eHl+h5GZnp6WjYR9eHl+hpCYnZyUjIN8eHl+hpGZnp6WjYR9eHl+hpCYnp6WjYR9eHl+h5GZnp6WjYR9eHp/h5GZnp6WjYR9eHl+hpCZnp6WjYR8eHl+hpGZnp6WjYR9eHl+h5GZnZyVjIR9eHl+hpCZnp6WjYR9eHl+h5GZnp6WjYR9eHl+h5GZnp6WjYR9eHl+h5GZnZyVjIR9eHl+hpGZnp6WjYR9eHl+h5GZnZyVjIN8eHl+hpGZnp6WjYR9" type="audio/wav">
+</audio>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ===== CUSTOM MODAL SYSTEM =====
+    let _modalResolve = null;
+
+    function showModal(opts) {
+        return new Promise(function(resolve) {
+            _modalResolve = resolve;
+            const overlay = document.getElementById('customModal');
+            document.getElementById('modalTitle').textContent = opts.title || 'Confirm';
+            document.getElementById('modalMessage').textContent = opts.message || '';
+            const icon = document.getElementById('modalIcon');
+            const iconI = document.getElementById('modalIconI');
+            icon.className = 'modal-icon ' + (opts.type || 'info');
+            iconI.className = 'fas ' + (opts.icon || 'fa-info-circle');
+            const input = document.getElementById('modalInput');
+            if (opts.input) {
+                input.style.display = 'block';
+                input.placeholder = opts.placeholder || '';
+                input.value = opts.defaultValue || '';
+                input.type = opts.inputType || 'text';
+                setTimeout(function() { input.focus(); }, 100);
+            } else {
+                input.style.display = 'none';
+            }
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            confirmBtn.textContent = opts.confirmText || 'Confirm';
+            confirmBtn.className = 'modal-btn ' + (opts.confirmClass || 'confirm');
+            overlay.classList.add('show');
+        });
+    }
+
+    function modalResolve(val) {
+        const overlay = document.getElementById('customModal');
+        overlay.classList.remove('show');
+        if (_modalResolve) {
+            if (val === true) {
+                const input = document.getElementById('modalInput');
+                _modalResolve(input.style.display !== 'none' ? input.value : true);
+            } else {
+                _modalResolve(null);
+            }
+            _modalResolve = null;
+        }
+    }
+
+    // Close modal on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('customModal').classList.contains('show')) {
+            modalResolve(null);
+        }
+    });
+
+    // ===== VISITOR PANEL TOGGLE =====
+    function toggleVisitorPanel() {
+        document.querySelector('.chat-layout').classList.toggle('panel-closed');
+    }
+
+    const roomId = '{{ room.room_id }}';
+    const wsToken = '{{ ws_token }}';
+    const agentName = '{{ request.user.get_full_name|default:request.user.username }}';
+    const visitorName = '{{ room.visitor_name }}';
+    const csrfToken = '{{ csrf_token }}';
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+
+    let chatSocket;
+    let soundEnabled = true;
+    let typingTimeout;
+    let isScreenSharing = false;
+    let inputMode = 'reply'; // 'reply' or 'whisper'
+
+    // ===== WEBSOCKET =====
+    function connectWebSocket() {
+        chatSocket = new WebSocket(wsProtocol + window.location.host + '/ws/chat/' + roomId + '/?token=' + encodeURIComponent(wsToken));
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+
+            if (data.type === 'chat_message') {
+                if (data.sender_type !== 'agent' || data.sender_name !== agentName) {
+                    appendMessage(data.message, data.sender_type, data.sender_name, data.timestamp, data.msg_type, data.file_url, data.file_name);
+                    if (soundEnabled && data.sender_type === 'visitor') playSound();
+                    // AI Smart Reply + Sentiment
+                    if (data.sender_type === 'visitor') {
+                        generateSmartReplies(data.message);
+                        const sentHtml = getSentimentHtml(data.message);
+                        if (sentHtml) {
+                            const lastMsg = document.getElementById('chatMessages').lastElementChild;
+                            if (lastMsg) lastMsg.querySelector('.msg-sender').insertAdjacentHTML('beforeend', sentHtml);
+                        }
+                    }
+                    if (data.sender_type === 'visitor' && !document.hasFocus()) {
+                        unreadCount++;
+                        updateTabTitle();
+                        showDesktopNotif(data.sender_name || 'Visitor', data.message);
+                    }
+                }
+            }
+
+            if (data.type === 'typing') {
+                const el = document.getElementById('typingIndicator');
+                if (data.sender_type === 'visitor') {
+                    el.classList.toggle('show', data.is_typing);
+                    // Show typing preview text
+                    const previewEl = document.getElementById('typingPreview');
+                    if (data.preview_text && data.is_typing) {
+                        if (!previewEl) {
+                            const p = document.createElement('div');
+                            p.id = 'typingPreview';
+                            p.className = 'typing-preview-text';
+                            el.after(p);
+                        }
+                        (document.getElementById('typingPreview') || {}).textContent = '"' + data.preview_text + '..."';
+                    } else if (previewEl) {
+                        previewEl.remove();
+                    }
+                    scrollToBottom();
+                }
+                // Collision detection
+                checkCollision(data);
+            }
+
+            if (data.type === 'read_receipt') {
+                // Show double tick on last agent message
+                if (data.sender_type === 'visitor') {
+                    const agentMsgs = document.querySelectorAll('.message.agent');
+                    const last = agentMsgs[agentMsgs.length - 1];
+                    if (last && !last.querySelector('.read-receipt')) {
+                        const tick = document.createElement('div');
+                        tick.className = 'read-receipt';
+                        tick.innerHTML = '<i class="fas fa-check-double"></i> Read';
+                        last.appendChild(tick);
+                    }
+                }
+            }
+
+            // WebRTC Screen Share signals
+            if (data.type === 'screen_share_offer' && data.sender_type === 'visitor') {
+                handleScreenShareOffer(data.data);
+            }
+            if (data.type === 'ice_candidate' && data.sender_type === 'visitor') {
+                handleIceCandidate(data.data);
+            }
+            if (data.type === 'screen_share_stop' && data.sender_type === 'visitor') {
+                stopViewingScreen();
+                appendMessage('Visitor stopped screen sharing.', 'system', 'System', new Date().toISOString(), 'text');
+            }
+            if (data.type === 'cobrowse_update' && data.sender_type === 'visitor') {
+                handleCobrowseUpdate(data.data);
+            }
+
+            if (data.type === 'file_shared') {
+                if (data.sender_type !== 'agent' || data.sender_name !== agentName) {
+                    appendMessage(data.file_name, data.sender_type, data.sender_name, data.timestamp, data.msg_type, data.file_url, data.file_name);
+                    if (soundEnabled) playSound();
+                }
+            }
+
+            if (data.type === 'chat_closed') { location.reload(); }
+
+            if (data.type === 'chat_transferred') {
+                // Show transfer message in chat
+                appendMessage(data.message, 'system', 'System', new Date().toISOString(), 'text');
+                // Add transfer banner in collab tab
+                const histDiv = document.getElementById('transferHistory');
+                if (histDiv) {
+                    const banner = document.createElement('div');
+                    banner.className = 'transfer-banner';
+                    banner.innerHTML = '<i class="fas fa-exchange-alt"></i> ' + escapeHtml(data.message);
+                    histDiv.appendChild(banner);
+                }
+                // Update current agent display
+                const agentEl = document.getElementById('currentAgentName');
+                if (agentEl) agentEl.textContent = data.to_agent;
+                // If chat was transferred away from current agent, reload
+                if (data.to_agent !== agentName) {
+                    setTimeout(() => location.reload(), 1500);
+                }
+            }
+
+            if (data.type === 'internal_note') {
+                appendInternalNote(data.agent_name, data.content, data.created_at);
+                // Also show whisper inline in chat
+                appendWhisperMessage(data.agent_name, data.content, data.created_at);
+                if (soundEnabled) playSound();
+            }
+        };
+
+        chatSocket.onclose = function() { setTimeout(connectWebSocket, 3000); };
+    }
+
+    // ===== MESSAGES =====
+    function appendMessage(text, senderType, senderName, timestamp, msgType, fileUrl, fileName) {
+        const container = document.getElementById('chatMessages');
+        const time = timestamp ? new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+        const div = document.createElement('div');
+        div.className = 'message ' + senderType;
+
+        let content = '';
+        if (msgType === 'image' && fileUrl) {
+            content = `<div class="img-preview" onclick="openLightbox('${fileUrl}', '${escapeHtml(fileName)}')"><img src="${fileUrl}" alt="${escapeHtml(fileName)}"><div class="img-overlay"><i class="fas fa-search-plus"></i></div></div>`;
+        } else if (msgType === 'file' && fileUrl) {
+            const fn = (fileName || '').toLowerCase();
+            const iconClass = fn.includes('.pdf') ? 'pdf' : fn.includes('.doc') ? 'doc' : fn.includes('.xls') || fn.includes('.csv') ? 'xls' : fn.includes('.zip') || fn.includes('.rar') ? 'zip' : fn.includes('.txt') ? 'txt' : 'other';
+            const iconFa = fn.includes('.pdf') ? 'fa-file-pdf' : fn.includes('.doc') ? 'fa-file-word' : fn.includes('.xls') || fn.includes('.csv') ? 'fa-file-excel' : fn.includes('.zip') || fn.includes('.rar') ? 'fa-file-archive' : fn.includes('.txt') ? 'fa-file-alt' : 'fa-file';
+            content = `<a href="${fileUrl}" class="file-bubble" target="_blank" download>
+                <div class="file-icon ${iconClass}"><i class="fas ${iconFa}"></i></div>
+                <div class="file-info"><div class="file-name">${escapeHtml(fileName)}</div><div class="file-size">Click to download</div></div>
+                <div class="file-dl-icon"><i class="fas fa-download"></i></div>
+            </a>`;
+        } else {
+            content = `<div class="bubble">${formatMessage(text)}</div>`;
+        }
+
+        const msgId = 'msg-' + Date.now() + Math.random().toString(36).substr(2,4);
+        div.id = msgId;
+        div.style.position = 'relative';
+        const bubbleText = text || '';
+        div.innerHTML = `<div class="msg-sender">${escapeHtml(senderName)}</div>${content}<div class="msg-reactions" id="reactions-${msgId}"></div><div class="msg-time">${time}</div><button class="pin-btn" onclick="pinMessage('${escapeHtml(bubbleText).replace(/'/g,"\\'")}','${escapeHtml(senderName).replace(/'/g,"\\'")}')" title="Pin"><i class="fas fa-thumbtack"></i></button><button class="react-btn" onclick="toggleReactPicker('${msgId}')"><i class="fas fa-smile"></i></button><div class="react-picker" id="picker-${msgId}"><button class="react-emoji" onclick="addReaction('${msgId}','👍')">👍</button><button class="react-emoji" onclick="addReaction('${msgId}','❤️')">❤️</button><button class="react-emoji" onclick="addReaction('${msgId}','😂')">😂</button><button class="react-emoji" onclick="addReaction('${msgId}','🎉')">🎉</button><button class="react-emoji" onclick="addReaction('${msgId}','😢')">😢</button></div>`;
+        container.appendChild(div);
+        scrollToBottom();
+    }
+
+    function appendWhisperMessage(agentName, text, timestamp) {
+        const container = document.getElementById('chatMessages');
+        const time = timestamp ? new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+        const div = document.createElement('div');
+        div.className = 'message whisper';
+        div.innerHTML = `<div class="msg-sender"><i class="fas fa-user-secret" style="margin-right:4px;"></i>${escapeHtml(agentName)} · Whisper</div><div class="bubble">${escapeHtml(text)}</div><div class="msg-time">${time}</div>`;
+        container.appendChild(div);
+        scrollToBottom();
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const message = input.value.trim();
+        if (!message) return;
+
+        if (inputMode === 'whisper') {
+            // Send as internal note (whisper)
+            fetch('/dashboard/chats/' + roomId + '/notes/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: message }),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    input.value = '';
+                    input.focus();
+                }
+            });
+            return;
+        }
+
+        if (!chatSocket) return;
+        chatSocket.send(JSON.stringify({
+            type: 'chat_message',
+            message: message,
+            sender_type: 'agent',
+            sender_name: agentName,
+            msg_type: 'text',
+        }));
+
+        appendMessage(message, 'agent', agentName, new Date().toISOString(), 'text');
+        input.value = '';
+        input.focus();
+    }
+
+    function handleKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    }
+
+    // ===== REPLY / WHISPER MODE =====
+    function switchInputMode(mode) {
+        inputMode = mode;
+        const replyTab = document.getElementById('replyTab');
+        const whisperTab = document.getElementById('whisperTab');
+        const whisperNotice = document.getElementById('whisperNotice');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.querySelector('.send-btn');
+
+        if (mode === 'whisper') {
+            replyTab.classList.remove('active');
+            whisperTab.classList.add('active');
+            whisperNotice.classList.add('show');
+            chatInput.placeholder = 'Type a whisper (only agents can see)...';
+            chatInput.style.borderColor = 'var(--warning)';
+            if (sendBtn) sendBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+        } else {
+            whisperTab.classList.remove('active');
+            replyTab.classList.add('active');
+            whisperNotice.classList.remove('show');
+            chatInput.placeholder = 'Type your message...';
+            chatInput.style.borderColor = '';
+            if (sendBtn) sendBtn.style.background = '';
+        }
+        chatInput.focus();
+    }
+
+    // ===== CANNED RESPONSE SHORTCUT =====
+    function handleInputChange(input) {
+        handleTyping();
+        const val = input.value;
+        const popup = document.getElementById('cannedPopup');
+        if (val.startsWith('/')) {
+            const search = val.substring(1).toLowerCase();
+            const items = document.querySelectorAll('#cannedList .canned-item');
+            let visible = 0;
+            items.forEach(item => {
+                const title = item.querySelector('.ci-title').textContent.toLowerCase();
+                const shortcut = (item.querySelector('.ci-shortcut') || {}).textContent || '';
+                const show = !search || title.includes(search) || shortcut.includes(search);
+                item.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            popup.classList.toggle('show', visible > 0);
+        } else {
+            popup.classList.remove('show');
+        }
+    }
+
+    function useCanned(text) {
+        const input = document.getElementById('chatInput');
+        input.value = text;
+        input.focus();
+        document.getElementById('cannedPopup').classList.remove('show');
+    }
+
+    // ===== DESKTOP NOTIFICATIONS =====
+    let notifPermission = Notification.permission;
+    if (notifPermission === 'default') {
+        Notification.requestPermission().then(p => notifPermission = p);
+    }
+
+    function showDesktopNotif(title, body) {
+        if (notifPermission === 'granted') {
+            const n = new Notification(title, {
+                body: body,
+                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%236366f1" rx="20" width="100" height="100"/><text x="50" y="68" font-size="50" text-anchor="middle" fill="white">L</text></svg>',
+                tag: 'livetrack-' + roomId,
+            });
+            n.onclick = () => { window.focus(); n.close(); };
+            setTimeout(() => n.close(), 5000);
+        }
+    }
+
+    // ===== TAB TITLE UNREAD COUNT =====
+    let unreadCount = 0;
+    const originalTitle = document.title;
+
+    function updateTabTitle() {
+        document.title = unreadCount > 0 ? `(${unreadCount}) ${originalTitle}` : originalTitle;
+    }
+
+    // Reset unread on focus
+    window.addEventListener('focus', () => { unreadCount = 0; updateTabTitle(); });
+
+    // ===== TYPING INDICATOR =====
+    function handleTyping() {
+        if (!chatSocket) return;
+        chatSocket.send(JSON.stringify({ type: 'typing', sender_type: 'agent', is_typing: true }));
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            chatSocket.send(JSON.stringify({ type: 'typing', sender_type: 'agent', is_typing: false }));
+        }, 2000);
+    }
+
+    // ===== FILE UPLOAD =====
+    function uploadFile(input, type) {
+        const file = input.files[0];
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('sender_type', 'agent');
+        formData.append('sender_name', agentName);
+
+        fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                appendMessage(data.file_name, 'agent', agentName, data.timestamp, data.msg_type, data.file_url, data.file_name);
+
+                // Notify via WebSocket
+                chatSocket.send(JSON.stringify({
+                    type: 'chat_message',
+                    message: '📎 ' + data.file_name,
+                    sender_type: 'agent',
+                    sender_name: agentName,
+                    msg_type: data.msg_type,
+                    file_url: data.file_url,
+                    file_name: data.file_name,
+                }));
+            }
+        })
+        .catch(err => alert('Upload failed'));
+        input.value = '';
+    }
+
+    // ===== EMOJI =====
+    function toggleEmoji() {
+        const picker = document.getElementById('emojiPicker');
+        picker.classList.toggle('show');
+        document.getElementById('emojiBtn').classList.toggle('active', picker.classList.contains('show'));
+    }
+
+    function closeEmojiPicker() {
+        const picker = document.getElementById('emojiPicker');
+        picker.classList.remove('show');
+        document.getElementById('emojiBtn').classList.remove('active');
+    }
+
+    function insertEmoji(btn) {
+        const input = document.getElementById('chatInput');
+        input.value += btn.textContent;
+        input.focus();
+        closeEmojiPicker();
+    }
+
+    // Close emoji on click outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#emojiBtn') && !e.target.closest('#emojiPicker')) {
+            closeEmojiPicker();
+        }
+    });
+
+    // ===== QUICK REPLIES =====
+    function toggleQuickReplies() {
+        document.getElementById('quickReplies').classList.toggle('show');
+    }
+
+    function sendQuickReply(btn) {
+        document.getElementById('chatInput').value = btn.dataset.text || btn.textContent;
+        sendMessage();
+        document.getElementById('quickReplies').classList.remove('show');
+    }
+
+    // ===== SCREEN SHARE =====
+    let screenStream = null;
+
+    async function startScreenShare() {
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            document.getElementById('screenShareNotice').classList.add('show');
+            isScreenSharing = true;
+
+            chatSocket.send(JSON.stringify({
+                type: 'chat_message',
+                message: '🖥️ Agent started screen sharing',
+                sender_type: 'system',
+                sender_name: 'System',
+                msg_type: 'text',
+            }));
+
+            screenStream.getVideoTracks()[0].onended = () => stopScreenShare();
+        } catch(err) {
+            console.log('Screen share cancelled');
+        }
+    }
+
+    function stopScreenShare() {
+        if (screenStream) {
+            screenStream.getTracks().forEach(t => t.stop());
+            screenStream = null;
+        }
+        document.getElementById('screenShareNotice').classList.remove('show');
+        isScreenSharing = false;
+
+        chatSocket.send(JSON.stringify({
+            type: 'chat_message',
+            message: '🖥️ Screen sharing ended',
+            sender_type: 'system',
+            sender_name: 'System',
+            msg_type: 'text',
+        }));
+    }
+
+    // ===== SOUND =====
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        const icon = document.getElementById('soundIcon');
+        icon.className = soundEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute';
+        document.getElementById('soundBtn').querySelector('.tooltip').textContent = soundEnabled ? 'Sound On' : 'Sound Off';
+    }
+
+    function playSound() {
+        try { document.getElementById('notifSound').play(); } catch(e) {}
+    }
+
+    // ===== TRANSCRIPT =====
+    function downloadTranscript() {
+        window.open('/dashboard/chats/' + roomId + '/transcript/', '_blank');
+        document.getElementById('exportMenu').classList.remove('show');
+    }
+
+    async function emailTranscript() {
+        const email = await showModal({title:'Email Transcript',message:'Send chat transcript to:',icon:'fa-envelope',type:'info',input:true,placeholder:'email@example.com',defaultValue:'{{ room.visitor_email }}',confirmText:'Send'});
+        if (!email) return;
+        document.getElementById('exportMenu').classList.remove('show');
+        fetch('/dashboard/chats/' + roomId + '/email-transcript/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email }),
+        }).then(r => r.json()).then(data => {
+            if (data.status === 'ok') alert('Transcript sent to ' + data.email);
+            else alert(data.error || 'Failed to send');
+        }).catch(() => alert('Failed to send'));
+    }
+
+    // ===== CLOSE CHAT =====
+    function closeChat() {
+        if (!confirm('End this chat session?')) return;
+        fetch('/dashboard/chats/' + roomId + '/close/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        }).then(() => {
+            if (chatSocket) {
+                chatSocket.send(JSON.stringify({ type: 'close_chat' }));
+            }
+            location.reload();
+        });
+    }
+
+    function copyVisitorIp() {
+        const ip = '{{ visitor.ip_address|default:"" }}';
+        if (!ip) return;
+        navigator.clipboard.writeText(ip).then(() => {
+            alert('IP copied: ' + ip);
+        }).catch(() => {
+            alert('Copy failed');
+        });
+    }
+
+    function toggleBanVisitor(shouldBan) {
+        const action = shouldBan ? 'ban' : 'unban';
+        fetch('/dashboard/visitors/{{ visitor.id }}/ban/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                const btn = document.getElementById('banVisitorBtn');
+                if (data.is_banned) {
+                    btn.className = 'qa-btn success';
+                    btn.innerHTML = '<i class=\"fas fa-user-check\"></i> Unban';
+                    btn.onclick = () => toggleBanVisitor(false);
+                    alert('Visitor banned');
+                } else {
+                    btn.className = 'qa-btn danger';
+                    btn.innerHTML = '<i class=\"fas fa-user-slash\"></i> Ban';
+                    btn.onclick = () => toggleBanVisitor(true);
+                    alert('Visitor unbanned');
+                }
+            }
+        })
+        .catch(() => alert('Action failed'));
+    }
+
+    function saveChatTags() {
+        const tags = document.getElementById('chatTagsInput').value.trim();
+        fetch('/dashboard/chats/' + roomId + '/tags/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') alert('Tags updated');
+        })
+        .catch(() => alert('Tag update failed'));
+    }
+
+    async function transferChat() {
+        const sel1 = document.getElementById('transferAgentId');
+        const sel2 = document.getElementById('transferAgentId2');
+        const agentId = (sel1 && sel1.value) || (sel2 && sel2.value);
+        if (!agentId) {
+            alert('Select an agent first');
+            return;
+        }
+        const ok = await showModal({title:'Transfer Chat',message:'Transfer this chat to the selected agent?',icon:'fa-share',type:'info',confirmText:'Transfer'});
+        if (!ok) return;
+        fetch('/dashboard/chats/' + roomId + '/transfer/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent_id: agentId }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                alert('Chat transferred to ' + data.agent_name);
+                location.reload();
+            } else {
+                alert(data.error || 'Transfer failed');
+            }
+        })
+        .catch(() => alert('Transfer failed'));
+    }
+
+    // ===== INTERNAL NOTES =====
+    function sendInternalNote() {
+        const input = document.getElementById('internalNoteInput');
+        const content = (input.value || '').trim();
+        if (!content) return;
+        fetch('/dashboard/chats/' + roomId + '/notes/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                input.value = '';
+            } else {
+                alert(data.error || 'Failed to add note');
+            }
+        })
+        .catch(() => alert('Failed to add note'));
+    }
+
+    function appendInternalNote(agentName, content, createdAt) {
+        const list = document.getElementById('internalNotesList');
+        const noMsg = document.getElementById('noNotesMsg');
+        if (noMsg) noMsg.remove();
+
+        const time = createdAt ? new Date(createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'now';
+        const div = document.createElement('div');
+        div.className = 'note-item';
+        div.innerHTML = '<div class="note-header"><span class="note-agent"><i class="fas fa-user-shield"></i> ' + escapeHtml(agentName) + '</span><span class="note-time">' + time + '</span></div><div class="note-content">' + escapeHtml(content) + '</div>';
+        list.appendChild(div);
+        list.scrollTop = list.scrollHeight;
+
+        // Update collab badge count
+        updateCollabBadge();
+    }
+
+    function updateCollabBadge() {
+        const list = document.getElementById('internalNotesList');
+        const count = list ? list.querySelectorAll('.note-item').length : 0;
+        const badge = document.getElementById('collabCount');
+        if (badge) {
+            if (count > 0) {
+                badge.textContent = count;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    }
+    // Init collab badge on load
+    updateCollabBadge();
+
+    // ===== MESSAGE REACTIONS =====
+    function toggleReactPicker(msgId) {
+        document.querySelectorAll('.react-picker.show').forEach(p => {
+            if (p.id !== 'picker-' + msgId) p.classList.remove('show');
+        });
+        document.getElementById('picker-' + msgId).classList.toggle('show');
+    }
+    function addReaction(msgId, emoji) {
+        const container = document.getElementById('reactions-' + msgId);
+        // Check if already reacted with same emoji
+        const existing = container.querySelector(`[data-emoji="${emoji}"]`);
+        if (existing) {
+            existing.remove();
+        } else {
+            const span = document.createElement('span');
+            span.className = 'msg-reaction active';
+            span.dataset.emoji = emoji;
+            span.textContent = emoji;
+            span.onclick = () => span.remove();
+            container.appendChild(span);
+        }
+        document.getElementById('picker-' + msgId).classList.remove('show');
+    }
+    // Close pickers on click outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.react-btn') && !e.target.closest('.react-picker')) {
+            document.querySelectorAll('.react-picker.show').forEach(p => p.classList.remove('show'));
+        }
+    });
+
+    // ===== VISITOR NOTE =====
+    function addVisitorNote() {
+        const input = document.getElementById('visitorNoteInput');
+        const content = (input.value || '').trim();
+        if (!content) return;
+        fetch('/dashboard/visitors/{{ visitor.id }}/note/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content }),
+        }).then(r => r.json()).then(data => {
+            if (data.status === 'ok') {
+                const list = document.getElementById('visitorNotesList');
+                const div = document.createElement('div');
+                div.style.cssText = 'padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.04);font-size:12px;';
+                div.innerHTML = '<div style="color:var(--text-muted);font-size:10px;">' + agentName + ' - just now</div><div style="margin-top:2px;">' + escapeHtml(content) + '</div>';
+                list.appendChild(div);
+                input.value = '';
+            }
+        });
+    }
+
+    // ===== LIGHTBOX =====
+    function openLightbox(src, name) {
+        const lb = document.getElementById('lightbox');
+        document.getElementById('lightboxImg').src = src;
+        document.getElementById('lightboxDl').href = src;
+        lb.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox(e) {
+        if (e && e.target.tagName === 'IMG') return;
+        document.getElementById('lightbox').classList.remove('show');
+        document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeLightbox();
+    });
+
+    // ===== UTILS =====
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Format message with markdown-like syntax
+    function formatMessage(text) {
+        let html = escapeHtml(text);
+        // Bold: **text**
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // Italic: *text*
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        // Code: `text`
+        html = html.replace(/`(.*?)`/g, '<code style="background:rgba(99,102,241,0.1);padding:1px 5px;border-radius:4px;font-size:12px;font-family:monospace;">$1</code>');
+        // Links: auto-detect URLs
+        html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:var(--primary);text-decoration:underline;">$1</a>');
+        return html;
+    }
+
+    function scrollToBottom() {
+        const el = document.getElementById('chatMessages');
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function openSideTab(tab) {
+        const ids = ['overview', 'actions', 'journey', 'collab'];
+        ids.forEach((id) => {
+            const pane = document.getElementById('sideTab' + id.charAt(0).toUpperCase() + id.slice(1));
+            const btn = document.getElementById('sideTab' + id.charAt(0).toUpperCase() + id.slice(1) + 'Btn');
+            const active = id === tab;
+            if (pane) pane.classList.toggle('active', active);
+            if (btn) btn.classList.toggle('active', active);
+        });
+    }
+
+    // Init
+    scrollToBottom();
+    openSideTab('overview');
+    connectWebSocket();
+
+    // ===== CHAT DURATION TIMER =====
+    {% if room.status != 'closed' %}
+    (function() {
+        const startTime = new Date('{{ room.created_at|date:"c" }}');
+        function updateTimer() {
+            const diff = Math.floor((Date.now() - startTime.getTime()) / 1000);
+            const h = Math.floor(diff / 3600);
+            const m = Math.floor((diff % 3600) / 60);
+            const s = diff % 60;
+            const el = document.getElementById('timerValue');
+            if (el) el.textContent = h > 0
+                ? h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
+                : String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        }
+        updateTimer();
+        setInterval(updateTimer, 1000);
+    })();
+    {% endif %}
+
+    // ===== TYPING PREVIEW (see what visitor types before sending) =====
+    // Updated typing handler to send preview text
+    function handleTyping() {
+        if (!chatSocket) return;
+        const text = document.getElementById('chatInput').value;
+        chatSocket.send(JSON.stringify({
+            type: 'typing', sender_type: 'agent', is_typing: true,
+            preview_text: text.substring(0, 100),
+        }));
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            chatSocket.send(JSON.stringify({ type: 'typing', sender_type: 'agent', is_typing: false, preview_text: '' }));
+        }, 2000);
+    }
+
+    // ===== READ RECEIPTS =====
+    function sendReadReceipt() {
+        if (chatSocket && chatSocket.readyState === 1) {
+            chatSocket.send(JSON.stringify({ type: 'read_receipt' }));
+        }
+    }
+    // Send read receipt when window is focused
+    window.addEventListener('focus', sendReadReceipt);
+    // Send on page load
+    setTimeout(sendReadReceipt, 1000);
+
+    // ===== AGENT COLLISION DETECTION =====
+    let otherAgentTyping = {};
+    function checkCollision(data) {
+        if (data.type === 'typing' && data.sender_type === 'agent' && data.sender_name !== agentName) {
+            if (data.is_typing) {
+                otherAgentTyping[data.sender_name] = true;
+            } else {
+                delete otherAgentTyping[data.sender_name];
+            }
+            const names = Object.keys(otherAgentTyping);
+            const warning = document.getElementById('collisionWarning');
+            if (names.length > 0) {
+                document.getElementById('collisionText').textContent = names.join(', ') + ' is also typing...';
+                warning.classList.add('show');
+            } else {
+                warning.classList.remove('show');
+            }
+        }
+    }
+
+    // ===== PIN MESSAGES =====
+    let pinnedMessages = [];
+    function pinMessage(text, sender) {
+        if (pinnedMessages.includes(text)) return;
+        pinnedMessages.push(text);
+        const area = document.getElementById('pinnedArea');
+        const div = document.createElement('div');
+        div.className = 'pinned-msg';
+        div.innerHTML = '<i class="fas fa-thumbtack"></i><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(sender) + ': ' + escapeHtml(text.substring(0, 80)) + '</span><button onclick="this.parentElement.remove()" style="border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:11px;"><i class="fas fa-times"></i></button>';
+        area.appendChild(div);
+    }
+
+    // ===== VOICE NOTE RECORDING =====
+    let mediaRecorder = null, audioChunks = [];
+    function startVoiceNote() {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(t => t.stop());
+                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('file', blob, 'voice_' + Date.now() + '.webm');
+                formData.append('sender_type', 'agent');
+                formData.append('sender_name', agentName);
+                fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
+                .then(r => r.json()).then(data => {
+                    if (data.file_url) {
+                        chatSocket.send(JSON.stringify({
+                            type: 'chat_message', message: 'Voice note',
+                            sender_type: 'agent', sender_name: agentName,
+                            msg_type: 'file', file_url: data.file_url, file_name: data.file_name,
+                        }));
+                        appendMessage('Voice note', 'agent', agentName, new Date().toISOString(), 'file', data.file_url, data.file_name);
+                    }
+                });
+            };
+            mediaRecorder.start();
+            document.getElementById('voiceBtn').style.color = '#ef4444';
+            document.getElementById('voiceBtn').title = 'Stop recording (click again)';
+        }).catch(() => alert('Microphone access denied'));
+    }
+    function stopVoiceNote() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            document.getElementById('voiceBtn').style.color = '';
+            document.getElementById('voiceBtn').title = 'Record voice note';
+        }
+    }
+    function toggleVoiceNote() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') stopVoiceNote();
+        else startVoiceNote();
+    }
+
+    // ===== CHAT SUMMARY ON CLOSE =====
+    const origCloseChat = closeChat;
+    async function closeChat() {
+        const ok = await showModal({title:'End Chat',message:'Are you sure you want to end this chat session?',icon:'fa-phone-slash',type:'danger',confirmText:'End Chat',confirmClass:'danger'});
+        if (!ok) return;
+        // Generate summary from messages
+        const msgs = document.querySelectorAll('.message');
+        let visitorMsgs = [], agentMsgs = [];
+        msgs.forEach(m => {
+            const text = m.querySelector('.bubble')?.textContent || '';
+            if (m.classList.contains('visitor') && text) visitorMsgs.push(text);
+            if (m.classList.contains('agent') && text) agentMsgs.push(text);
+        });
+        const summary = 'Visitor asked about: ' + (visitorMsgs[0] || 'general inquiry').substring(0, 100) +
+            '. ' + agentMsgs.length + ' responses sent by agent. ' +
+            'Total ' + msgs.length + ' messages exchanged.';
+
+        // Show summary before closing
+        const container = document.getElementById('chatMessages');
+        const div = document.createElement('div');
+        div.className = 'chat-summary-card';
+        div.innerHTML = '<h4><i class="fas fa-clipboard-list"></i> Chat Summary</h4><p>' + escapeHtml(summary) + '</p>';
+        container.appendChild(div);
+        scrollToBottom();
+
+        // Actually close
+        fetch('/dashboard/chats/' + roomId + '/close/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        }).then(() => {
+            if (chatSocket) chatSocket.send(JSON.stringify({ type: 'close_chat' }));
+            setTimeout(() => location.reload(), 1500);
+        });
+    }
+
+    // ===== VISITOR SCREEN SHARE (WebRTC - Agent Side) =====
+    let peerConnection = null;
+    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+
+    function requestVisitorScreenShare() {
+        // Send request to visitor via WebSocket
+        chatSocket.send(JSON.stringify({ type: 'screen_share_request', data: {} }));
+        document.getElementById('ssRequestBar').classList.add('show');
+        document.getElementById('ssRequestBtn').style.color = '#10b981';
+        appendMessage('Screen share requested. Waiting for visitor...', 'system', 'System', new Date().toISOString(), 'text');
+    }
+
+    function cancelScreenShareRequest() {
+        chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
+        document.getElementById('ssRequestBar').classList.remove('show');
+        document.getElementById('ssRequestBtn').style.color = '';
+    }
+
+    function handleScreenShareOffer(data) {
+        // Visitor sent their screen share offer
+        document.getElementById('ssRequestBar').classList.remove('show');
+        peerConnection = new RTCPeerConnection(rtcConfig);
+
+        peerConnection.ontrack = function(event) {
+            const video = document.getElementById('remoteScreenVideo');
+            video.srcObject = event.streams[0];
+            document.getElementById('screenShareViewer').classList.add('show');
+        };
+
+        peerConnection.onicecandidate = function(event) {
+            if (event.candidate) {
+                chatSocket.send(JSON.stringify({
+                    type: 'ice_candidate',
+                    data: { candidate: event.candidate.toJSON() },
+                }));
+            }
+        };
+
+        peerConnection.onconnectionstatechange = function() {
+            if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
+                stopViewingScreen();
+            }
+        };
+
+        const offer = new RTCSessionDescription(data.sdp);
+        peerConnection.setRemoteDescription(offer).then(function() {
+            return peerConnection.createAnswer();
+        }).then(function(answer) {
+            return peerConnection.setLocalDescription(answer);
+        }).then(function() {
+            chatSocket.send(JSON.stringify({
+                type: 'screen_share_answer',
+                data: { sdp: peerConnection.localDescription.toJSON() },
+            }));
+        });
+    }
+
+    function handleIceCandidate(data) {
+        if (peerConnection && data.candidate) {
+            peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+    }
+
+    function stopViewingScreen() {
+        document.getElementById('screenShareViewer').classList.remove('show');
+        document.getElementById('ssRequestBtn').style.color = '';
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
+    }
+
+    function toggleScreenShareFullscreen() {
+        const video = document.getElementById('remoteScreenVideo');
+        if (video.requestFullscreen) video.requestFullscreen();
+        else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+    }
+
+    function screenshotRemoteScreen() {
+        const video = document.getElementById('remoteScreenVideo');
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        canvas.toBlob(function(blob) {
+            const formData = new FormData();
+            formData.append('file', blob, 'screen_capture_' + Date.now() + '.png');
+            formData.append('sender_type', 'agent');
+            formData.append('sender_name', agentName);
+            fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
+            .then(r => r.json()).then(data => {
+                if (data.file_url) {
+                    chatSocket.send(JSON.stringify({
+                        type: 'chat_message', message: 'Screen capture',
+                        sender_type: 'agent', sender_name: agentName,
+                        msg_type: 'image', file_url: data.file_url, file_name: data.file_name,
+                    }));
+                    appendMessage('Screen capture', 'agent', agentName, new Date().toISOString(), 'image', data.file_url, data.file_name);
+                }
+            });
+        }, 'image/png');
+    }
+
+    // ===== CO-BROWSING (Live URL Tracking) =====
+    function handleCobrowseUpdate(data) {
+        const bar = document.getElementById('cobrowseBar');
+        const urlEl = document.getElementById('cobrowseUrl');
+        const timeEl = document.getElementById('cobrowseTime');
+        if (data.url) {
+            urlEl.textContent = data.url.length > 60 ? data.url.substring(0, 60) + '...' : data.url;
+            urlEl.href = data.url;
+            timeEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+            bar.classList.add('show');
+            // Update visitor current page in header
+            const pageEl = document.getElementById('visitorCurrentPage');
+            if (pageEl) pageEl.textContent = data.url.length > 40 ? data.url.substring(0, 40) + '...' : data.url;
+        }
+    }
+
+    // ===== IN-CHAT SEARCH =====
+    function toggleChatSearch() {
+        const bar = document.getElementById('chatSearchBar');
+        const isVisible = bar.style.display === 'flex';
+        bar.style.display = isVisible ? 'none' : 'flex';
+        if (!isVisible) document.getElementById('chatSearchInput').focus();
+        else clearSearchHighlights();
+    }
+    function closeChatSearch() {
+        document.getElementById('chatSearchBar').style.display = 'none';
+        clearSearchHighlights();
+    }
+    function searchInChat(query) {
+        clearSearchHighlights();
+        if (!query || query.length < 2) {
+            document.getElementById('chatSearchCount').textContent = '';
+            return;
+        }
+        const msgs = document.querySelectorAll('.message .bubble');
+        let count = 0;
+        msgs.forEach(bubble => {
+            const text = bubble.textContent.toLowerCase();
+            if (text.includes(query.toLowerCase())) {
+                bubble.style.outline = '2px solid var(--primary)';
+                bubble.style.outlineOffset = '2px';
+                bubble.style.borderRadius = '12px';
+                count++;
+                if (count === 1) bubble.scrollIntoView({behavior: 'smooth', block: 'center'});
+            }
+        });
+        document.getElementById('chatSearchCount').textContent = count + ' found';
+    }
+    function clearSearchHighlights() {
+        document.querySelectorAll('.message .bubble').forEach(b => {
+            b.style.outline = '';
+            b.style.outlineOffset = '';
+        });
+    }
+
+    // ===== SNOOZE CHAT =====
+    async function snoozeChat() {
+        const min = await showModal({title:'Snooze Chat',message:'Snooze this chat and get reminded later:',icon:'fa-clock',type:'info',input:true,inputType:'number',placeholder:'Minutes',defaultValue:'15',confirmText:'Snooze'});
+        if (!min || isNaN(min)) return;
+        fetch('/dashboard/chats/' + roomId + '/snooze/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+            body: JSON.stringify({minutes: parseInt(min)}),
+        }).then(r => r.json()).then(data => {
+            if (data.status === 'ok') {
+                alert('Chat snoozed for ' + min + ' minutes');
+                location.href = '/dashboard/chats/';
+            }
+        });
+    }
+
+    // ===== BOOKMARK CHAT =====
+    function bookmarkChat() {
+        fetch('/dashboard/chats/' + roomId + '/bookmark/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken},
+        }).then(r => r.json()).then(data => {
+            if (data.status === 'ok') {
+                const btn = document.getElementById('bookmarkBtn');
+                btn.style.color = data.is_bookmarked ? 'var(--warning)' : 'var(--text-muted)';
+            }
+        });
+    }
+
+    // ===== SCHEDULE MESSAGE =====
+    async function scheduleMessage() {
+        const input = document.getElementById('chatInput');
+        const message = input.value.trim();
+        if (!message) { await showModal({title:'Schedule',message:'Type a message first before scheduling.',icon:'fa-exclamation-circle',type:'warning',confirmText:'OK'}); return; }
+        const minutes = await showModal({title:'Schedule Message',message:'Send this message after:',icon:'fa-clock',type:'info',input:true,inputType:'number',placeholder:'Minutes',defaultValue:'5',confirmText:'Schedule'});
+        if (!minutes || isNaN(minutes) || parseInt(minutes) < 1) return;
+        const ms = parseInt(minutes) * 60 * 1000;
+        const sendTime = new Date(Date.now() + ms);
+
+        // Show scheduled indicator
+        const container = document.getElementById('chatMessages');
+        const div = document.createElement('div');
+        div.className = 'scheduled-msg';
+        div.innerHTML = '<i class="fas fa-clock"></i> Scheduled: "' + escapeHtml(message.substring(0, 50)) + '..." at ' + sendTime.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' <button onclick="this.parentElement.remove()" style="border:none;background:none;color:var(--danger);cursor:pointer;margin-left:auto;font-size:11px;"><i class="fas fa-times"></i> Cancel</button>';
+        container.appendChild(div);
+        scrollToBottom();
+        input.value = '';
+
+        setTimeout(function() {
+            if (!div.parentElement) return; // cancelled
+            div.remove();
+            if (chatSocket && chatSocket.readyState === 1) {
+                chatSocket.send(JSON.stringify({
+                    type: 'chat_message', message: message,
+                    sender_type: 'agent', sender_name: agentName, msg_type: 'text',
+                }));
+                appendMessage(message, 'agent', agentName, new Date().toISOString(), 'text');
+            }
+        }, ms);
+    }
+
+    // ===== CHAT TAKEOVER =====
+    async function takeoverChat() {
+        const ok = await showModal({title:'Take Over Chat',message:'Take over this chat from the current agent?',icon:'fa-hand-paper',type:'warning',confirmText:'Take Over'});
+        if (!ok) return;
+        fetch('/dashboard/chats/' + roomId + '/takeover/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+        }).then(r => r.json()).then(data => {
+            if (data.status === 'ok') location.reload();
+            else alert(data.error || 'Failed');
+        });
+    }
+
+    // ===== AI SMART REPLY SUGGESTIONS =====
+    const smartReplyMap = {
+        'hello|hi|hey|hii': ['Hello! How can I help you today?', 'Hi there! What can I assist you with?', 'Welcome! How may I help?'],
+        'help|support|issue|problem': ['I\'d be happy to help! Can you describe the issue?', 'Let me look into this for you right away.', 'Could you share more details about the problem?'],
+        'price|pricing|cost|plan': ['You can check our pricing at the pricing page.', 'We have Free, Pro, and Enterprise plans. Which interests you?', 'Let me share the pricing details with you.'],
+        'thank|thanks|thx': ['You\'re welcome! Is there anything else I can help with?', 'Happy to help! Let me know if you need anything else.', 'Glad I could help! Have a great day!'],
+        'bye|goodbye|close': ['Thank you for chatting! Have a great day!', 'Goodbye! Don\'t hesitate to reach out again.', 'Take care! We\'re always here to help.'],
+        'billing|payment|invoice': ['Let me check your billing details.', 'I can help with billing questions. What specifically do you need?', 'Could you share your account email so I can look up your invoice?'],
+        'bug|error|broken|crash': ['Sorry about that! Can you share a screenshot of the error?', 'I\'ll escalate this to our technical team right away.', 'Let me reproduce this issue. What steps did you follow?'],
+        'slow|loading|performance': ['I understand the frustration. Let me check the server status.', 'Could you clear your cache and try again?', 'We\'re looking into performance improvements.'],
+        'cancel|refund|unsubscribe': ['I\'m sorry to hear that. May I know the reason?', 'Let me process that for you. Can you confirm your account email?', 'Would you like to try our free plan instead?'],
+        'feature|request|suggestion': ['Great idea! I\'ll forward this to our product team.', 'Thank you for the suggestion! We\'re always improving.', 'That\'s on our roadmap! Stay tuned for updates.'],
+    };
+
+    function generateSmartReplies(visitorMsg) {
+        const msg = (visitorMsg || '').toLowerCase();
+        const container = document.getElementById('smartReplyChips');
+        const wrap = document.getElementById('smartReplies');
+        container.innerHTML = '';
+        let found = false;
+
+        for (const [keywords, replies] of Object.entries(smartReplyMap)) {
+            const patterns = keywords.split('|');
+            if (patterns.some(p => msg.includes(p))) {
+                replies.forEach(reply => {
+                    const chip = document.createElement('button');
+                    chip.className = 'smart-reply-chip';
+                    chip.textContent = reply;
+                    chip.onclick = function() {
+                        document.getElementById('chatInput').value = reply;
+                        document.getElementById('chatInput').focus();
+                        wrap.classList.remove('show');
+                    };
+                    container.appendChild(chip);
+                });
+                found = true;
+                break;
+            }
+        }
+        wrap.classList.toggle('show', found);
+    }
+
+    // ===== VISITOR SENTIMENT DETECTION =====
+    function detectSentiment(text) {
+        const t = (text || '').toLowerCase();
+        const positive = ['thank','thanks','great','awesome','love','perfect','amazing','happy','good','excellent','nice','wonderful','helpful'];
+        const negative = ['angry','bad','terrible','worst','hate','frustrated','annoyed','disappointed','awful','horrible','useless','stupid','slow','broken','bug','error','crash'];
+        if (positive.some(w => t.includes(w))) return 'positive';
+        if (negative.some(w => t.includes(w))) return 'negative';
+        return 'neutral';
+    }
+
+    function getSentimentHtml(text) {
+        const s = detectSentiment(text);
+        if (s === 'positive') return '<span class="sentiment-badge sentiment-positive">&#128522; Happy</span>';
+        if (s === 'negative') return '<span class="sentiment-badge sentiment-negative">&#128544; Upset</span>';
+        return '';
+    }
+
+    // ===== VISITOR INTENT DETECTION (HOT LEAD) =====
+    function detectIntent(pageUrl) {
+        if (!pageUrl) return '';
+        const url = pageUrl.toLowerCase();
+        if (url.includes('pricing') || url.includes('plans') || url.includes('checkout') || url.includes('buy') || url.includes('signup')) {
+            return '<span class="hot-lead-badge"><i class="fas fa-fire"></i> Hot Lead</span>';
+        }
+        return '';
+    }
+
+    // Show hot lead if visitor was on pricing page
+    (function() {
+        const pageEl = document.getElementById('visitorCurrentPage');
+        if (pageEl) {
+            const intent = detectIntent(pageEl.textContent);
+            if (intent) pageEl.insertAdjacentHTML('afterend', ' ' + intent);
+        }
+    })();
+
+    // ===== SLA BREACH DETECTION =====
+    {% if room.status == 'waiting' %}
+    (function() {
+        const created = new Date('{{ room.created_at|date:"c" }}');
+        const slaMin = {{ sla_minutes|default:5 }};
+        function checkSla() {
+            const elapsed = (Date.now() - created.getTime()) / 60000;
+            if (elapsed > slaMin) {
+                document.getElementById('slaBreachBar').classList.add('show');
+                if (typeof playSound === 'function') playSound();
+            }
+        }
+        checkSla();
+        setInterval(checkSla, 30000);
+    })();
+    {% endif %}
+
+    // ===== DRAG & DROP FILE UPLOAD =====
+    (function() {
+        const panel = document.getElementById('chatPanel');
+        const overlay = document.getElementById('dropOverlay');
+        let dragCounter = 0;
+
+        panel.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            dragCounter++;
+            overlay.classList.add('show');
+        });
+        panel.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter <= 0) { overlay.classList.remove('show'); dragCounter = 0; }
+        });
+        panel.addEventListener('dragover', function(e) { e.preventDefault(); });
+        panel.addEventListener('drop', function(e) {
+            e.preventDefault();
+            overlay.classList.remove('show');
+            dragCounter = 0;
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
+                const isImage = file.type.startsWith('image/');
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('sender_type', 'agent');
+                formData.append('sender_name', agentName);
+                fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.file_url) {
+                        const msgType = isImage ? 'image' : 'file';
+                        chatSocket.send(JSON.stringify({
+                            type: 'chat_message', message: data.file_name,
+                            sender_type: 'agent', sender_name: agentName,
+                            msg_type: msgType, file_url: data.file_url, file_name: data.file_name,
+                        }));
+                        appendMessage(data.file_name, 'agent', agentName, new Date().toISOString(), msgType, data.file_url, data.file_name);
+                    }
+                });
+            }
+        });
+    })();
+
+    // ===== PASTE SCREENSHOT (Ctrl+V) =====
+    document.addEventListener('paste', function(e) {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image/')) {
+                e.preventDefault();
+                const file = items[i].getAsFile();
+                if (!file || file.size > 10 * 1024 * 1024) return;
+                const formData = new FormData();
+                formData.append('file', file, 'screenshot_' + Date.now() + '.png');
+                formData.append('sender_type', 'agent');
+                formData.append('sender_name', agentName);
+                fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.file_url) {
+                        chatSocket.send(JSON.stringify({
+                            type: 'chat_message', message: data.file_name,
+                            sender_type: 'agent', sender_name: agentName,
+                            msg_type: 'image', file_url: data.file_url, file_name: data.file_name,
+                        }));
+                        appendMessage(data.file_name, 'agent', agentName, new Date().toISOString(), 'image', data.file_url, data.file_name);
+                    }
+                });
+                break;
+            }
+        }
+    });
+
+    // ===== KEYBOARD SHORTCUTS =====
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+F = search in chat
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            toggleChatSearch();
+        }
+        // ? = show shortcuts
+        if (e.key === '?' && !e.target.matches('input,textarea')) {
+            e.preventDefault();
+            alert(
+                'Keyboard Shortcuts:\n\n' +
+                '/ = Canned responses\n' +
+                'Enter = Send message\n' +
+                'Ctrl+F = Search in chat\n' +
+                'Ctrl+V = Paste screenshot\n' +
+                'Esc = Close popups\n' +
+                '? = Show this help'
+            );
+        }
+    });
+</script>
+{% endblock %}

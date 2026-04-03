@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Search Chats{% endblock %}
+{% block page_title %}Search Chats{% endblock %}
+
+{% block content %}
+<div style="max-width:900px;">
+    <form method="get" style="margin-bottom:20px;">
+        <div style="display:flex;gap:10px;">
+            <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search messages, visitor names, emails..." style="flex:1;" autofocus>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+        </div>
+    </form>
+
+    {% if query %}
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-search" style="color:var(--primary);"></i> Results for "{{ query }}" ({{ results|length }})</h3></div>
+        <div class="card-body" style="padding:0;">
+            {% for msg in results %}
+            <a href="{% url 'dashboard:chat_room' msg.room.room_id %}" style="display:flex;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;transition:background .15s;">
+                <div style="width:36px;height:36px;border-radius:50%;background:{% if msg.sender_type == 'visitor' %}var(--primary){% elif msg.sender_type == 'agent' %}var(--success){% else %}var(--warning){% endif %};display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;flex-shrink:0;">
+                    {{ msg.sender_name|first|upper }}
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div style="font-weight:600;font-size:13px;">{{ msg.sender_name }} <span style="color:var(--text-muted);font-weight:400;">in #{{ msg.room.room_id|truncatechars:8 }}</span></div>
+                        <div style="font-size:11px;color:var(--text-muted);">{{ msg.timestamp|timesince }} ago</div>
+                    </div>
+                    <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ msg.content|truncatechars:120 }}</div>
+                </div>
+            </a>
+            {% empty %}
+            <div style="text-align:center;padding:40px;color:var(--text-muted);">
+                <i class="fas fa-search" style="font-size:32px;opacity:0.3;display:block;margin-bottom:10px;"></i>
+                No messages found for "{{ query }}"
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Webhooks{% endblock %}
+{% block page_title %}Webhooks{% endblock %}
+
+{% block content %}
+<div style="max-width:900px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <!-- Add Webhook -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-plug" style="color:var(--primary);"></i> Add Webhook</h3></div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label>Endpoint URL</label>
+                        <input class="form-control" type="url" name="url" placeholder="https://your-server.com/webhook" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Events</label>
+                        {% for val, label in event_choices %}
+                        <div style="padding:4px 0;">
+                            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                                <input type="checkbox" name="events" value="{{ val }}" checked> {{ label }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="form-group">
+                        <label>Secret Key (optional, for HMAC signature)</label>
+                        <input class="form-control" type="text" name="secret" placeholder="your-webhook-secret">
+                    </div>
+                    <button class="btn btn-primary" type="submit" style="width:100%;"><i class="fas fa-plus"></i> Add Webhook</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Existing Webhooks -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-list" style="color:var(--info);"></i> Active Webhooks ({{ webhooks|length }})</h3></div>
+            <div class="card-body" style="padding:0;">
+                {% for wh in webhooks %}
+                <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ wh.url|truncatechars:45 }}</div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">{{ wh.events }}</div>
+                    </div>
+                    <span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600;{% if wh.is_active %}background:rgba(16,185,129,0.1);color:#10b981;{% else %}background:rgba(239,68,68,0.1);color:#ef4444;{% endif %}">
+                        {% if wh.is_active %}Active{% else %}Paused{% endif %}
+                    </span>
+                    <button onclick="fetch('/dashboard/settings/webhooks/{{ wh.id }}/toggle/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload())" class="btn btn-sm btn-secondary" title="Toggle"><i class="fas fa-power-off"></i></button>
+                    <button onclick="if(confirm('Delete this webhook?'))fetch('/dashboard/settings/webhooks/{{ wh.id }}/delete/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload())" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                </div>
+                {% empty %}
+                <div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px;">
+                    <i class="fas fa-plug" style="font-size:24px;opacity:0.3;display:block;margin-bottom:8px;"></i>
+                    No webhooks configured
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

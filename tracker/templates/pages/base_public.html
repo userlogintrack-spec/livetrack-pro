@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LiveTrack Pro{% endblock %} | LiveTrack Pro</title>
+    <meta name="description" content="{% block meta_desc %}LiveTrack Pro — Real-time visitor tracking & live chat{% endblock %}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #7c3aed;
+            --primary-light: #a78bfa;
+            --primary-soft: #c4b5fd;
+            --primary-dark: #5b21b6;
+            --bg-body: #fafbff;
+            --bg-white: #ffffff;
+            --bg-soft: #f1f0ff;
+            --bg-hero: linear-gradient(135deg, #0f0a2e 0%, #1a1145 40%, #2d1b69 70%, #1e1250 100%);
+            --bg-card: #ffffff;
+            --text-dark: #1e1b4b;
+            --text-body: #4b5563;
+            --text-muted: #6b7280;
+            --text-muted-on-dark: #a09dc4;
+            --border-light: #e5e2ff;
+            --border-dark: rgba(167,139,250,0.2);
+            --gradient-primary: linear-gradient(135deg, #7c3aed, #a855f7, #c084fc);
+            --shadow-card: 0 4px 24px rgba(0,0,0,0.04);
+            --shadow-md: 0 8px 30px rgba(124,58,237,0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-body); color: var(--text-body); line-height: 1.6;
+        }
+
+        /* Navbar */
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            padding: 0 48px; height: 72px;
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(255,255,255,0.7); backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid rgba(124,58,237,0.08);
+        }
+        .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .nav-brand .logo-icon {
+            width: 40px; height: 40px; background: var(--gradient-primary);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 17px; color: white; box-shadow: 0 4px 12px rgba(124,58,237,0.3);
+        }
+        .nav-brand h1 { font-size: 20px; font-weight: 800; color: var(--text-dark); }
+        .nav-brand h1 em { font-style: normal; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+        .nav-links a:hover { color: var(--primary); }
+        .nav-actions { display: flex; gap: 10px; }
+        .nav-search {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(124,58,237,0.06);
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            padding: 4px 6px;
+        }
+        .nav-search input {
+            border: none;
+            background: transparent;
+            outline: none;
+            width: 180px;
+            font-size: 13px;
+            color: var(--text-dark);
+        }
+        .nav-search button {
+            border: none;
+            background: var(--gradient-primary);
+            color: white;
+            border-radius: 8px;
+            padding: 7px 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 22px; border-radius: 12px; font-size: 14px; font-weight: 600;
+            text-decoration: none; border: none; cursor: pointer; font-family: inherit; transition: all 0.3s;
+        }
+        .btn-ghost { color: var(--text-dark); background: transparent; }
+        .btn-ghost:hover { background: var(--bg-soft); color: var(--primary); }
+        .btn-primary { background: var(--gradient-primary); color: white; box-shadow: 0 4px 15px rgba(124,58,237,0.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
+
+        /* Page Hero (Dark) */
+        .page-hero {
+            padding: 140px 48px 60px; text-align: center;
+            background: var(--bg-hero); color: white;
+            position: relative; overflow: hidden;
+        }
+        .page-hero::before {
+            content: ''; position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, rgba(124,58,237,0.15), transparent 70%);
+        }
+        .page-hero .grid-bg {
+            position: absolute; inset: 0;
+            background-image: linear-gradient(rgba(167,139,250,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(167,139,250,0.06) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+        }
+        .page-hero h1 { font-size: 48px; font-weight: 900; letter-spacing: -1.5px; margin-bottom: 16px; position: relative; z-index: 2; }
+        .page-hero h1 span { background: linear-gradient(135deg, #c084fc, #f0abfc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .page-hero p { font-size: 18px; color: var(--text-muted-on-dark); max-width: 600px; margin: 0 auto; position: relative; z-index: 2; }
+        .breadcrumb {
+            display: flex; justify-content: center; gap: 8px;
+            font-size: 13px; color: var(--text-muted-on-dark); margin-bottom: 20px; position: relative; z-index: 2;
+        }
+        .breadcrumb a { color: var(--primary-soft); text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        /* Content */
+        .page-content { max-width: 900px; margin: 0 auto; padding: 48px 48px 100px; }
+        .content-card {
+            background: var(--bg-card); border: 1px solid var(--border-light);
+            border-radius: 24px; padding: 48px;
+            box-shadow: var(--shadow-card);
+        }
+        .content-card h2 {
+            font-size: 24px; font-weight: 700; margin: 40px 0 16px;
+            color: var(--text-dark);
+        }
+        .content-card h2:first-child { margin-top: 0; }
+        .content-card h3 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; color: var(--primary); }
+        .content-card p { font-size: 15px; color: var(--text-body); line-height: 1.8; margin-bottom: 16px; }
+        .content-card ul, .content-card ol { padding-left: 24px; margin-bottom: 16px; }
+        .content-card li { font-size: 15px; color: var(--text-body); line-height: 1.8; margin-bottom: 8px; }
+        .content-card a { color: var(--primary); text-decoration: none; }
+        .content-card a:hover { text-decoration: underline; }
+        .content-card strong { color: var(--text-dark); }
+
+        .content-card .highlight-box {
+            background: var(--bg-soft); border: 1px solid var(--border-light);
+            border-radius: 16px; padding: 22px 28px; margin: 20px 0;
+        }
+        .content-card .highlight-box p { margin-bottom: 0; }
+
+        .last-updated {
+            font-size: 13px; color: var(--text-muted); margin-bottom: 32px;
+            padding-bottom: 24px; border-bottom: 1px solid var(--border-light);
+        }
+        .last-updated i { color: var(--primary-light); margin-right: 4px; }
+
+        /* Footer (Dark) */
+        .footer { background: #0a0a1a; border-top: 1px solid rgba(167,139,250,0.1); padding: 60px 48px; color: var(--text-muted-on-dark); }
+        .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 40px; max-width: 1200px; margin: 0 auto; }
+        .footer-brand h3 { font-size: 20px; font-weight: 800; margin-bottom: 12px; color: white; }
+        .footer-brand h3 i { color: var(--primary-light); }
+        .footer-brand p { font-size: 14px; color: var(--text-muted-on-dark); line-height: 1.7; margin-bottom: 20px; }
+        .footer-social { display: flex; gap: 10px; }
+        .footer-social a {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text-muted-on-dark); text-decoration: none; transition: all 0.2s;
+        }
+        .footer-social a:hover { background: var(--primary); color: white; border-color: var(--primary); }
+        .footer-col h4 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: white; }
+        .footer-col a { display: block; color: var(--text-muted-on-dark); text-decoration: none; font-size: 13px; padding: 5px 0; transition: color 0.2s; }
+        .footer-col a:hover { color: var(--primary-light); }
+        .footer-bottom {
+            max-width: 1200px; margin: 40px auto 0; padding-top: 24px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px; color: var(--text-muted-on-dark);
+        }
+        .footer-bottom-links { display: flex; gap: 24px; }
+        .footer-bottom-links a { color: var(--text-muted-on-dark); text-decoration: none; }
+        .footer-bottom-links a:hover { color: var(--primary-light); }
+
+        @media (max-width: 768px) {
+            .navbar { padding: 0 20px; }
+            .nav-links { display: none; }
+            .page-hero { padding: 120px 20px 40px; }
+            .page-hero h1 { font-size: 32px; }
+            .page-content { padding: 24px 16px 60px; }
+            .content-card { padding: 28px 24px; border-radius: 16px; }
+            .footer { padding: 40px 20px; }
+            .footer-grid { grid-template-columns: 1fr 1fr; }
+            .footer-bottom { flex-direction: column; gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <a class="nav-brand" href="/">
+        <div class="logo-icon"><i class="fas fa-bolt"></i></div>
+        <h1>Live<em>Track</em> Pro</h1>
+    </a>
+    <ul class="nav-links">
+        <li><a href="/#features">Features</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="{% url 'pages:about' %}">About</a></li>
+        <li><a href="{% url 'pages:contact' %}">Contact</a></li>
+        <li><a href="{% url 'pages:all_pages' %}">All Pages</a></li>
+    </ul>
+    <div class="nav-actions">
+        <form class="nav-search" method="get" action="{% url 'pages:all_pages' %}">
+            <input type="text" name="q" placeholder="Search pages">
+            <button type="submit"><i class="fas fa-search"></i></button>
+        </form>
+        <a href="{% url 'core:login' %}" class="btn btn-ghost">Sign In</a>
+        <a href="{% url 'core:register' %}" class="btn btn-primary">Get Started Free</a>
+    </div>
+</nav>
+
+{% block hero %}{% endblock %}
+
+<div class="page-content">
+    {% block content %}{% endblock %}
+</div>
+
+<footer class="footer">
+    <div class="footer-grid">
+        <div class="footer-brand">
+            <h3><i class="fas fa-bolt"></i> LiveTrack Pro</h3>
+            <p>The most powerful visitor tracking and live chat platform for modern businesses.</p>
+            <div class="footer-social">
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                <a href="#"><i class="fab fa-github"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+            </div>
+        </div>
+        <div class="footer-col"><h4>Product</h4><a href="/#features">Features</a><a href="/#pricing">Pricing</a><a href="/#how-it-works">How It Works</a></div>
+        <div class="footer-col"><h4>Company</h4><a href="{% url 'pages:about' %}">About Us</a><a href="{% url 'pages:contact' %}">Contact</a><a href="#">Careers</a></div>
+        <div class="footer-col"><h4>Resources</h4><a href="#">Documentation</a><a href="#">Help Center</a><a href="#">Blog</a></div>
+        <div class="footer-col"><h4>Legal</h4><a href="{% url 'pages:privacy' %}">Privacy Policy</a><a href="{% url 'pages:terms' %}">Terms of Service</a><a href="{% url 'pages:refund' %}">Refund Policy</a></div>
+    </div>
+    <div class="footer-bottom">
+        <span>&copy; 2026 LiveTrack Pro. All rights reserved.</span>
+        <div class="footer-bottom-links">
+            <a href="{% url 'pages:privacy' %}">Privacy</a>
+            <a href="{% url 'pages:terms' %}">Terms</a>
+            <a href="{% url 'pages:refund' %}">Refund</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

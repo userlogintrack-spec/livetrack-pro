@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Offline Messages{% endblock %}
+{% block nav_offline %}active{% endblock %}
+{% block page_title %}Offline Messages{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-envelope" style="color: var(--warning);"></i> Messages from visitors when agents were offline</h3>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Message</th>
+                    <th>IP</th>
+                    <th>Received</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for msg in messages %}
+                <tr id="offMsg{{ msg.id }}" style="{% if not msg.is_read %}background: rgba(99, 102, 241, 0.03);{% endif %}">
+                    <td>
+                        {% if msg.is_read %}
+                        <span class="status status-closed"><span class="dot"></span> Read</span>
+                        {% else %}
+                        <span class="status status-waiting"><span class="dot"></span> New</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ msg.name }}</strong></td>
+                    <td><a href="mailto:{{ msg.email }}" style="color: var(--primary-light); text-decoration: none;">{{ msg.email }}</a></td>
+                    <td style="max-width: 300px;">{{ msg.message|truncatechars:100 }}</td>
+                    <td><small>{{ msg.ip_address }}</small></td>
+                    <td><small>{{ msg.created_at|timesince }} ago</small></td>
+                    <td>
+                        {% if not msg.is_read %}
+                        <button onclick="markRead({{ msg.id }})" class="btn btn-sm btn-primary">
+                            <i class="fas fa-check"></i> Mark Read
+                        </button>
+                        {% endif %}
+                        <a href="mailto:{{ msg.email }}" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-reply"></i> Reply
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7">
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No offline messages</p>
+                    </div>
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function markRead(id) {
+    fetch('/dashboard/offline-messages/' + id + '/read/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'},
+    }).then(() => location.reload());
+}
+</script>
+{% endblock %}
