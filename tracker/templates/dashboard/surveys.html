@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}Surveys & NPS{% endblock %}
+{% block page_title %}Surveys & NPS{% endblock %}
+
+{% block content %}
+{% if nps_data %}
+<div class="stats-grid">
+    <div class="stat-card {% if nps_data.score >= 50 %}green{% elif nps_data.score >= 0 %}orange{% else %}purple{% endif %}">
+        <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+        <div class="stat-value">{{ nps_data.score }}</div>
+        <div class="stat-label">NPS Score</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-icon"><i class="fas fa-smile"></i></div>
+        <div class="stat-value">{{ nps_data.promoters }}</div>
+        <div class="stat-label">Promoters (9-10)</div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-meh"></i></div>
+        <div class="stat-value">{{ nps_data.passives }}</div>
+        <div class="stat-label">Passives (7-8)</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-frown"></i></div>
+        <div class="stat-value">{{ nps_data.detractors }}</div>
+        <div class="stat-label">Detractors (0-6)</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-poll"></i> Your Surveys</h3></div>
+        <div class="card-body">
+            {% for survey in surveys %}
+            <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:600;font-size:14px;">{{ survey.title }}</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+                        <span class="status" style="font-size:11px;{% if survey.survey_type == 'nps' %}background:var(--primary-soft);color:var(--primary);{% elif survey.survey_type == 'csat' %}background:var(--success-soft);color:var(--success);{% else %}background:var(--info-soft);color:var(--info);{% endif %}">{{ survey.get_survey_type_display }}</span>
+                        &middot; {{ survey.response_count }} responses
+                        {% if survey.avg_score %}&middot; Avg: {{ survey.avg_score|floatformat:1 }}{% endif %}
+                        &middot; {% if survey.show_after_chat %}<i class="fas fa-check-circle" style="color:var(--success);"></i> Post-chat{% endif %}
+                    </div>
+                </div>
+                <div style="display:flex;gap:4px;">
+                    <a href="{% url 'dashboard:survey_detail' survey.id %}" class="btn btn-sm btn-secondary"><i class="fas fa-chart-bar"></i></a>
+                    <button onclick="toggleSurvey({{ survey.id }})" class="btn btn-sm {% if survey.is_active %}btn-success{% else %}btn-secondary{% endif %}"><i class="fas fa-{% if survey.is_active %}check{% else %}play{% endif %}"></i></button>
+                    <button onclick="deleteSurvey({{ survey.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state"><i class="fas fa-poll-h"></i><p>No surveys yet.</p></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-plus-circle"></i> Create Survey</h3></div>
+        <div class="card-body">
+            <div class="form-group"><label>Title</label><input type="text" id="surveyTitle" class="form-control" placeholder="e.g. How was your experience?"></div>
+            <div class="form-group"><label>Description</label><textarea id="surveyDesc" class="form-control" rows="2" placeholder="Optional description"></textarea></div>
+            <div class="form-group"><label>Type</label>
+                <select id="surveyType" class="form-control">
+                    <option value="nps">Net Promoter Score (NPS)</option>
+                    <option value="csat">Customer Satisfaction (CSAT)</option>
+                    <option value="custom">Custom Survey</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="surveyAfterChat" checked> Show after chat closes</label>
+            </div>
+
+            <div id="questionsContainer">
+                <label style="font-size:13px;font-weight:600;color:var(--text-secondary);">Questions</label>
+                <div id="questionsList"></div>
+                <button onclick="addQuestion()" class="btn btn-sm btn-secondary" style="margin-top:6px;"><i class="fas fa-plus"></i> Add Question</button>
+            </div>
+
+            <button onclick="createSurvey()" class="btn btn-primary" style="margin-top:16px;"><i class="fas fa-plus"></i> Create Survey</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var questionCount = 0;
+function addQuestion() {
+    var id = questionCount++;
+    var html = '<div id="q'+id+'" style="padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:6px;">';
+    html += '<div style="display:flex;gap:6px;"><input class="form-control q-text" placeholder="Question text" style="flex:1;">';
+    html += '<select class="form-control q-type" style="width:120px;"><option value="rating">Rating</option><option value="text">Text</option><option value="choice">Choice</option><option value="yesno">Yes/No</option></select>';
+    html += '<button onclick="document.getElementById(\'q'+id+'\').remove()" class="btn btn-sm btn-danger"><i class="fas fa-times"></i></button></div></div>';
+    document.getElementById('questionsList').insertAdjacentHTML('beforeend', html);
+}
+
+function postJSON(url, data) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json());
+}
+
+function createSurvey() {
+    var questions = [];
+    document.querySelectorAll('#questionsList > div').forEach(function(div) {
+        questions.push({text: div.querySelector('.q-text').value, type: div.querySelector('.q-type').value, required: true});
+    });
+    postJSON('', {
+        action: 'create',
+        title: document.getElementById('surveyTitle').value,
+        description: document.getElementById('surveyDesc').value,
+        survey_type: document.getElementById('surveyType').value,
+        show_after_chat: document.getElementById('surveyAfterChat').checked,
+        questions: questions,
+    }).then(()=>location.reload());
+}
+
+function deleteSurvey(id) { if(confirm('Delete this survey?')) postJSON('', {action:'delete', survey_id:id}).then(()=>location.reload()); }
+function toggleSurvey(id) { postJSON('', {action:'toggle', survey_id:id}).then(()=>location.reload()); }
+</script>
+{% endblock %}

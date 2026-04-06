@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Upgrade Required{% endblock %}
+{% block page_title %}Upgrade Required{% endblock %}
+
+{% block content %}
+<div style="max-width:500px;margin:40px auto;text-align:center;">
+    <div style="width:80px;height:80px;border-radius:50%;background:var(--warning-soft);display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--warning);margin:0 auto 20px;">
+        <i class="fas fa-lock"></i>
+    </div>
+    <h2 style="font-size:24px;font-weight:800;color:var(--text-primary);margin-bottom:8px;">{{ feature }} requires {{ required_plan }} plan</h2>
+    <p style="font-size:14px;color:var(--text-muted);margin-bottom:24px;">This feature is not available on your current plan. Upgrade to {{ required_plan }} to unlock it.</p>
+    <a href="{% url 'dashboard:billing' %}" class="btn btn-primary btn-lg" style="justify-content:center;"><i class="fas fa-arrow-up"></i> View Plans & Upgrade</a>
+</div>
+{% endblock %}

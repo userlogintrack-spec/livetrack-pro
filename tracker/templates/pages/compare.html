@@ -1,0 +1,301 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Compare LiveTrack Pro vs Google Analytics vs Microsoft Clarity vs Intercom vs Hotjar vs Tawk.to — see why LiveTrack is the best free all-in-one platform.">
+    <title>Compare LiveTrack Pro vs Competitors — LiveTrack Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary:#7c3aed;--primary-light:#a78bfa;--primary-soft:#ede9fe;
+            --success:#10b981;--warning:#f59e0b;--danger:#ef4444;--info:#3b82f6;
+            --bg-body:#fafbff;--text-dark:#1e1b4b;--text-body:#4b5563;--text-muted:#6b7280;
+            --border:#e5e2ff;--gradient:linear-gradient(135deg,#7c3aed,#a855f7,#c084fc);
+        }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        html{scroll-behavior:smooth;}
+        body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg-body);color:var(--text-body);line-height:1.6;}
+
+        /* Navbar */
+        .navbar{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 48px;height:68px;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.85);backdrop-filter:blur(24px);border-bottom:1px solid rgba(0,0,0,0.04);transition:all .4s;}
+        .navbar.scrolled{background:rgba(255,255,255,0.96);box-shadow:0 1px 16px rgba(0,0,0,0.06);height:60px;}
+        .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
+        .nav-brand .logo-icon{width:36px;height:36px;background:var(--gradient);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;color:white;}
+        .nav-brand h1{font-size:19px;font-weight:800;color:var(--text-dark);}
+        .nav-brand h1 em{font-style:normal;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+        .nav-links{display:flex;align-items:center;gap:4px;list-style:none;}
+        .nav-links a{color:var(--text-muted);text-decoration:none;font-size:13px;font-weight:500;padding:6px 14px;border-radius:8px;transition:all .2s;}
+        .nav-links a:hover{color:var(--primary);background:rgba(99,102,241,0.06);}
+        .nav-links a.active{color:var(--primary);background:rgba(99,102,241,0.08);font-weight:600;}
+        .nav-actions{display:flex;align-items:center;gap:8px;}
+        .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 20px;border-radius:10px;font-size:13px;font-weight:600;text-decoration:none;border:none;cursor:pointer;font-family:inherit;transition:all .25s;}
+        .btn-ghost{color:var(--text-dark);background:transparent;border:1.5px solid var(--border);}
+        .btn-ghost:hover{background:#f1f0ff;color:var(--primary);}
+        .btn-primary{background:var(--gradient);color:white;box-shadow:0 3px 12px rgba(124,58,237,0.25);}
+        .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(124,58,237,0.35);}
+        .btn-lg{padding:14px 32px;font-size:15px;border-radius:12px;}
+        .btn-xl{padding:16px 40px;font-size:16px;border-radius:14px;}
+        .btn-outline-light{border:2px solid rgba(255,255,255,0.3);color:white;background:transparent;}
+        .btn-outline-light:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.6);}
+
+        /* Hero */
+        .hero{position:relative;padding:140px 48px 70px;text-align:center;background:linear-gradient(135deg,#0f0a2e 0%,#1a1145 40%,#2d1b69 70%,#1e1250 100%);color:white;overflow:hidden;}
+        .hero .orb{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;}
+        .hero .orb-1{top:-80px;left:-100px;width:500px;height:500px;background:rgba(124,58,237,0.25);}
+        .hero .orb-2{bottom:-120px;right:-80px;width:400px;height:400px;background:rgba(6,182,212,0.15);}
+        .hero .grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(167,139,250,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(167,139,250,0.06) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse at center,black 30%,transparent 80%);}
+        .hero-inner{position:relative;z-index:2;max-width:800px;margin:0 auto;}
+        .hero h1{font-size:52px;font-weight:900;line-height:1.1;letter-spacing:-2px;margin-bottom:18px;}
+        .hero h1 .grad{background:linear-gradient(135deg,#c084fc,#f0abfc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+        .hero p{font-size:18px;color:#a09dc4;max-width:600px;margin:0 auto 32px;line-height:1.7;}
+
+        /* Tool Selector */
+        .tool-selector{display:flex;justify-content:center;gap:8px;padding:20px 48px;background:white;border-bottom:1px solid var(--border);position:sticky;top:60px;z-index:99;flex-wrap:wrap;}
+        .tool-btn{padding:10px 20px;border-radius:50px;font-size:13px;font-weight:600;border:2px solid var(--border);background:white;color:var(--text-muted);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:inherit;}
+        .tool-btn:hover{border-color:var(--primary-light);color:var(--primary);}
+        .tool-btn.active{background:var(--gradient);color:white;border-color:transparent;box-shadow:0 4px 12px rgba(124,58,237,0.2);}
+        .tool-btn img,.tool-btn i{width:18px;height:18px;font-size:16px;}
+
+        /* Content */
+        .container{max-width:1200px;margin:0 auto;padding:48px;}
+
+        /* VS Section */
+        .vs-section{margin-bottom:60px;}
+        .vs-header{display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:40px;}
+        .vs-logo{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+        .vs-badge{font-size:28px;font-weight:900;color:var(--text-muted);}
+        .vs-name{font-size:14px;font-weight:700;color:var(--text-dark);margin-top:6px;text-align:center;}
+
+        /* Feature Table */
+        .compare-tbl{width:100%;border-collapse:separate;border-spacing:0;border-radius:16px;overflow:hidden;border:1px solid var(--border);background:white;box-shadow:0 4px 24px rgba(0,0,0,0.03);}
+        .compare-tbl th{padding:14px 20px;font-size:12px;font-weight:700;text-align:center;background:#f6f5ff;color:var(--text-dark);border-bottom:2px solid var(--border);}
+        .compare-tbl th:first-child{text-align:left;width:40%;}
+        .compare-tbl th.lt{background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(168,85,247,0.05));color:var(--primary);}
+        .compare-tbl td{padding:13px 20px;font-size:14px;border-bottom:1px solid #f3f2ff;text-align:center;transition:background .2s;}
+        .compare-tbl td:first-child{text-align:left;font-weight:500;color:var(--text-dark);}
+        .compare-tbl tr:hover td{background:rgba(124,58,237,0.02);}
+        .compare-tbl tr:last-child td{border-bottom:none;}
+        .compare-tbl .yes{color:var(--success);font-size:16px;}
+        .compare-tbl .no{color:#d1d5db;font-size:16px;}
+        .compare-tbl .paid{color:var(--warning);font-size:11px;font-weight:600;}
+        .compare-tbl .cat-row td{background:rgba(124,58,237,0.03);font-weight:700;color:var(--primary);font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:10px 20px;}
+
+        /* Winner Badge */
+        .winner-card{background:white;border:2px solid var(--primary);border-radius:20px;padding:40px;text-align:center;margin-top:40px;position:relative;overflow:hidden;}
+        .winner-card::before{content:'';position:absolute;inset:0;background:var(--gradient);opacity:0.03;}
+        .winner-card h3{font-size:24px;font-weight:900;color:var(--text-dark);margin-bottom:8px;}
+        .winner-card .score{font-size:64px;font-weight:900;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
+        .winner-card p{font-size:15px;color:var(--text-muted);margin-top:8px;}
+
+        /* Summary Cards */
+        .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:40px;}
+        .summary-card{background:white;border:1px solid var(--border);border-radius:16px;padding:24px;transition:all .3s;}
+        .summary-card:hover{transform:translateY(-4px);box-shadow:0 8px 30px rgba(0,0,0,0.06);}
+        .summary-card .tool-name{font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+        .summary-card .tool-score{font-size:32px;font-weight:900;margin-bottom:2px;}
+        .summary-card .tool-price{font-size:13px;color:var(--text-muted);}
+        .summary-card .tool-bar{height:8px;background:#f3f2ff;border-radius:4px;margin-top:12px;overflow:hidden;}
+        .summary-card .tool-fill{height:100%;border-radius:4px;transition:width .8s ease;}
+        .summary-card.winner{border-color:var(--primary);box-shadow:0 4px 16px rgba(124,58,237,0.1);}
+        .summary-card.winner::after{content:'WINNER';position:absolute;top:12px;right:12px;font-size:9px;font-weight:800;background:var(--gradient);color:white;padding:3px 10px;border-radius:20px;letter-spacing:.5px;}
+        .summary-card{position:relative;}
+
+        /* CTA */
+        .cta{padding:80px 48px;text-align:center;background:linear-gradient(135deg,#0f0a2e,#2d1b69);position:relative;overflow:hidden;}
+        .cta .orb{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;}
+        .cta .orb-1{top:-80px;right:-100px;width:400px;height:400px;background:rgba(124,58,237,0.2);}
+        .cta h2{font-size:40px;font-weight:900;color:white;letter-spacing:-1.5px;margin-bottom:14px;position:relative;z-index:2;}
+        .cta p{font-size:17px;color:#a09dc4;margin-bottom:28px;position:relative;z-index:2;}
+
+        /* Footer */
+        .footer{background:#0a0a1a;padding:40px 48px;color:#a09dc4;text-align:center;font-size:13px;}
+        .footer a{color:var(--primary-light);text-decoration:none;}
+
+        /* Responsive */
+        @media(max-width:768px){
+            .hero{padding:110px 20px 50px;} .hero h1{font-size:32px;}
+            .navbar{padding:0 16px;} .nav-links{display:none;}
+            .container{padding:24px 16px;}
+            .tool-selector{padding:12px;gap:4px;top:56px;} .tool-btn{padding:6px 12px;font-size:11px;}
+            .vs-header{flex-direction:column;gap:12px;} .vs-badge{font-size:20px;}
+            .compare-tbl th,.compare-tbl td{padding:8px 10px;font-size:11px;}
+            .compare-tbl th:first-child{width:35%;}
+            .summary-grid{grid-template-columns:1fr 1fr;}
+            .cta{padding:48px 20px;} .cta h2{font-size:28px;}
+            .footer{padding:24px 16px;}
+        }
+        @media(max-width:480px){
+            .hero h1{font-size:26px;} .summary-grid{grid-template-columns:1fr;}
+            .compare-tbl{font-size:10px;}
+            .vs-logo{width:48px;height:48px;font-size:20px;border-radius:12px;}
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar" id="navbar">
+    <a class="nav-brand" href="/"><div class="logo-icon"><i class="fas fa-bolt"></i></div><h1>Live<em>Track</em> Pro</h1></a>
+    <ul class="nav-links">
+        <li><a href="{% url 'pages:features' %}">Features</a></li>
+        <li><a href="{% url 'pages:compare' %}" class="active">Compare</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="{% url 'pages:about' %}">About</a></li>
+        <li><a href="{% url 'pages:contact' %}">Contact</a></li>
+    </ul>
+    <div class="nav-actions">
+        <a href="{% url 'core:login' %}" class="btn btn-ghost">Sign In</a>
+        <a href="{% url 'core:register' %}" class="btn btn-primary">Get Started Free</a>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="grid-bg"></div>
+    <div class="hero-inner">
+        <h1>LiveTrack Pro vs<br><span class="grad">Every Competitor</span></h1>
+        <p>The only platform that combines live chat, Google Analytics, and Microsoft Clarity features — all free. See exactly how we stack up.</p>
+        <a href="#comparison" class="btn btn-primary btn-lg">See Full Comparison <i class="fas fa-chevron-down"></i></a>
+    </div>
+</section>
+
+<!-- Score Summary -->
+<div class="container" id="comparison">
+    <div style="text-align:center;margin-bottom:40px;">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--primary);margin-bottom:8px;">Feature Score (out of 35)</div>
+        <h2 style="font-size:36px;font-weight:900;color:var(--text-dark);letter-spacing:-1px;">Who Has The Most Features?</h2>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card winner">
+            <div class="tool-name"><i class="fas fa-bolt" style="color:var(--primary);margin-right:4px;"></i> LiveTrack Pro</div>
+            <div class="tool-score" style="color:var(--primary);">35/35</div>
+            <div class="tool-price">Free forever</div>
+            <div class="tool-bar"><div class="tool-fill" style="width:100%;background:var(--gradient);"></div></div>
+        </div>
+        <div class="summary-card">
+            <div class="tool-name"><i class="fab fa-google" style="color:#4285f4;margin-right:4px;"></i> Google Analytics</div>
+            <div class="tool-score" style="color:#4285f4;">14/35</div>
+            <div class="tool-price">Free (analytics only)</div>
+            <div class="tool-bar"><div class="tool-fill" style="width:40%;background:linear-gradient(90deg,#4285f4,#34a853);"></div></div>
+        </div>
+        <div class="summary-card">
+            <div class="tool-name"><i class="fas fa-chart-bar" style="color:#0078d4;margin-right:4px;"></i> Microsoft Clarity</div>
+            <div class="tool-score" style="color:#0078d4;">9/35</div>
+            <div class="tool-price">Free (heatmaps only)</div>
+            <div class="tool-bar"><div class="tool-fill" style="width:26%;background:#0078d4;"></div></div>
+        </div>
+        <div class="summary-card">
+            <div class="tool-name"><i class="fas fa-intercom" style="color:#286efa;margin-right:4px;"></i> Intercom</div>
+            <div class="tool-score" style="color:#286efa;">18/35</div>
+            <div class="tool-price">From $74/mo</div>
+            <div class="tool-bar"><div class="tool-fill" style="width:51%;background:#286efa;"></div></div>
+        </div>
+        <div class="summary-card">
+            <div class="tool-name"><i class="fas fa-fire" style="color:#fd3a5c;margin-right:4px;"></i> Hotjar</div>
+            <div class="tool-score" style="color:#fd3a5c;">11/35</div>
+            <div class="tool-price">From $32/mo</div>
+            <div class="tool-bar"><div class="tool-fill" style="width:31%;background:#fd3a5c;"></div></div>
+        </div>
+        <div class="summary-card">
+            <div class="tool-name"><i class="fas fa-comment" style="color:#1c9c59;margin-right:4px;"></i> Tawk.to</div>
+            <div class="tool-score" style="color:#1c9c59;">8/35</div>
+            <div class="tool-price">Free (chat only)</div>
+            <div class="tool-bar"><div class="tool-fill" style="width:23%;background:#1c9c59;"></div></div>
+        </div>
+    </div>
+
+    <!-- Full Comparison Table -->
+    <table class="compare-tbl">
+        <thead>
+            <tr>
+                <th>Feature</th>
+                <th class="lt"><i class="fas fa-bolt"></i> LiveTrack Pro<br><span style="font-size:10px;font-weight:800;color:var(--success);">FREE</span></th>
+                <th><i class="fab fa-google" style="color:#4285f4;"></i> Google<br>Analytics</th>
+                <th><i class="fas fa-chart-bar" style="color:#0078d4;"></i> MS<br>Clarity</th>
+                <th>Intercom<br><span style="font-size:10px;color:var(--text-muted);">$74/mo</span></th>
+                <th>Hotjar<br><span style="font-size:10px;color:var(--text-muted);">$32/mo</span></th>
+                <th>Tawk.to<br><span style="font-size:10px;color:var(--text-muted);">Free</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- LIVE CHAT -->
+            <tr class="cat-row"><td colspan="7"><i class="fas fa-comments" style="margin-right:6px;"></i> Live Chat & Support</td></tr>
+            <tr><td>Real-Time Live Chat</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+            <tr><td>AI Auto-Reply Bot</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Chatbot Flow Builder</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Knowledge Base</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+            <tr><td>WhatsApp Integration</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>SLA Management</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Surveys & NPS</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Agent Departments</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Unlimited Agents</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no">N/A</td><td class="no">N/A</td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no">N/A</td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+
+            <!-- ANALYTICS -->
+            <tr class="cat-row"><td colspan="7"><i class="fas fa-chart-line" style="margin-right:6px;color:#3b82f6;"></i> Analytics (Google Analytics Features)</td></tr>
+            <tr><td>UTM Campaign Tracking</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Bounce Rate & Session Metrics</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Goals & Conversions</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Custom Event Tracking</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>User Flow Visualization</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Cohort / Retention Analysis</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Landing & Exit Pages</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Scheduled Email Reports</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Real-time Visitor Tracking</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+
+            <!-- CLARITY -->
+            <tr class="cat-row"><td colspan="7"><i class="fas fa-fire" style="margin-right:6px;color:#10b981;"></i> Heatmaps & Recordings (MS Clarity Features)</td></tr>
+            <tr><td>Click Heatmaps</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Scroll Depth Tracking</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Session Recordings</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Rage Click Detection</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Dead Click Detection</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>JS Error Tracking</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Frustration Score</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+
+            <!-- PLATFORM -->
+            <tr class="cat-row"><td colspan="7"><i class="fas fa-cog" style="margin-right:6px;"></i> Platform</td></tr>
+            <tr><td>Dark Mode</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Mobile PWA</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td>Self-Hosted / Open Source</td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+        </tbody>
+    </table>
+
+    <!-- Winner Card -->
+    <div class="winner-card">
+        <div style="font-size:40px;margin-bottom:12px;">🏆</div>
+        <h3>LiveTrack Pro Wins</h3>
+        <div class="score">35/35</div>
+        <p>The only platform with <strong>100% feature coverage</strong> across Live Chat, Analytics, and Heatmaps — completely free.</p>
+        <div style="margin-top:20px;display:flex;gap:24px;justify-content:center;flex-wrap:wrap;font-size:13px;">
+            <span style="color:var(--success);font-weight:600;"><i class="fas fa-check-circle"></i> Replaces Google Analytics</span>
+            <span style="color:var(--success);font-weight:600;"><i class="fas fa-check-circle"></i> Replaces Microsoft Clarity</span>
+            <span style="color:var(--success);font-weight:600;"><i class="fas fa-check-circle"></i> Replaces Intercom</span>
+            <span style="color:var(--success);font-weight:600;"><i class="fas fa-check-circle"></i> Replaces Hotjar</span>
+        </div>
+        <a href="{% url 'core:register' %}" class="btn btn-primary btn-lg" style="margin-top:24px;">Switch to LiveTrack — It's Free <i class="fas fa-arrow-right"></i></a>
+    </div>
+</div>
+
+<!-- CTA -->
+<section class="cta">
+    <div class="orb orb-1"></div>
+    <h2>Stop Paying for 4 Different Tools</h2>
+    <p>LiveTrack Pro = Intercom + Google Analytics + Microsoft Clarity + Hotjar. One platform. Zero cost.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative;z-index:2;">
+        <a href="{% url 'core:register' %}" class="btn btn-primary btn-xl">Get Started Free <i class="fas fa-arrow-right"></i></a>
+        <a href="{% url 'pages:features' %}" class="btn btn-outline-light btn-lg">See All 200+ Features</a>
+    </div>
+</section>
+
+<footer class="footer">
+    <p>&copy; 2026 LiveTrack Pro. All rights reserved. &middot; <a href="{% url 'pages:privacy' %}">Privacy</a> &middot; <a href="{% url 'pages:terms' %}">Terms</a> &middot; <a href="{% url 'pages:features' %}">Features</a></p>
+</footer>
+
+<script>
+window.addEventListener('scroll',function(){document.getElementById('navbar').classList.toggle('scrolled',window.scrollY>20);});
+</script>
+</body>
+</html>

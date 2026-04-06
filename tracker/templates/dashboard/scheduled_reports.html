@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}Scheduled Reports{% endblock %}
+{% block page_title %}Scheduled Reports{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Your Reports</h3></div>
+        <div class="card-body">
+            {% for report in reports %}
+            <div style="padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:600;font-size:14px;">{{ report.name }}</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+                        <i class="fas fa-envelope" style="margin-right:2px;"></i> {{ report.email }}
+                        &middot; <span class="status" style="font-size:10px;background:var(--primary-soft);color:var(--primary);">{{ report.get_frequency_display }}</span>
+                        {% if report.last_sent %}&middot; Last: {{ report.last_sent|timesince }} ago{% endif %}
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+                        {% if report.include_visitors %}<i class="fas fa-check" style="color:var(--success);"></i> Visitors{% endif %}
+                        {% if report.include_chats %}<i class="fas fa-check" style="color:var(--success);margin-left:6px;"></i> Chats{% endif %}
+                        {% if report.include_goals %}<i class="fas fa-check" style="color:var(--success);margin-left:6px;"></i> Goals{% endif %}
+                    </div>
+                </div>
+                <div style="display:flex;gap:4px;">
+                    <button onclick="sendNow({{ report.id }})" class="btn btn-sm btn-primary" title="Send now"><i class="fas fa-paper-plane"></i></button>
+                    <button onclick="toggleReport({{ report.id }})" class="btn btn-sm {% if report.is_active %}btn-success{% else %}btn-secondary{% endif %}"><i class="fas fa-{% if report.is_active %}check{% else %}play{% endif %}"></i></button>
+                    <button onclick="deleteReport({{ report.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="padding:30px;"><i class="fas fa-calendar-alt"></i><p>No scheduled reports. Create one to get automated analytics emails.</p></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-plus-circle"></i> Create Report</h3></div>
+        <div class="card-body">
+            <div class="form-group"><label>Report Name</label><input type="text" id="reportName" class="form-control" placeholder="e.g. Weekly Dashboard Summary"></div>
+            <div class="form-group"><label>Email Address</label><input type="email" id="reportEmail" class="form-control" placeholder="your@email.com"></div>
+            <div class="form-group"><label>Frequency</label>
+                <select id="reportFreq" class="form-control">
+                    <option value="daily">Daily</option>
+                    <option value="weekly" selected>Weekly (Monday)</option>
+                    <option value="monthly">Monthly (1st)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Include:</label>
+                <div style="display:flex;gap:16px;margin-top:4px;">
+                    <label style="font-size:13px;"><input type="checkbox" id="incVisitors" checked> Visitors</label>
+                    <label style="font-size:13px;"><input type="checkbox" id="incChats" checked> Chats</label>
+                    <label style="font-size:13px;"><input type="checkbox" id="incGoals" checked> Goals</label>
+                </div>
+            </div>
+            <button onclick="createReport()" class="btn btn-primary"><i class="fas fa-plus"></i> Create Report</button>
+        </div>
+    </div>
+</div>
+<script>
+function postJSON(url, data) { return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json()); }
+function createReport() {
+    postJSON('', {action:'create', name:document.getElementById('reportName').value, email:document.getElementById('reportEmail').value, frequency:document.getElementById('reportFreq').value, include_visitors:document.getElementById('incVisitors').checked, include_chats:document.getElementById('incChats').checked, include_goals:document.getElementById('incGoals').checked}).then(()=>location.reload());
+}
+function deleteReport(id) { if(confirm('Delete?')) postJSON('', {action:'delete', report_id:id}).then(()=>location.reload()); }
+function toggleReport(id) { postJSON('', {action:'toggle', report_id:id}).then(()=>location.reload()); }
+function sendNow(id) { postJSON('', {action:'send_now', report_id:id}).then(d => { if(d.status==='ok') alert('Report sent!'); }); }
+</script>
+{% endblock %}

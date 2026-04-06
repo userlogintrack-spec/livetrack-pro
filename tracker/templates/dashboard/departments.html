@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Departments{% endblock %}
+{% block page_title %}Departments{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+    {% for dept in departments %}
+    <div class="stat-card purple" id="dept-{{ dept.id }}">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div>
+                <div class="stat-icon" style="background:{{ dept.color }}22;color:{{ dept.color }};"><i class="fas fa-building"></i></div>
+                <div class="stat-value" style="font-size:20px;">{{ dept.name }}</div>
+                <div class="stat-label">{{ dept.description|truncatewords:10|default:"No description" }}</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+                <button onclick="toggleDept({{ dept.id }})" class="btn btn-sm btn-secondary" title="Toggle"><i class="fas fa-{% if dept.is_active %}pause{% else %}play{% endif %}"></i></button>
+                <button onclick="deleteDept({{ dept.id }})" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+            <span class="status status-active"><span class="dot"></span> {{ dept.agent_count }} agents</span>
+            <span class="status status-online"><span class="dot"></span> {{ dept.online_agent_count }} online</span>
+        </div>
+        <div style="margin-top:10px;">
+            <strong style="font-size:12px;color:var(--text-muted);">Members:</strong>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
+                {% for member in dept.members.all %}
+                <span style="background:var(--bg-hover);padding:3px 8px;border-radius:6px;font-size:11px;display:flex;align-items:center;gap:4px;">
+                    {{ member.agent.user.get_full_name|default:member.agent.user.username }}
+                    {% if member.is_lead %}<i class="fas fa-star" style="color:var(--warning);font-size:9px;"></i>{% endif %}
+                    <button onclick="removeMember({{ dept.id }}, {{ member.agent.id }})" style="border:0;background:0;cursor:pointer;color:var(--danger);font-size:10px;padding:0 2px;"><i class="fas fa-times"></i></button>
+                </span>
+                {% empty %}
+                <span style="font-size:11px;color:var(--text-muted);">No members yet</span>
+                {% endfor %}
+            </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:4px;">
+            <select id="addAgent-{{ dept.id }}" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-input);color:var(--text-primary);">
+                <option value="">Add agent...</option>
+                {% for agent in agents %}
+                <option value="{{ agent.id }}">{{ agent.user.get_full_name|default:agent.user.username }}</option>
+                {% endfor %}
+            </select>
+            <button onclick="addMember({{ dept.id }})" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i></button>
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state" style="grid-column:1/-1;">
+        <i class="fas fa-building"></i>
+        <p>No departments yet. Create your first department below.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-plus-circle"></i> Create Department</h3></div>
+    <div class="card-body">
+        <div class="grid-3" style="gap:12px;">
+            <div class="form-group"><label>Name</label><input type="text" id="deptName" class="form-control" placeholder="e.g. Sales"></div>
+            <div class="form-group"><label>Description</label><input type="text" id="deptDesc" class="form-control" placeholder="Optional description"></div>
+            <div class="form-group"><label>Color</label><input type="color" id="deptColor" value="#6366f1" class="form-control" style="height:42px;"></div>
+        </div>
+        <button onclick="createDept()" class="btn btn-primary" style="margin-top:12px;"><i class="fas fa-plus"></i> Create Department</button>
+    </div>
+</div>
+
+<script>
+function postJSON(url, data) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json());
+}
+function createDept() {
+    postJSON('', {action:'create', name:document.getElementById('deptName').value, description:document.getElementById('deptDesc').value, color:document.getElementById('deptColor').value}).then(()=>location.reload());
+}
+function deleteDept(id) { if(confirm('Delete this department?')) postJSON('', {action:'delete', department_id:id}).then(()=>location.reload()); }
+function toggleDept(id) { postJSON('', {action:'toggle', department_id:id}).then(()=>location.reload()); }
+function addMember(deptId) {
+    var sel = document.getElementById('addAgent-'+deptId);
+    if(!sel.value) return;
+    postJSON('', {action:'add_member', department_id:deptId, agent_id:parseInt(sel.value)}).then(()=>location.reload());
+}
+function removeMember(deptId, agentId) { postJSON('', {action:'remove_member', department_id:deptId, agent_id:agentId}).then(()=>location.reload()); }
+</script>
+{% endblock %}

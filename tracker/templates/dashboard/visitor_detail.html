@@ -1,164 +1,213 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Visitor #{{ visitor.id }}{% endblock %}
+{% block title %}Visitor · {{ visitor.ip_address }}{% endblock %}
 {% block nav_visitors %}active{% endblock %}
 {% block page_title %}Visitor Details{% endblock %}
 
 {% block top_actions %}
-<a href="{% url 'dashboard:visitor_list' %}" class="btn btn-sm btn-secondary">
-    <i class="fas fa-arrow-left"></i> Back to Visitors
-</a>
+<div style="display:flex;gap:8px;">
+    {% if visitor.is_banned %}
+    <button onclick="fetch('/dashboard/visitors/{{ visitor.id }}/ban/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}','Content-Type':'application/json'},body:JSON.stringify({action:'unban'})}).then(()=>location.reload())" class="btn btn-sm btn-secondary"><i class="fas fa-user-check"></i> Unban</button>
+    {% else %}
+    <button onclick="fetch('/dashboard/visitors/{{ visitor.id }}/ban/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}','Content-Type':'application/json'},body:JSON.stringify({action:'ban'})}).then(()=>location.reload())" class="btn btn-sm btn-danger"><i class="fas fa-ban"></i> Ban</button>
+    {% endif %}
+    <a href="{% url 'dashboard:visitor_list' %}" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="grid-2" style="margin-bottom: 24px;">
-    <!-- Visitor Profile -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-user" style="color: var(--primary-light);"></i> Visitor Profile</h3>
-            <span class="status {% if visitor.is_online %}status-online{% else %}status-offline{% endif %}">
-                <span class="dot"></span>
-                {% if visitor.is_online %}Online{% else %}Offline{% endif %}
-            </span>
+<!-- Profile Card -->
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-body" style="padding:24px;">
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+            <!-- Avatar -->
+            <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-light));display:flex;align-items:center;justify-content:center;color:white;font-size:24px;font-weight:700;flex-shrink:0;">
+                {{ visitor.ip_address|truncatechars:2 }}
+            </div>
+            <!-- Name + Status -->
+            <div style="flex:1;min-width:200px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span style="font-size:18px;font-weight:700;color:var(--text-primary);">{{ visitor.ip_address }}</span>
+                    {% if visitor.is_online %}
+                    <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(16,185,129,0.1);color:#10b981;"><i class="fas fa-circle" style="font-size:6px;"></i> Online</span>
+                    {% else %}
+                    <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(100,116,139,0.1);color:#64748b;"><i class="fas fa-circle" style="font-size:6px;"></i> Offline</span>
+                    {% endif %}
+                    {% if visitor.is_banned %}
+                    <span style="padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(239,68,68,0.1);color:#ef4444;"><i class="fas fa-ban"></i> Banned</span>
+                    {% endif %}
+                    {% if visitor.score >= 70 %}
+                    <span style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;"><i class="fas fa-fire"></i> Hot · {{ visitor.score }}</span>
+                    {% elif visitor.score >= 30 %}
+                    <span style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(245,158,11,0.12);color:#f59e0b;">Warm · {{ visitor.score }}</span>
+                    {% else %}
+                    <span style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:600;background:rgba(100,116,139,0.1);color:#64748b;">Cold · {{ visitor.score }}</span>
+                    {% endif %}
+                </div>
+                <div style="font-size:13px;color:var(--text-muted);">
+                    {{ visitor.browser }} · {{ visitor.os }} · {{ visitor.device_type|title }}
+                    {% if visitor.country %} · {{ visitor.city }}{{ visitor.city|yesno:", ,," }}{{ visitor.country }}{% endif %}
+                    · {{ visitor.referrer_source }}
+                </div>
+            </div>
+            <!-- Quick Stats -->
+            <div style="display:flex;gap:20px;flex-shrink:0;">
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:800;color:var(--primary);">{{ visitor.total_visits }}</div>
+                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Visits</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:800;color:var(--warning);">{{ page_views.count }}</div>
+                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Pages</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:800;color:var(--success);">{{ chat_rooms.count }}</div>
+                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Chats</div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">IP Address</div>
-                    <div style="font-weight: 600; font-size: 15px;">{{ visitor.ip_address }}</div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Session Key</div>
-                    <div style="font-size: 12px; font-family: monospace; color: var(--text-secondary);">{{ visitor.session_key|truncatechars:20 }}</div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Browser</div>
-                    <div style="font-weight: 500;">{{ visitor.browser }}</div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Operating System</div>
-                    <div style="font-weight: 500;">{{ visitor.os }}</div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Device Type</div>
-                    <div style="font-weight: 500;">
-                        {% if visitor.device_type == "desktop" %}<i class="fas fa-desktop"></i>
-                        {% elif visitor.device_type == "mobile" %}<i class="fas fa-mobile-alt"></i>
-                        {% elif visitor.device_type == "tablet" %}<i class="fas fa-tablet-alt"></i>
-                        {% endif %}
-                        {{ visitor.device_type|title }}
-                    </div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Traffic Source</div>
-                    <div><span class="status status-active">{{ visitor.referrer_source }}</span></div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">First Visit</div>
-                    <div style="font-weight: 500;">{{ visitor.first_visit|date:"M d, Y H:i" }}</div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Last Seen</div>
-                    <div style="font-weight: 500;">{{ visitor.last_seen|timesince }} ago</div>
-                </div>
-                <div>
-                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Total Visits</div>
-                    <div style="font-weight: 700; font-size: 20px; color: var(--primary-light);">{{ visitor.total_visits }}</div>
-                </div>
-            </div>
-            {% if visitor.referrer %}
-            <div style="margin-top: 16px;">
-                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Referrer URL</div>
-                <div style="font-size: 12px; color: var(--primary-light); word-break: break-all;">{{ visitor.referrer }}</div>
-            </div>
-            {% endif %}
+        <!-- Meta Info -->
+        <div style="display:flex;gap:16px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;">
+            <div style="font-size:11px;color:var(--text-muted);"><i class="fas fa-calendar" style="margin-right:4px;"></i> First: {{ visitor.first_visit|date:"M d, Y H:i" }}</div>
+            <div style="font-size:11px;color:var(--text-muted);"><i class="fas fa-clock" style="margin-right:4px;"></i> Last: {{ visitor.last_seen|timesince }} ago</div>
+            <div style="font-size:11px;color:var(--text-muted);font-family:monospace;"><i class="fas fa-key" style="margin-right:4px;"></i> {{ visitor.session_key|truncatechars:24 }}</div>
+            {% if visitor.referrer %}<div style="font-size:11px;color:var(--primary-light);"><i class="fas fa-link" style="margin-right:4px;"></i> {{ visitor.referrer|truncatechars:50 }}</div>{% endif %}
         </div>
     </div>
+</div>
 
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
     <!-- Chat History -->
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-comments" style="color: var(--success);"></i> Chat History</h3>
+            <h3><i class="fas fa-comments" style="color:var(--success);"></i> Chat History</h3>
+            <span style="font-size:12px;color:var(--text-muted);">{{ chat_rooms.count }} chats</span>
         </div>
-        <div class="card-body" style="padding: 0;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Room</th>
-                        <th>Status</th>
-                        <th>Agent</th>
-                        <th>Messages</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for chat in chat_rooms %}
-                    <tr>
-                        <td>
-                            <a href="{% url 'dashboard:chat_room' chat.room_id %}" style="color: var(--primary-light); text-decoration: none;">
-                                #{{ chat.room_id|truncatechars:8 }}
-                            </a>
-                        </td>
-                        <td>
-                            <span class="status status-{{ chat.status }}">
-                                <span class="dot"></span> {{ chat.get_status_display }}
-                            </span>
-                        </td>
-                        <td>{{ chat.agent.get_full_name|default:"-" }}</td>
-                        <td>{{ chat.message_count }}</td>
-                        <td><small>{{ chat.created_at|date:"M d, H:i" }}</small></td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5">
-                            <div class="empty-state" style="padding: 24px;">
-                                <p>No chats from this visitor</p>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="card-body" style="padding:0;max-height:260px;overflow-y:auto;">
+            {% for chat in chat_rooms %}
+            <a href="{% url 'dashboard:chat_room' chat.room_id %}" style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;transition:background .15s;" onmouseover="this.style.background='rgba(99,102,241,0.03)'" onmouseout="this.style.background=''">
+                <div style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;{% if chat.status == 'active' %}background:rgba(16,185,129,0.1);color:#10b981;{% elif chat.status == 'waiting' %}background:rgba(245,158,11,0.1);color:#f59e0b;{% else %}background:rgba(100,116,139,0.08);color:#64748b;{% endif %}">
+                    <i class="fas {% if chat.status == 'active' %}fa-comment-dots{% elif chat.status == 'waiting' %}fa-clock{% else %}fa-check{% endif %}"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;font-weight:600;display:flex;justify-content:space-between;">
+                        <span>#{{ chat.room_id|truncatechars:8 }}</span>
+                        <span style="font-weight:400;color:var(--text-muted);">{{ chat.created_at|timesince }} ago</span>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">{{ chat.agent.get_full_name|default:"Unassigned" }} · {{ chat.message_count }} msgs · {{ chat.duration_display }}</div>
+                </div>
+            </a>
+            {% empty %}
+            <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">No chats yet</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Agent Notes -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-sticky-note" style="color:var(--warning);"></i> Agent Notes</h3>
+        </div>
+        <div class="card-body" style="max-height:220px;overflow-y:auto;">
+            {% for note in notes %}
+            <div style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.04);">
+                <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);">
+                    <span><i class="fas fa-user" style="margin-right:3px;"></i> {{ note.agent.get_full_name|default:note.agent.username }}</span>
+                    <span>{{ note.created_at|timesince }} ago</span>
+                </div>
+                <div style="font-size:12px;margin-top:3px;color:var(--text-primary);line-height:1.5;">{{ note.content }}</div>
+            </div>
+            {% empty %}
+            <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px;">No notes</div>
+            {% endfor %}
+        </div>
+        <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:6px;">
+            <input type="text" id="noteInput" placeholder="Add a note..." style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;background:var(--bg-primary);color:var(--text-primary);outline:none;">
+            <button onclick="addNote()" style="border:none;background:var(--primary);color:white;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;"><i class="fas fa-plus"></i></button>
         </div>
     </div>
 </div>
 
-<!-- Page View History -->
+<!-- Page View History (Real-time) -->
 <div class="card">
     <div class="card-header">
-        <h3><i class="fas fa-file-alt" style="color: var(--warning);"></i> Page View History</h3>
-        <span style="font-size: 13px; color: var(--text-muted);">{{ page_views.count }} pages</span>
+        <h3><i class="fas fa-satellite-dish" style="color:var(--warning);"></i> Page View History <span style="font-size:10px;color:#10b981;font-weight:400;margin-left:6px;"><span style="display:inline-block;width:6px;height:6px;background:#10b981;border-radius:50%;margin-right:3px;animation:livePulse 2s infinite;"></span>Live</span></h3>
+        <span style="font-size:12px;color:var(--text-muted);" id="pvCount">{{ page_views.count }} pages</span>
     </div>
-    <div class="card-body" style="padding: 0;">
-        <table>
-            <thead>
-                <tr>
-                    <th>Page URL</th>
-                    <th>Title</th>
-                    <th>Visited At</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for pv in page_views %}
-                <tr>
-                    <td style="max-width: 400px; word-break: break-all;">
-                        <span style="color: var(--primary-light); font-size: 13px;">{{ pv.url }}</span>
-                    </td>
-                    <td>{{ pv.page_title|default:"-" }}</td>
-                    <td><small>{{ pv.timestamp|date:"M d, Y H:i:s" }}</small></td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="3">
-                        <div class="empty-state">
-                            <p>No page views recorded</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
+        <div id="pvBody">
+            {% for pv in page_views %}
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);">
+                <div style="width:28px;height:28px;border-radius:8px;background:rgba(99,102,241,0.08);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-file" style="color:var(--text-muted);font-size:11px;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <a href="{{ pv.url }}" target="_blank" style="font-size:12px;color:var(--primary-light);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pv.url }}</a>
+                    <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">{{ pv.page_title|default:"" }}</div>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">{{ pv.timestamp|date:"M d, H:i:s" }}</div>
+            </div>
+            {% empty %}
+            <div id="pvEmpty" style="text-align:center;padding:30px;color:var(--text-muted);font-size:12px;">No page views recorded</div>
+            {% endfor %}
+        </div>
     </div>
 </div>
+
+<style>
+@keyframes livePulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+@keyframes flashRow{0%{background:rgba(16,185,129,0.15);}100%{background:transparent;}}
+.pv-new{animation:flashRow 1.2s ease;}
+</style>
+
+<script>
+// Add note
+function addNote() {
+    const input = document.getElementById('noteInput');
+    const content = input.value.trim();
+    if (!content) return;
+    fetch('/dashboard/visitors/{{ visitor.id }}/note/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify({content}),
+    }).then(() => location.reload());
+}
+document.getElementById('noteInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') addNote(); });
+
+// Real-time page view updates via WebSocket
+const WATCH_VISITOR_ID = {{ visitor.id }};
+window.addEventListener('livetrack:visitor', function(e) {
+    const v = e.detail;
+    if (v.visitor_id !== WATCH_VISITOR_ID) return;
+
+    const empty = document.getElementById('pvEmpty');
+    if (empty) empty.remove();
+
+    const body = document.getElementById('pvBody');
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const dateStr = now.toLocaleDateString('en-US', {month:'short',day:'numeric'});
+    const urlDisplay = v.current_page.length > 80 ? v.current_page.substring(0, 80) + '...' : v.current_page;
+
+    const div = document.createElement('div');
+    div.className = 'pv-new';
+    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);';
+    div.innerHTML = '<div style="width:28px;height:28px;border-radius:8px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-bolt" style="color:#10b981;font-size:11px;"></i></div>'
+        + '<div style="flex:1;min-width:0;"><a href="' + v.current_page + '" target="_blank" style="font-size:12px;color:var(--primary-light);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + urlDisplay + '</a><div style="font-size:10px;color:#10b981;margin-top:1px;font-weight:600;">Just now</div></div>'
+        + '<div style="font-size:11px;color:#10b981;white-space:nowrap;flex-shrink:0;font-weight:600;">' + dateStr + ', ' + timeStr + '</div>';
+    body.insertBefore(div, body.firstChild);
+
+    // Update count
+    document.getElementById('pvCount').textContent = body.children.length + ' pages';
+
+    // After 5s, change icon back to normal
+    setTimeout(function() {
+        const icon = div.querySelector('.fa-bolt');
+        if (icon) { icon.className = 'fas fa-file'; icon.style.color = 'var(--text-muted)'; }
+        div.querySelector('.fa-bolt')?.closest('div')?.style && (div.children[0].style.background = 'rgba(99,102,241,0.08)');
+        const justNow = div.querySelector('div[style*="10b981"]');
+    }, 5000);
+});
+</script>
 {% endblock %}

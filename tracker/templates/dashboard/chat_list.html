@@ -129,7 +129,8 @@
                     <span class="cr-time">{{ chat.created_at|timesince }} ago</span>
                 </div>
                 <div class="cr-preview">
-                    {% if chat.subject %}{{ chat.subject|truncatechars:60 }}{% else %}{{ chat.visitor.ip_address }} · {{ chat.agent.get_full_name|default:"Unassigned" }}{% endif %}
+                    {% if chat.subject %}{{ chat.subject|truncatechars:50 }}{% else %}{{ chat.visitor.ip_address }}{% endif %}
+                    · {{ chat.agent.get_full_name|default:"Unassigned" }}
                 </div>
             </a>
 
@@ -150,6 +151,7 @@
                 <span class="cr-unread">{{ chat.unread_count }}</span>
                 {% endif %}
 
+                <span style="font-size:10px;color:var(--text-muted);display:inline-flex;align-items:center;gap:3px;" title="Duration"><i class="fas fa-stopwatch" style="font-size:8px;"></i> {{ chat.duration_display }}</span>
                 <span style="font-size:11px;color:var(--text-muted);">{{ chat.message_count }} <i class="fas fa-comment" style="font-size:9px;"></i></span>
             </div>
 
@@ -188,15 +190,14 @@ function getSelectedIds() {
 function bulkAction(action) {
     const ids = getSelectedIds();
     if (!ids.length) return;
-    if (!confirm('Apply "' + action + '" to ' + ids.length + ' chats?')) return;
     fetch('/dashboard/chats/bulk-action/', {
         method: 'POST',
         headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
         body: JSON.stringify({action: action, room_ids: ids}),
-    }).then(r => r.json()).then(data => {
+    }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.status === 'ok') location.reload();
         else alert(data.error || 'Failed');
-    });
+    }).catch(function(err) { console.error('Bulk action error:', err); alert('Failed: ' + err); });
 }
 function clearBulk() {
     document.querySelectorAll('.chat-checkbox').forEach(cb => cb.checked = false);

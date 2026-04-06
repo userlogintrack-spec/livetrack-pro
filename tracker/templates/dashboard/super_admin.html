@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Super Admin{% endblock %}
+{% block page_title %}Super Admin Panel{% endblock %}
+{% block top_actions %}
+<div style="display:flex;align-items:center;gap:10px;">
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;padding:4px 12px;border-radius:20px;background:rgba(239,68,68,0.08);color:var(--danger);font-weight:700;"><i class="fas fa-shield-alt"></i> Superuser</span>
+    <span style="font-size:12px;color:var(--text-muted);"><i class="fas fa-calendar"></i> {% now "D, d M Y" %}</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- ═══════ GLOBAL KPIs ═══════ -->
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:20px;">
+    <div class="stat-card purple">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div><div class="stat-value">{{ total_orgs }}</div><div class="stat-label">Organizations</div></div>
+            <div class="stat-icon"><i class="fas fa-building"></i></div>
+        </div>
+    </div>
+    <div class="stat-card blue">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div><div class="stat-value">{{ total_users }}</div><div class="stat-label">Users</div></div>
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+        </div>
+    </div>
+    <div class="stat-card green">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div><div class="stat-value">{{ total_visitors_global|intcomma }}</div><div class="stat-label">Visitors</div></div>
+            <div class="stat-icon"><i class="fas fa-eye"></i></div>
+        </div>
+    </div>
+    <div class="stat-card orange">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div><div class="stat-value">{{ online_now }}</div><div class="stat-label">Online Now</div></div>
+            <div class="stat-icon"><i class="fas fa-signal"></i></div>
+        </div>
+    </div>
+    <div class="stat-card blue">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div><div class="stat-value">{{ total_chats_global|intcomma }}</div><div class="stat-label">Chats</div></div>
+            <div class="stat-icon"><i class="fas fa-comments"></i></div>
+        </div>
+    </div>
+    <div class="stat-card purple">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div><div class="stat-value">{{ total_messages|intcomma }}</div><div class="stat-label">Messages</div></div>
+            <div class="stat-icon"><i class="fas fa-envelope"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ REVENUE + PLANS ═══════ -->
+<div class="grid-2" style="margin-bottom:20px;">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-dollar-sign" style="color:var(--success);"></i> Revenue</h3></div>
+        <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div style="text-align:center;padding:20px;background:linear-gradient(135deg,rgba(16,185,129,0.06),rgba(16,185,129,0.02));border-radius:14px;">
+                    <div style="font-size:36px;font-weight:900;color:var(--success);">${{ monthly_revenue|floatformat:0|intcomma }}</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">This Month</div>
+                </div>
+                <div style="text-align:center;padding:20px;background:linear-gradient(135deg,rgba(124,58,237,0.06),rgba(124,58,237,0.02));border-radius:14px;">
+                    <div style="font-size:36px;font-weight:900;color:var(--primary);">${{ total_revenue|floatformat:0|intcomma }}</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">All Time</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-chart-pie" style="color:var(--primary);"></i> Plan Distribution</h3></div>
+        <div class="card-body">
+            {% for plan, count in plan_dist.items %}
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                <span style="display:inline-flex;align-items:center;gap:6px;min-width:100px;">
+                    <span style="width:12px;height:12px;border-radius:4px;background:{% if plan == 'free' %}#64748b{% elif plan == 'pro' %}var(--primary){% else %}var(--warning){% endif %};"></span>
+                    <span style="font-size:13px;font-weight:700;text-transform:capitalize;">{{ plan }}</span>
+                </span>
+                <div style="flex:1;height:10px;background:var(--bg-hover);border-radius:5px;overflow:hidden;">
+                    <div style="height:100%;width:{% widthratio count total_orgs 100 %}%;background:{% if plan == 'free' %}#64748b{% elif plan == 'pro' %}var(--primary){% else %}var(--warning){% endif %};border-radius:5px;min-width:6px;"></div>
+                </div>
+                <span style="font-size:14px;font-weight:800;min-width:30px;text-align:right;">{{ count }}</span>
+            </div>
+            {% empty %}
+            <div style="text-align:center;color:var(--text-muted);padding:20px;">No data</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ ALL ORGANIZATIONS ═══════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3><i class="fas fa-building" style="color:var(--primary);"></i> All Organizations</h3>
+        <span style="font-size:12px;color:var(--text-muted);">{{ total_orgs }} total</span>
+    </div>
+    <div class="card-body" style="padding:0;"><div class="table-container"><table>
+        <thead><tr>
+            <th>Organization</th><th>Owner</th><th>Plan</th><th>Agents</th>
+            <th>Visitors</th><th>Online</th><th>Chats</th><th>Active</th><th>Rating</th>
+        </tr></thead>
+        <tbody>
+        {% for org in orgs %}
+        <tr>
+            <td>
+                <div style="font-weight:700;font-size:13px;">{{ org.name }}</div>
+                <div style="font-size:10px;color:var(--text-muted);font-family:monospace;">{{ org.slug }}</div>
+            </td>
+            <td>
+                <div style="font-size:12px;font-weight:600;">{{ org.owner.get_full_name|default:org.owner.username }}</div>
+                <div style="font-size:10px;color:var(--text-muted);">{{ org.owner.email }}</div>
+            </td>
+            <td>
+                {% with sub=org.subscription %}
+                <span style="padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;{% if sub.plan == 'enterprise' %}background:var(--warning-soft);color:var(--warning);{% elif sub.plan == 'pro' %}background:var(--primary-soft);color:var(--primary);{% else %}background:var(--bg-hover);color:var(--text-muted);{% endif %}">{{ sub.plan|default:"free"|title }}</span>
+                {% if sub.billing_interval == 'year' %}<div style="font-size:9px;color:var(--success);margin-top:2px;">Yearly</div>{% endif %}
+                {% endwith %}
+            </td>
+            <td style="text-align:center;font-weight:700;">{{ org.total_agents }}</td>
+            <td style="text-align:center;">
+                <div style="font-weight:700;">{{ org.total_visitors|intcomma }}</div>
+                <div style="font-size:10px;color:var(--primary);">{{ org.monthly_visitors }} this month</div>
+            </td>
+            <td style="text-align:center;">
+                {% if org.online_visitors > 0 %}
+                <span style="display:inline-flex;align-items:center;gap:3px;color:var(--success);font-weight:700;font-size:13px;">
+                    <span style="width:6px;height:6px;background:var(--success);border-radius:50%;animation:pulse 2s infinite;"></span>{{ org.online_visitors }}
+                </span>
+                {% else %}<span style="color:var(--text-muted);">0</span>{% endif %}
+            </td>
+            <td style="text-align:center;font-weight:600;">{{ org.total_chats|intcomma }}</td>
+            <td style="text-align:center;">
+                {% if org.active_chats > 0 %}
+                <span style="background:var(--success-soft);color:var(--success);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">{{ org.active_chats }}</span>
+                {% else %}<span style="color:var(--text-muted);">0</span>{% endif %}
+            </td>
+            <td style="text-align:center;">
+                {% if org.avg_rating %}
+                <span style="font-weight:700;color:{% if org.avg_rating >= 4 %}var(--success){% elif org.avg_rating >= 3 %}var(--warning){% else %}var(--danger){% endif %};">{{ org.avg_rating|floatformat:1 }}<i class="fas fa-star" style="font-size:9px;margin-left:2px;"></i></span>
+                {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9"><div class="empty-state" style="padding:30px;"><i class="fas fa-building"></i><p>No organizations</p></div></td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div></div>
+</div>
+
+<!-- ═══════ PAYMENT HISTORY (ALL ORGS) ═══════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3><i class="fas fa-receipt" style="color:var(--success);"></i> All Payments</h3>
+        <span style="font-size:12px;color:var(--text-muted);">{{ all_payments.count }} transaction{{ all_payments.count|pluralize }}</span>
+    </div>
+    <div class="card-body" style="padding:0;"><div class="table-container"><table>
+        <thead><tr><th>Date</th><th>Organization</th><th>Description</th><th>Plan</th><th>Amount</th><th>Invoice</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for p in all_payments %}
+        <tr>
+            <td style="font-size:12px;white-space:nowrap;">{{ p.created_at|date:"M d, Y" }}<br><span style="color:var(--text-muted);font-size:10px;">{{ p.created_at|time:"h:i A" }}</span></td>
+            <td style="font-weight:600;font-size:13px;">{{ p.organization.name }}</td>
+            <td style="font-size:12px;">{{ p.description }}</td>
+            <td><span style="padding:2px 10px;border-radius:6px;font-size:11px;font-weight:700;{% if p.plan == 'enterprise' %}background:var(--warning-soft);color:var(--warning);{% else %}background:var(--primary-soft);color:var(--primary);{% endif %}">{{ p.plan|title }}</span></td>
+            <td style="font-weight:800;font-size:15px;">${{ p.amount|floatformat:2 }}</td>
+            <td style="font-size:11px;font-family:monospace;color:var(--text-muted);">{% if p.stripe_invoice_id %}{{ p.stripe_invoice_id|truncatechars:16 }}{% else %}—{% endif %}</td>
+            <td><span class="status status-online" style="font-size:10px;"><span class="dot"></span> {{ p.status|title }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7"><div class="empty-state" style="padding:30px;"><i class="fas fa-receipt"></i><p>No payments yet</p></div></td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div></div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- ═══════ RECENT SIGNUPS ═══════ -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-user-plus" style="color:var(--info);"></i> Recent Signups</h3></div>
+        <div class="card-body" style="padding:0;"><div class="table-container"><table>
+            <thead><tr><th>User</th><th>Email</th><th>Joined</th></tr></thead>
+            <tbody>
+            {% for u in recent_users %}
+            <tr>
+                <td>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:28px;height:28px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:700;flex-shrink:0;">{{ u.first_name|default:u.username|first|upper }}</div>
+                        <div>
+                            <div style="font-weight:600;font-size:12px;">{{ u.get_full_name|default:u.username }}</div>
+                            <div style="font-size:10px;color:var(--text-muted);">{% if u.is_superuser %}Superuser{% elif u.is_staff %}Staff{% else %}User{% endif %}</div>
+                        </div>
+                    </div>
+                </td>
+                <td style="font-size:12px;">{{ u.email|default:"—" }}</td>
+                <td style="font-size:11px;color:var(--text-muted);">{{ u.date_joined|timesince }} ago</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+
+    <!-- ═══════ ACTIVE COUPONS ═══════ -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-tags" style="color:var(--warning);"></i> Coupons</h3>
+            <a href="{% url 'dashboard:manage_coupons' %}" class="btn btn-sm btn-secondary"><i class="fas fa-cog"></i> Manage</a>
+        </div>
+        <div class="card-body" style="padding:0;"><div class="table-container"><table>
+            <thead><tr><th>Code</th><th>Discount</th><th>Used</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for c in coupons %}
+            <tr>
+                <td><code style="background:var(--bg-hover);padding:3px 10px;border-radius:6px;font-weight:700;font-size:12px;">{{ c.code }}</code></td>
+                <td style="font-weight:700;color:var(--primary);">{% if c.discount_type == 'percent' %}{{ c.discount_value }}%{% else %}${{ c.discount_value }}{% endif %} off</td>
+                <td>{{ c.times_used }}{% if c.max_uses > 0 %}/{{ c.max_uses }}{% else %}/∞{% endif %}</td>
+                <td>{% if c.is_valid %}<span class="status status-online" style="font-size:10px;"><span class="dot"></span> Active</span>{% else %}<span class="status status-closed" style="font-size:10px;"><span class="dot"></span> Expired</span>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No coupons</td></tr>
+            {% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+</div>
+
+<!-- ═══════ QUICK ACTIONS ═══════ -->
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-bolt" style="color:var(--warning);"></i> Quick Actions</h3></div>
+    <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="{% url 'admin:index' %}" class="btn btn-sm btn-secondary" target="_blank"><i class="fas fa-cog"></i> Django Admin</a>
+        <a href="{% url 'dashboard:manage_coupons' %}" class="btn btn-sm btn-secondary"><i class="fas fa-tags"></i> Coupons</a>
+        <a href="{% url 'dashboard:billing' %}" class="btn btn-sm btn-secondary"><i class="fas fa-credit-card"></i> Billing</a>
+        <a href="{% url 'dashboard:advanced_analytics' %}" class="btn btn-sm btn-secondary"><i class="fas fa-chart-bar"></i> Analytics</a>
+        <a href="{% url 'dashboard:tour_guide' %}" class="btn btn-sm btn-secondary"><i class="fas fa-map-signs"></i> Tour Guide</a>
+    </div>
+</div>
+
+<style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}</style>
+{% endblock %}

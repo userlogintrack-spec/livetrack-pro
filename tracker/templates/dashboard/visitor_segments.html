@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}Visitor Segments{% endblock %}
+{% block page_title %}Visitor Segments{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <p style="color:var(--text-muted);font-size:14px;">Create custom visitor segments for targeted engagement and analytics.</p>
+</div>
+
+<div class="grid-2">
+    <!-- Existing Segments -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-layer-group"></i> Your Segments</h3></div>
+        <div class="card-body">
+            {% for segment in segments %}
+            <div style="padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="width:12px;height:12px;border-radius:50%;background:{{ segment.color }};"></div>
+                            <strong style="font-size:15px;">{{ segment.name }}</strong>
+                        </div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">{{ segment.description|default:"No description" }}</div>
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                        <button onclick="previewSegment({{ segment.id }})" class="btn btn-sm btn-secondary" title="Preview count"><i class="fas fa-eye"></i></button>
+                        <button onclick="deleteSegment({{ segment.id }})" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+                    {% for cond in segment.conditions %}
+                    <span style="background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500;">
+                        {{ cond.type }}: {{ cond.value }}
+                    </span>
+                    {% endfor %}
+                </div>
+                <div id="segCount-{{ segment.id }}" style="margin-top:6px;font-size:12px;color:var(--text-muted);display:none;">
+                    <i class="fas fa-users"></i> <span></span> matching visitors
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="padding:30px;"><i class="fas fa-layer-group"></i><p>No segments yet. Create your first segment.</p></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Create Segment -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-plus-circle"></i> Create Segment</h3></div>
+        <div class="card-body">
+            <div class="form-group"><label>Segment Name</label><input type="text" id="segName" class="form-control" placeholder="e.g. VIP Visitors"></div>
+            <div class="form-group"><label>Description</label><input type="text" id="segDesc" class="form-control" placeholder="Optional description"></div>
+            <div class="form-group"><label>Color</label><input type="color" id="segColor" value="#6366f1" class="form-control" style="height:42px;"></div>
+
+            <div style="margin-top:16px;">
+                <label style="font-size:13px;font-weight:600;color:var(--text-secondary);">Conditions</label>
+                <div id="conditionsList"></div>
+                <button onclick="addCondition()" class="btn btn-sm btn-secondary" style="margin-top:6px;"><i class="fas fa-plus"></i> Add Condition</button>
+            </div>
+
+            <button onclick="createSegment()" class="btn btn-primary" style="margin-top:16px;"><i class="fas fa-plus"></i> Create Segment</button>
+        </div>
+    </div>
+</div>
+
+<!-- Preset Segments -->
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><h3><i class="fas fa-magic"></i> Quick Presets</h3></div>
+    <div class="card-body">
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <button onclick="createPreset('VIP Visitors', '#10b981', [{type:'score_gte',value:'70'}])" class="stat-card green" style="border:none;cursor:pointer;text-align:left;">
+                <div class="stat-icon"><i class="fas fa-crown"></i></div>
+                <div style="font-weight:700;">VIP Visitors</div>
+                <div class="stat-label">Engagement score >= 70</div>
+            </button>
+            <button onclick="createPreset('Returning Visitors', '#3b82f6', [{type:'returning',value:'true'}])" class="stat-card blue" style="border:none;cursor:pointer;text-align:left;">
+                <div class="stat-icon"><i class="fas fa-redo"></i></div>
+                <div style="font-weight:700;">Returning Visitors</div>
+                <div class="stat-label">Visited 2+ times</div>
+            </button>
+            <button onclick="createPreset('Mobile Users', '#f59e0b', [{type:'device',value:'mobile'}])" class="stat-card orange" style="border:none;cursor:pointer;text-align:left;">
+                <div class="stat-icon"><i class="fas fa-mobile-alt"></i></div>
+                <div style="font-weight:700;">Mobile Users</div>
+                <div class="stat-label">Device type: mobile</div>
+            </button>
+            <button onclick="createPreset('Active Chatters', '#7c3aed', [{type:'has_chatted',value:'true'}])" class="stat-card purple" style="border:none;cursor:pointer;text-align:left;">
+                <div class="stat-icon"><i class="fas fa-comments"></i></div>
+                <div style="font-weight:700;">Active Chatters</div>
+                <div class="stat-label">Has started a chat</div>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+var condCount = 0;
+function addCondition() {
+    var id = condCount++;
+    var html = '<div id="cond'+id+'" style="display:flex;gap:6px;margin-top:6px;">';
+    html += '<select class="form-control cond-type" style="width:auto;">';
+    html += '<option value="visits_gte">Total visits >=</option><option value="visits_lte">Total visits <=</option>';
+    html += '<option value="country">Country is</option><option value="device">Device type is</option>';
+    html += '<option value="referrer">Referrer source is</option><option value="score_gte">Score >=</option>';
+    html += '<option value="score_lte">Score <=</option><option value="browser">Browser is</option>';
+    html += '<option value="returning">Is returning visitor</option><option value="has_chatted">Has chatted</option>';
+    html += '</select><input class="form-control cond-val" placeholder="Value" style="flex:1;">';
+    html += '<button onclick="document.getElementById(\'cond'+id+'\').remove()" class="btn btn-sm btn-danger"><i class="fas fa-times"></i></button></div>';
+    document.getElementById('conditionsList').insertAdjacentHTML('beforeend', html);
+}
+
+function postJSON(url, data) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json());
+}
+
+function createSegment() {
+    var conditions = [];
+    document.querySelectorAll('#conditionsList > div').forEach(function(div) {
+        conditions.push({type: div.querySelector('.cond-type').value, value: div.querySelector('.cond-val').value});
+    });
+    postJSON('', {action:'create', name:document.getElementById('segName').value, description:document.getElementById('segDesc').value, color:document.getElementById('segColor').value, conditions:conditions}).then(()=>location.reload());
+}
+
+function createPreset(name, color, conditions) {
+    postJSON('', {action:'create', name:name, color:color, conditions:conditions}).then(()=>location.reload());
+}
+
+function deleteSegment(id) { if(confirm('Delete this segment?')) postJSON('', {action:'delete', segment_id:id}).then(()=>location.reload()); }
+
+function previewSegment(id) {
+    postJSON('', {action:'preview', segment_id:id}).then(function(d) {
+        var el = document.getElementById('segCount-'+id);
+        el.style.display = 'block';
+        el.querySelector('span').textContent = d.count;
+    });
+}
+</script>
+{% endblock %}

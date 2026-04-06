@@ -61,4 +61,58 @@ urlpatterns = [
     path('saved-replies/<int:reply_id>/delete/', views.delete_saved_reply, name='delete_saved_reply'),
     # API
     path('api/stats/', views.api_stats, name='api_stats'),
+    path('api/live-visitors/', views.live_visitors_api, name='live_visitors_api'),
+
+    # Feature 7: Departments
+    path('departments/', views.departments_view, name='departments'),
+
+    # Feature 8: SLA Management
+    path('sla/', views.sla_policies_view, name='sla_policies'),
+
+    # Feature 9: Surveys / NPS
+    path('surveys/', views.surveys_view, name='surveys'),
+    path('surveys/<int:survey_id>/', views.survey_detail_view, name='survey_detail'),
+
+    # Feature 1: AI Auto-Reply Bot
+    path('ai-bot/', views.ai_bot_config_view, name='ai_bot_config'),
+
+    # Feature 2: Chatbot Flow Builder
+    path('chatbot-flows/', views.chatbot_flows_view, name='chatbot_flows'),
+    path('chatbot-flows/<int:flow_id>/editor/', views.chatbot_flow_editor, name='chatbot_flow_editor'),
+
+    # Feature 3: Knowledge Base (management)
+    path('knowledge-base/', views.kb_manage_view, name='kb_manage'),
+
+    # Feature 4: WhatsApp Integration
+    path('whatsapp/', views.whatsapp_config_view, name='whatsapp_config'),
+
+    # Feature 5: Visitor Segmentation
+    path('segments/', views.visitor_segments_view, name='visitor_segments'),
+
+    # Google Analytics Features
+    path('advanced-analytics/', views.advanced_analytics_view, name='advanced_analytics'),
+    path('goals/', views.goals_view, name='goals'),
+    path('scheduled-reports/', views.scheduled_reports_view, name='scheduled_reports'),
+
+    # Tour Guide
+    path('tour/', views.tour_guide_view, name='tour_guide'),
+
+    # Billing & Subscription
+    path('billing/', views.billing_view, name='billing'),
+    path('billing/checkout/', views.create_checkout_session, name='checkout'),
+    path('billing/success/', views.billing_success, name='billing_success'),
+    path('billing/cancel/', views.cancel_subscription, name='cancel_subscription'),
+    path('billing/validate-coupon/', views.validate_coupon, name='validate_coupon'),
+    path('billing/download-invoice/', views.download_invoice, name='download_invoice'),
+    path('billing/coupons/', views.manage_coupons_view, name='manage_coupons'),
+
+    # Super Admin
+    path('super-admin/', views.super_admin_view, name='super_admin'),
+
+    # Microsoft Clarity Features
+    path('heatmaps/', views.heatmaps_view, name='heatmaps'),
+    path('recordings/', views.session_recordings_view, name='session_recordings'),
+    path('recordings/<str:session_id>/', views.session_replay_view, name='session_replay'),
+    path('js-errors/', views.js_errors_view, name='js_errors'),
+    path('frustration/', views.frustration_dashboard_view, name='frustration_dashboard'),
 ]

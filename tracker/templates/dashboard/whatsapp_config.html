@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}WhatsApp Integration{% endblock %}
+{% block page_title %}WhatsApp Integration{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+    <div class="stat-card {% if config.is_enabled %}green{% else %}purple{% endif %}">
+        <div class="stat-icon"><i class="fab fa-whatsapp"></i></div>
+        <div class="stat-value">{% if config.is_enabled %}Connected{% else %}Disabled{% endif %}</div>
+        <div class="stat-label">WhatsApp Status</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-inbox"></i></div>
+        <div class="stat-value">{{ messages.count }}</div>
+        <div class="stat-label">Recent Messages</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3><i class="fab fa-whatsapp" style="color:#25d366;"></i> WhatsApp Business API Configuration</h3></div>
+        <div class="card-body">
+            <div class="form-group">
+                <label><input type="checkbox" id="waEnabled" {% if config.is_enabled %}checked{% endif %}> Enable WhatsApp Integration</label>
+            </div>
+            <div class="form-group"><label>Phone Number ID</label><input type="text" id="waPhoneId" class="form-control" value="{{ config.phone_number_id }}" placeholder="From Meta Business Suite"></div>
+            <div class="form-group"><label>Access Token</label><input type="password" id="waToken" class="form-control" value="{{ config.access_token }}" placeholder="WhatsApp API access token"></div>
+            <div class="form-group"><label>Verify Token</label><input type="text" id="waVerify" class="form-control" value="{{ config.verify_token }}" placeholder="Custom verify token for webhook">
+                <small style="color:var(--text-muted);">Use this token when setting up the webhook in Meta Business Suite</small>
+            </div>
+            <button onclick="saveWAConfig()" class="btn btn-primary" style="margin-top:8px;"><i class="fas fa-save"></i> Save Configuration</button>
+
+            <div style="margin-top:20px;padding:16px;background:var(--bg-hover);border-radius:var(--radius-sm);">
+                <div style="font-weight:600;font-size:13px;margin-bottom:6px;"><i class="fas fa-link"></i> Webhook URL</div>
+                <code style="font-size:12px;word-break:break-all;color:var(--primary);">{{ request.scheme }}://{{ request.get_host }}/api/whatsapp/webhook/</code>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Paste this URL in your Meta Business webhook configuration</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-info-circle"></i> Setup Guide</h3></div>
+        <div class="card-body">
+            <div style="font-size:13px;line-height:1.8;">
+                <div style="margin-bottom:16px;">
+                    <strong style="font-size:14px;">Step 1: Create a Meta Business App</strong>
+                    <p style="color:var(--text-muted);">Go to developers.facebook.com and create a new Business app with WhatsApp product.</p>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <strong style="font-size:14px;">Step 2: Get API Credentials</strong>
+                    <p style="color:var(--text-muted);">Copy the Phone Number ID and generate a permanent Access Token.</p>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <strong style="font-size:14px;">Step 3: Configure Webhook</strong>
+                    <p style="color:var(--text-muted);">Set the webhook URL (shown on the left) and your custom Verify Token.</p>
+                </div>
+                <div>
+                    <strong style="font-size:14px;">Step 4: Subscribe to Messages</strong>
+                    <p style="color:var(--text-muted);">Subscribe to the "messages" webhook field to receive incoming messages.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if messages %}
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><h3><i class="fas fa-history"></i> Recent WhatsApp Messages</h3></div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Time</th><th>Direction</th><th>Phone</th><th>Name</th><th>Message</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for msg in messages %}
+                <tr>
+                    <td>{{ msg.created_at|timesince }} ago</td>
+                    <td><span class="status {% if msg.direction == 'inbound' %}status-active{% else %}status-online{% endif %}"><span class="dot"></span> {{ msg.direction }}</span></td>
+                    <td>{{ msg.phone_number }}</td>
+                    <td>{{ msg.contact_name|default:"-" }}</td>
+                    <td>{{ msg.content|truncatewords:15 }}</td>
+                    <td>{{ msg.status }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function saveWAConfig() {
+    fetch('', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken':'{{ csrf_token }}'},
+        body: JSON.stringify({
+            is_enabled: document.getElementById('waEnabled').checked,
+            phone_number_id: document.getElementById('waPhoneId').value,
+            access_token: document.getElementById('waToken').value,
+            verify_token: document.getElementById('waVerify').value,
+        })
+    }).then(r=>r.json()).then(d => { if(d.status==='ok') alert('WhatsApp configuration saved!'); });
+}
+</script>
+{% endblock %}

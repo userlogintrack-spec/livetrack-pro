@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}AI Auto-Reply Bot{% endblock %}
+{% block page_title %}AI Auto-Reply Bot{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+    <div class="stat-card {% if config.is_enabled %}green{% else %}purple{% endif %}">
+        <div class="stat-icon"><i class="fas fa-robot"></i></div>
+        <div class="stat-value">{% if config.is_enabled %}Active{% else %}Inactive{% endif %}</div>
+        <div class="stat-label">Bot Status</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-brain"></i></div>
+        <div class="stat-value">{{ knowledge.count }}</div>
+        <div class="stat-label">Knowledge Entries</div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-reply"></i></div>
+        <div class="stat-value">{{ config.max_auto_replies }}</div>
+        <div class="stat-label">Max Auto-Replies</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-cog"></i> Bot Configuration</h3></div>
+        <div class="card-body">
+            <div class="form-group">
+                <label><input type="checkbox" id="botEnabled" {% if config.is_enabled %}checked{% endif %}> Enable AI Auto-Reply Bot</label>
+            </div>
+            <div class="form-group"><label>Bot Name</label><input type="text" id="botName" class="form-control" value="{{ config.bot_name }}"></div>
+            <div class="form-group"><label>Greeting Message</label><textarea id="botGreeting" class="form-control" rows="2">{{ config.greeting_message }}</textarea></div>
+            <div class="form-group"><label>Fallback Message (when no match found)</label><textarea id="botFallback" class="form-control" rows="2">{{ config.fallback_message }}</textarea></div>
+            <div class="form-group"><label>Handoff Keywords (comma-separated)</label><input type="text" id="botHandoff" class="form-control" value="{{ config.handoff_keywords }}"><small style="color:var(--text-muted);">When visitor types these, bot hands off to human agent</small></div>
+            <div class="grid-2" style="gap:12px;">
+                <div class="form-group"><label>Max Auto-Replies</label><input type="number" id="botMaxReplies" class="form-control" value="{{ config.max_auto_replies }}" min="1" max="20"></div>
+                <div class="form-group"><label>Response Delay (seconds)</label><input type="number" id="botDelay" class="form-control" value="{{ config.response_delay_seconds }}" min="0" max="10"></div>
+            </div>
+            <button onclick="saveConfig()" class="btn btn-primary" style="margin-top:12px;"><i class="fas fa-save"></i> Save Configuration</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-book"></i> Knowledge Base</h3>
+            <span style="font-size:12px;color:var(--text-muted);">Train your bot with Q&A pairs</span>
+        </div>
+        <div class="card-body">
+            <div class="form-group"><label>Question / Trigger</label><input type="text" id="kbQuestion" class="form-control" placeholder="e.g. What are your business hours?"></div>
+            <div class="form-group"><label>Answer</label><textarea id="kbAnswer" class="form-control" rows="2" placeholder="We are open Monday-Friday, 9 AM - 6 PM IST."></textarea></div>
+            <div class="form-group"><label>Keywords (comma-separated)</label><input type="text" id="kbKeywords" class="form-control" placeholder="hours, timing, open, close"></div>
+            <div class="form-group"><label>Priority (higher = matched first)</label><input type="number" id="kbPriority" class="form-control" value="0" min="0"></div>
+            <button onclick="addKnowledge()" class="btn btn-primary"><i class="fas fa-plus"></i> Add Knowledge Entry</button>
+
+            <div style="margin-top:16px;">
+                {% for k in knowledge %}
+                <div style="padding:10px;border:1px solid var(--border);border-radius:8px;margin-top:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:start;">
+                        <div>
+                            <div style="font-weight:600;font-size:13px;">Q: {{ k.question|truncatewords:15 }}</div>
+                            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">A: {{ k.answer|truncatewords:20 }}</div>
+                            {% if k.keywords %}<div style="font-size:11px;color:var(--text-muted);margin-top:2px;"><i class="fas fa-tags"></i> {{ k.keywords }}</div>{% endif %}
+                        </div>
+                        <button onclick="deleteKnowledge({{ k.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="empty-state" style="padding:20px;"><i class="fas fa-lightbulb"></i><p>No knowledge entries yet. Add Q&A pairs to train your bot.</p></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><h3><i class="fas fa-info-circle"></i> How It Works</h3></div>
+    <div class="card-body">
+        <div class="grid-3" style="gap:16px;">
+            <div style="text-align:center;padding:16px;">
+                <div style="font-size:32px;margin-bottom:8px;">1️⃣</div>
+                <div style="font-weight:600;font-size:14px;">Visitor Starts Chat</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Bot sends greeting message automatically</div>
+            </div>
+            <div style="text-align:center;padding:16px;">
+                <div style="font-size:32px;margin-bottom:8px;">2️⃣</div>
+                <div style="font-weight:600;font-size:14px;">Bot Matches Keywords</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Searches knowledge base for best matching answer</div>
+            </div>
+            <div style="text-align:center;padding:16px;">
+                <div style="font-size:32px;margin-bottom:8px;">3️⃣</div>
+                <div style="font-weight:600;font-size:14px;">Auto-Handoff</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">After max replies or handoff keywords, connects to human agent</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function postJSON(url, data) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json());
+}
+function saveConfig() {
+    postJSON('', {
+        action: 'update',
+        is_enabled: document.getElementById('botEnabled').checked,
+        bot_name: document.getElementById('botName').value,
+        greeting_message: document.getElementById('botGreeting').value,
+        fallback_message: document.getElementById('botFallback').value,
+        handoff_keywords: document.getElementById('botHandoff').value,
+        max_auto_replies: document.getElementById('botMaxReplies').value,
+        response_delay_seconds: document.getElementById('botDelay').value,
+    }).then(d => { if(d.status==='ok') alert('Configuration saved!'); });
+}
+function addKnowledge() {
+    postJSON('', {
+        action: 'add_knowledge',
+        question: document.getElementById('kbQuestion').value,
+        answer: document.getElementById('kbAnswer').value,
+        keywords: document.getElementById('kbKeywords').value,
+        priority: document.getElementById('kbPriority').value,
+    }).then(()=>location.reload());
+}
+function deleteKnowledge(id) { if(confirm('Delete this entry?')) postJSON('', {action:'delete_knowledge', knowledge_id:id}).then(()=>location.reload()); }
+</script>
+{% endblock %}

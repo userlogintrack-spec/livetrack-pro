@@ -6,105 +6,135 @@
 {% block page_title %}Visitors{% endblock %}
 
 {% block top_actions %}
-<a href="{% url 'dashboard:export_visitors' %}{% if date_from or date_to %}?{% endif %}{% if date_from %}from={{ date_from }}{% endif %}{% if date_from and date_to %}&{% endif %}{% if date_to %}to={{ date_to }}{% endif %}" class="btn btn-sm btn-secondary">
-    <i class="fas fa-download"></i> Export CSV
-</a>
+<a href="{% url 'dashboard:export_visitors' %}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> Export</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .v-row {
+        display: flex; align-items: center; gap: 14px;
+        padding: 12px 18px; border-bottom: 1px solid var(--border);
+        transition: background 0.15s; text-decoration: none; color: inherit;
+    }
+    .v-row:hover { background: rgba(99,102,241,0.02); }
+    .v-avatar {
+        width: 40px; height: 40px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-weight: 700; font-size: 13px; flex-shrink: 0;
+        position: relative;
+    }
+    .v-avatar .v-dot {
+        position: absolute; bottom: 0; right: 0;
+        width: 10px; height: 10px; border-radius: 50%;
+        border: 2px solid var(--bg-card);
+    }
+    .v-main { flex: 1; min-width: 0; }
+    .v-top { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap; }
+    .v-ip { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+    .v-meta { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+    .v-stats { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+    .v-stat { text-align: center; min-width: 40px; }
+    .v-stat-num { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .v-stat-lbl { font-size: 9px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    .v-badge {
+        padding: 2px 8px; border-radius: 12px; font-size: 10px;
+        font-weight: 600; white-space: nowrap;
+    }
+    .v-action {
+        width: 32px; height: 32px; border-radius: 8px;
+        background: var(--bg-primary); border: 1px solid var(--border);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--text-muted); font-size: 12px; cursor: pointer;
+        text-decoration: none; flex-shrink: 0; transition: all 0.15s;
+    }
+    .v-action:hover { border-color: var(--primary); color: var(--primary); }
+</style>
 {% endblock %}
 
 {% block content %}
-<form method="get" style="margin-bottom: 12px; display: flex; gap: 10px; align-items: center;">
+<!-- Search -->
+<form method="get" style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <input type="hidden" name="filter" value="{{ current_filter }}">
-    <input type="text" name="q" value="{{ search_q }}" class="form-control" placeholder="Search IP, browser, OS, source..." style="max-width: 320px;">
-    <input type="date" name="from" value="{{ date_from }}" class="form-control" style="max-width: 170px;">
-    <input type="date" name="to" value="{{ date_to }}" class="form-control" style="max-width: 170px;">
-    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-search"></i> Apply</button>
+    <div style="flex:1;min-width:200px;position:relative;">
+        <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;"></i>
+        <input type="text" name="q" value="{{ search_q }}" class="form-control" placeholder="Search IP, browser, OS, country..." style="padding-left:36px;">
+    </div>
+    <input type="date" name="from" value="{{ date_from }}" class="form-control" style="max-width:150px;">
+    <input type="date" name="to" value="{{ date_to }}" class="form-control" style="max-width:150px;">
+    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-search"></i></button>
+    {% if search_q or date_from or date_to %}
+    <a href="?filter={{ current_filter }}" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></a>
+    {% endif %}
 </form>
 
+<!-- Tabs -->
 <div class="filter-tabs">
-    <a href="?filter=all{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}" class="filter-tab {% if current_filter == 'all' %}active{% endif %}">
-        <i class="fas fa-users"></i> All Visitors
-    </a>
-    <a href="?filter=online{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}" class="filter-tab {% if current_filter == 'online' %}active{% endif %}">
-        <i class="fas fa-circle" style="font-size: 8px; color: var(--success);"></i> Online Now
-    </a>
-    <a href="?filter=today{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if date_from %}&from={{ date_from }}{% endif %}{% if date_to %}&to={{ date_to }}{% endif %}" class="filter-tab {% if current_filter == 'today' %}active{% endif %}">
-        <i class="fas fa-calendar-day"></i> Today
-    </a>
+    <a href="?filter=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}"><i class="fas fa-users"></i> All Visitors</a>
+    <a href="?filter=online" class="filter-tab {% if current_filter == 'online' %}active{% endif %}"><i class="fas fa-circle" style="font-size:8px;color:#10b981;"></i> Online Now</a>
+    <a href="?filter=today" class="filter-tab {% if current_filter == 'today' %}active{% endif %}"><i class="fas fa-calendar-day"></i> Today</a>
 </div>
 
+<!-- Visitor List -->
 <div class="card">
-    <div class="card-body" style="padding: 0;">
-        <table>
-            <thead>
-                <tr>
-                    <th>Status</th>
-                    <th>IP Address</th>
-                    <th>Browser / OS</th>
-                    <th>Device</th>
-                    <th>Source</th>
-                    <th>Score</th>
-                    <th>Pages</th>
-                    <th>Chats</th>
-                    <th>First Visit</th>
-                    <th>Last Seen</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for v in visitors %}
-                <tr>
-                    <td>
-                        {% if v.last_seen >= last_30_min %}
-                            <span class="status status-online"><span class="dot"></span> Online</span>
-                        {% else %}
-                            <span class="status status-offline"><span class="dot"></span> Offline</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <a href="{% url 'dashboard:visitor_detail' v.id %}" style="color: var(--primary-light); text-decoration: none; font-weight: 500;">
-                            {{ v.ip_address }}
-                        </a>
-                    </td>
-                    <td>{{ v.browser }} / {{ v.os }}</td>
-                    <td>
-                        {% if v.device_type == "desktop" %}<i class="fas fa-desktop"></i>
-                        {% elif v.device_type == "mobile" %}<i class="fas fa-mobile-alt"></i>
-                        {% elif v.device_type == "tablet" %}<i class="fas fa-tablet-alt"></i>
-                        {% else %}<i class="fas fa-question"></i>{% endif %}
-                        {{ v.device_type|title }}
-                    </td>
-                    <td><span class="status status-active">{{ v.referrer_source }}</span></td>
-                    <td>
-                        {% if v.score >= 70 %}
-                        <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;"><i class="fas fa-fire"></i> {{ v.score }}</span>
-                        {% elif v.score >= 30 %}
-                        <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:rgba(245,158,11,0.15);color:#f59e0b;">{{ v.score }}</span>
-                        {% else %}
-                        <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;background:rgba(100,116,139,0.1);color:#64748b;">{{ v.score }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ v.page_count }}</td>
-                    <td>{{ v.chat_count }}</td>
-                    <td><small>{{ v.first_visit|date:"M d, H:i" }}</small></td>
-                    <td><small>{{ v.last_seen|timesince }} ago</small></td>
-                    <td>
-                        <a href="{% url 'dashboard:visitor_detail' v.id %}" class="btn btn-sm btn-secondary">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="11">
-                        <div class="empty-state">
-                            <i class="fas fa-user-slash"></i>
-                            <p>No visitors found</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card-body" style="padding:0;">
+        {% for v in visitors %}
+        <div class="v-row">
+            <a href="{% url 'dashboard:visitor_detail' v.id %}" class="v-avatar" style="text-decoration:none;color:white;">
+                {{ v.ip_address|truncatechars:2 }}
+                <div class="v-dot" style="background:{% if v.last_seen >= last_30_min %}#10b981{% else %}#94a3b8{% endif %};"></div>
+            </a>
+
+            <a href="{% url 'dashboard:visitor_detail' v.id %}" class="v-main" style="text-decoration:none;color:inherit;">
+                <div class="v-top">
+                    <span class="v-ip">{{ v.ip_address }}</span>
+                    {% if v.last_seen >= last_30_min %}
+                    <span class="v-badge" style="background:rgba(16,185,129,0.1);color:#10b981;">Online</span>
+                    {% endif %}
+                    {% if v.score >= 70 %}
+                    <span class="v-badge" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;"><i class="fas fa-fire" style="font-size:8px;"></i> {{ v.score }}</span>
+                    {% elif v.score >= 30 %}
+                    <span class="v-badge" style="background:rgba(245,158,11,0.12);color:#f59e0b;">{{ v.score }}</span>
+                    {% endif %}
+                    {% if v.is_banned %}
+                    <span class="v-badge" style="background:rgba(239,68,68,0.1);color:#ef4444;"><i class="fas fa-ban" style="font-size:8px;"></i> Banned</span>
+                    {% endif %}
+                </div>
+                <div class="v-meta">
+                    <i class="fas {% if v.device_type == 'desktop' %}fa-desktop{% elif v.device_type == 'mobile' %}fa-mobile-alt{% else %}fa-tablet-alt{% endif %}" style="font-size:10px;width:12px;"></i>
+                    {{ v.browser }} · {{ v.os }}
+                    {% if v.country %} · {{ v.country }}{% endif %}
+                    · <span style="color:var(--primary-light);">{{ v.referrer_source }}</span>
+                    · {{ v.last_seen|timesince }} ago
+                </div>
+            </a>
+
+            <div class="v-stats">
+                <div class="v-stat">
+                    <div class="v-stat-num" style="color:var(--primary);">{{ v.page_count }}</div>
+                    <div class="v-stat-lbl">Pages</div>
+                </div>
+                <div class="v-stat">
+                    <div class="v-stat-num" style="color:var(--success);">{{ v.chat_count }}</div>
+                    <div class="v-stat-lbl">Chats</div>
+                </div>
+                <div class="v-stat">
+                    <div class="v-stat-num" style="color:var(--warning);">{{ v.total_visits }}</div>
+                    <div class="v-stat-lbl">Visits</div>
+                </div>
+            </div>
+
+            <a href="{% url 'dashboard:visitor_detail' v.id %}" class="v-action" title="View details">
+                <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+        {% empty %}
+        <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
+            <i class="fas fa-users" style="font-size:40px;opacity:0.15;display:block;margin-bottom:12px;"></i>
+            <p style="font-size:15px;font-weight:600;">No visitors found</p>
+            <p style="font-size:13px;margin-top:4px;">Visitors will appear here when they browse your website.</p>
+        </div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}

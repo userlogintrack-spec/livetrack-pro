@@ -1,0 +1,502 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ org.widget_title|default:"LiveTrack Support" }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --wc: {{ org.widget_color|default:"#7c3aed" }}; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Inter',-apple-system,sans-serif; background:#f8f9ff; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+        /* Header */
+        .header {
+            background: var(--wc); padding:18px 20px;
+            display:flex; align-items:center; justify-content:space-between;
+            color:white; flex-shrink:0; position:relative; overflow:hidden;
+        }
+        .header::before { content:''; position:absolute; top:-20px; right:-20px; width:80px; height:80px; background:rgba(255,255,255,0.06); border-radius:50%; }
+        .header::after { content:''; position:absolute; bottom:-30px; left:-10px; width:60px; height:60px; background:rgba(255,255,255,0.04); border-radius:50%; }
+        .header-info { display:flex; align-items:center; gap:12px; position:relative; z-index:1; }
+        .avatar { width:40px; height:40px; background:rgba(255,255,255,0.2); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:17px; backdrop-filter:blur(4px); }
+        .title { font-size:15px; font-weight:700; letter-spacing:-0.2px; }
+        .status { font-size:11px; color:rgba(255,255,255,0.85); display:flex; align-items:center; gap:5px; }
+        .status-dot { width:7px; height:7px; background:#34d399; border-radius:50%; box-shadow:0 0 8px #34d399; animation:pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .header-actions { display:flex; gap:5px; position:relative; z-index:1; }
+        .header-btn { background:rgba(255,255,255,0.12); border:none; color:rgba(255,255,255,0.9); border-radius:10px; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; transition:all .2s; backdrop-filter:blur(4px); }
+        .header-btn:hover { background:rgba(255,255,255,0.25); transform:scale(1.05); }
+
+        /* Messages */
+        .messages { flex:1; overflow-y:auto; padding:16px; background:linear-gradient(180deg,#f8f9ff,#fff); display:flex; flex-direction:column; gap:10px; }
+        .messages::-webkit-scrollbar { width:4px; }
+        .messages::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:4px; }
+
+        .msg { max-width:80%; font-size:13px; padding:10px 14px; border-radius:16px; line-height:1.5; animation:msgIn .3s ease; position:relative; }
+        @keyframes msgIn { from{opacity:0;transform:translateY(6px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+        .msg-agent { align-self:flex-start; background:white; color:#1f2937; border:1px solid #e5e7eb; border-bottom-left-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+        .msg-visitor { align-self:flex-end; background:var(--wc); color:white; border-bottom-right-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+        .msg-system { align-self:center; background:#f1f0ff; color:#5b21b6; font-size:11px; padding:5px 14px; border-radius:20px; font-weight:500; }
+        .msg-time { font-size:10px; opacity:0.5; margin-top:4px; }
+        .msg img { max-width:100%; border-radius:10px; cursor:pointer; margin-top:4px; }
+        .msg a { color:inherit; }
+
+        /* Pre-chat */
+        .prechat { padding:24px 20px; display:flex; flex-direction:column; gap:14px; flex:1; overflow-y:auto; background:white; }
+        .prechat p { font-size:13px; color:#6b7280; line-height:1.6; }
+        .prechat input, .prechat textarea {
+            padding:13px 16px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:12px;
+            font-size:14px; font-family:inherit; color:#1f2937; outline:none; transition:all .2s; width:100%; box-sizing:border-box;
+        }
+        .prechat input:focus, .prechat textarea:focus { border-color:var(--wc); background:white; box-shadow:0 0 0 3px rgba(124,58,237,0.06); }
+        .prechat input::placeholder, .prechat textarea::placeholder { color:#9ca3af; }
+        .prechat textarea { resize:none; min-height:70px; }
+        .start-btn {
+            padding:14px; background:var(--wc); color:white; border:none; border-radius:14px;
+            font-size:15px; font-weight:700; cursor:pointer; font-family:inherit;
+            box-shadow:0 4px 16px rgba(0,0,0,0.12); transition:all .2s; position:relative; overflow:hidden;
+        }
+        .start-btn:hover { box-shadow:0 6px 24px rgba(0,0,0,0.18); transform:translateY(-1px); }
+        .start-btn::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent); }
+
+        /* Chat input */
+        .chat-input { padding:10px 14px; border-top:1px solid #f0f0f0; background:white; flex-shrink:0; }
+        .toolbar { display:flex; gap:2px; margin-bottom:6px; align-items:center; }
+        .tool-btn { width:34px; height:34px; border:none; background:transparent; color:#9ca3af; cursor:pointer; border-radius:10px; font-size:15px; transition:all .2s; display:flex; align-items:center; justify-content:center; }
+        .tool-btn:hover { background:#f5f3ff; color:var(--wc); }
+        .tool-sep { width:1px; height:20px; background:#e5e7eb; margin:0 4px; }
+        .input-row { display:flex; gap:8px; align-items:center; }
+        .input-row input { flex:1; padding:11px 16px; border:1.5px solid #e5e7eb; border-radius:24px; font-size:14px; font-family:inherit; outline:none; color:#1f2937; background:#f9fafb; transition:all .2s; }
+        .input-row input:focus { border-color:var(--wc); background:white; box-shadow:0 0 0 3px rgba(124,58,237,0.06); }
+        .send-btn { width:44px; height:44px; border-radius:50%; background:var(--wc); color:white; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; box-shadow:0 4px 14px rgba(0,0,0,0.12); transition:all .2s; flex-shrink:0; }
+        .send-btn:hover { transform:scale(1.06); box-shadow:0 6px 20px rgba(0,0,0,0.18); }
+
+        /* Status bar */
+        .status-bar { padding:8px; text-align:center; font-size:10px; color:#9ca3af; background:#fafafa; border-top:1px solid #f0f0f0; flex-shrink:0; }
+        .status-bar a { color:#6366f1; text-decoration:none; font-weight:600; }
+
+        /* Typing */
+        .typing { padding:8px 16px; font-size:12px; color:#9ca3af; display:none; align-items:center; gap:6px; }
+
+        /* End chat */
+        .end-chat-area { display:none; padding:24px; text-align:center; background:white; }
+        .end-chat-area p { color:#6b7280; font-size:13px; margin-bottom:14px; }
+        .newchat-btn { padding:13px; background:var(--wc); color:white; border:none; border-radius:14px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; width:100%; box-shadow:0 4px 14px rgba(0,0,0,0.1); transition:all .2s; }
+        .newchat-btn:hover { transform:translateY(-1px); }
+
+        /* Emoji */
+        .emoji-popup { display:none; position:absolute; bottom:100px; left:10px; right:10px; background:white; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 12px 40px rgba(0,0,0,.12); padding:12px; max-height:200px; overflow-y:auto; z-index:10; }
+        .emoji-popup.show { display:grid; grid-template-columns:repeat(8,1fr); gap:3px; }
+        .emoji-popup button { width:34px; height:34px; border:none; background:transparent; font-size:20px; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+        .emoji-popup button:hover { background:#f5f3ff; transform:scale(1.2); }
+
+        .hidden { display:none !important; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-info">
+            <div class="avatar"><i class="fas fa-headset"></i></div>
+            <div>
+                <div class="title">{{ org.widget_title|default:"LiveTrack Support" }}</div>
+                <div class="status"><span class="status-dot"></span> We're online</div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="header-btn" onclick="toggleMenu()" title="Menu"><i class="fas fa-ellipsis-v"></i></button>
+            <button class="header-btn" onclick="parent.postMessage('ltw-close','*')" title="Close"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages hidden" id="messages"></div>
+
+    <!-- Pre-chat form -->
+    <div class="prechat" id="prechat">
+        <p>{{ org.welcome_message|default:"Please fill in this form. We will get back to you as soon as possible." }}</p>
+        <input type="text" id="nameInput" placeholder="Your name *" required>
+        <input type="email" id="emailInput" placeholder="Email (optional)">
+        <input type="tel" id="phoneInput" placeholder="Phone number (optional)">
+        <textarea id="subjectInput" placeholder="How can we help you?"></textarea>
+        <button class="start-btn" onclick="startChat()"><i class="fas fa-paper-plane" style="margin-right:8px;"></i> Start Chat</button>
+    </div>
+
+    <!-- Typing indicator -->
+    <div class="typing" id="typing"><span style="display:inline-flex;gap:3px;margin-right:6px;"><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s infinite;"></span><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s .2s infinite;"></span><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s .4s infinite;"></span></span> Agent is typing...</div>
+    <style>@keyframes typingB{0%,100%{opacity:.3}50%{opacity:1}}</style>
+
+    <!-- Chat input -->
+    <div class="chat-input hidden" id="chatInput">
+        <div class="toolbar">
+            <button class="tool-btn" onclick="document.getElementById('fileInput').click()" title="Attach file"><i class="fas fa-paperclip"></i></button>
+            <button class="tool-btn" onclick="document.getElementById('imgInput').click()" title="Send image"><i class="fas fa-image"></i></button>
+            <button class="tool-btn" onclick="toggleEmoji()" title="Emoji"><i class="fas fa-smile"></i></button>
+            <div class="tool-sep"></div>
+            <button class="tool-btn" onclick="startVisitorCall('audio')" title="Audio Call" id="btnAudioCall"><i class="fas fa-phone"></i></button>
+            <button class="tool-btn" onclick="startVisitorCall('video')" title="Video Call" id="btnVideoCall"><i class="fas fa-video"></i></button>
+            <button class="tool-btn" onclick="startVisitorScreenShare()" title="Share Screen" id="btnScreenShare"><i class="fas fa-desktop"></i></button>
+            <div style="flex:1;"></div>
+            <button class="tool-btn" onclick="endChat()" title="End Chat" style="color:#ef4444;font-size:13px;"><i class="fas fa-phone-slash"></i></button>
+        </div>
+        <div class="input-row">
+            <input type="text" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()">
+            <button class="send-btn" onclick="sendMsg()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+        <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this)" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip">
+        <input type="file" id="imgInput" style="display:none" onchange="uploadFile(this)" accept="image/*">
+    </div>
+
+    <!-- Emoji popup -->
+    <div class="emoji-popup" id="emojiPopup"></div>
+
+    <!-- Call overlay -->
+    <div id="callOverlay" style="display:none;position:absolute;inset:0;z-index:20;background:rgba(15,10,42,0.95);flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(10px);">
+        <div id="callAvatar" style="width:70px;height:70px;border-radius:50%;background:{{ org.widget_color|default:'#7c3aed' }};display:flex;align-items:center;justify-content:center;font-size:28px;color:white;margin-bottom:14px;box-shadow:0 0 30px rgba(124,58,237,0.4);"><i class="fas fa-phone" id="callIcon"></i></div>
+        <div id="callTitle" style="font-size:16px;font-weight:700;color:white;margin-bottom:4px;">Calling...</div>
+        <div id="callTimer" style="font-size:13px;color:rgba(255,255,255,0.6);">00:00</div>
+        <div id="videoBox" style="display:none;width:100%;max-height:200px;margin:14px 0;border-radius:12px;overflow:hidden;position:relative;">
+            <video id="remoteVid" autoplay playsinline style="width:100%;background:#000;"></video>
+            <video id="localVid" autoplay playsinline muted style="position:absolute;bottom:8px;right:8px;width:80px;border-radius:8px;border:2px solid rgba(255,255,255,0.2);"></video>
+        </div>
+        <div id="screenBox" style="display:none;width:100%;margin:14px 0;border-radius:12px;overflow:hidden;">
+            <video id="screenVid" autoplay playsinline style="width:100%;max-height:200px;background:#000;object-fit:contain;"></video>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button onclick="toggleMute()" id="muteBtn" style="width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,0.1);color:white;font-size:16px;cursor:pointer;"><i class="fas fa-microphone" id="muteIcon"></i></button>
+            <button onclick="toggleCam()" id="camBtn" style="width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,0.1);color:white;font-size:16px;cursor:pointer;"><i class="fas fa-video" id="camIcon"></i></button>
+            <button onclick="endCallVisitor()" style="width:52px;height:52px;border-radius:50%;border:none;background:#ef4444;color:white;font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(239,68,68,0.4);"><i class="fas fa-phone-slash"></i></button>
+        </div>
+    </div>
+
+    <!-- Incoming call banner -->
+    <div id="incomingCall" style="display:none;position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:25;background:white;border:2px solid #10b981;border-radius:14px;padding:14px 20px;box-shadow:0 10px 30px rgba(0,0,0,0.2);align-items:center;gap:12px;width:90%;max-width:300px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(16,185,129,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;color:#10b981;"><i class="fas fa-phone" style="animation:ring 1s ease infinite;"></i></div>
+            <div><div style="font-weight:700;font-size:13px;" id="inCallName">Incoming Call</div><div style="font-size:11px;color:#6b7280;" id="inCallType">Audio Call</div></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button onclick="acceptIncomingCall()" style="flex:1;padding:8px;border:none;border-radius:10px;background:#10b981;color:white;font-weight:700;font-size:12px;cursor:pointer;"><i class="fas fa-phone"></i> Accept</button>
+            <button onclick="rejectIncomingCall()" style="flex:1;padding:8px;border:none;border-radius:10px;background:#ef4444;color:white;font-weight:700;font-size:12px;cursor:pointer;"><i class="fas fa-phone-slash"></i> Reject</button>
+        </div>
+    </div>
+    <style>@keyframes ring{0%{transform:rotate(0)}25%{transform:rotate(15deg)}50%{transform:rotate(0)}75%{transform:rotate(-15deg)}100%{transform:rotate(0)}}</style>
+
+    <!-- End chat / New chat -->
+    <div class="end-chat-area" id="endArea">
+        <p style="font-size:13px;color:#6b7280;margin-bottom:12px;">Chat has ended.</p>
+        <button class="newchat-btn" onclick="newChat()"><i class="fas fa-plus" style="margin-right:6px;"></i> Start New Chat</button>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar"><span style="display:inline-block;width:6px;height:6px;background:#34d399;border-radius:50%;margin-right:4px;"></span> Online &middot; Powered by <a href="/" target="_blank">LiveTrack</a></div>
+
+<script>
+var BASE = window.location.origin;
+var KEY = '{{ widget_key }}';
+var SESSION = '{{ session_key }}';
+var roomId = null, wsToken = '', socket = null, visitorName = 'Visitor';
+var WC = '{{ org.widget_color|default:"#7c3aed" }}';
+
+// Emojis
+var EMOJIS = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉','😊','😇','🥰','😍','🤩','😘','😋','😛','😜','🤪','😝','🤗','🤭','🤔','😐','😏','😒','🙄','😬','😌','😔','😪','😴','😷','🤒','🤕','🤢','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','😕','😟','🙁','😮','😲','😳','🥺','😢','😭','😱','😤','😡','👍','👎','👋','🤝','🙏','✅','❌','❤️','🔥','⭐','🎉','💯','👏','🚀','💡','📎'];
+
+function toggleEmoji() {
+    var p = document.getElementById('emojiPopup');
+    if (p.classList.contains('show')) { p.classList.remove('show'); return; }
+    if (!p.innerHTML) { p.innerHTML = EMOJIS.map(function(e){return '<button onclick="insertEmoji(\''+e+'\')">'+e+'</button>';}).join(''); }
+    p.classList.add('show');
+}
+function insertEmoji(e) { document.getElementById('msgInput').value += e; document.getElementById('msgInput').focus(); document.getElementById('emojiPopup').classList.remove('show'); }
+
+function post(path, data) {
+    data = data || {}; data.key = KEY; data.session_key = SESSION;
+    return fetch(BASE + path, {method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(data)}).then(function(r){return r.json();});
+}
+
+function addMsg(text, type, timestamp, msgType, fileUrl, fileName) {
+    var c = document.getElementById('messages');
+    var d = document.createElement('div');
+    d.className = 'msg msg-' + type;
+
+    if (msgType === 'image' && fileUrl) {
+        var img = document.createElement('img');
+        img.src = fileUrl.startsWith('http') ? fileUrl : BASE + fileUrl;
+        img.onclick = function(){window.open(img.src,'_blank');};
+        d.appendChild(img);
+    } else if (msgType === 'file' && fileUrl) {
+        d.innerHTML = '<a href="'+(fileUrl.startsWith('http')?fileUrl:BASE+fileUrl)+'" target="_blank">📎 '+(fileName||'File')+'</a>';
+    } else {
+        d.textContent = text || '';
+    }
+
+    if (timestamp) {
+        var t = new Date(timestamp);
+        var te = document.createElement('div');
+        te.className = 'msg-time';
+        te.textContent = t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+        d.appendChild(te);
+    }
+    c.appendChild(d);
+    c.scrollTop = c.scrollHeight;
+}
+
+function connectWs() {
+    if (!roomId || !wsToken) return;
+    var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    socket = new WebSocket(proto + location.host + '/ws/chat/' + roomId + '/?token=' + encodeURIComponent(wsToken));
+    socket.onmessage = function(e) {
+        var d = JSON.parse(e.data);
+        if (d.type === 'chat_message' && d.sender_type !== 'visitor') {
+            addMsg(d.message, d.sender_type === 'system' ? 'system' : 'agent', d.timestamp, d.msg_type, d.file_url, d.file_name);
+        }
+        if (d.type === 'typing' && d.sender_type === 'agent') {
+            document.getElementById('typing').style.display = d.is_typing ? 'block' : 'none';
+        }
+        if (d.type === 'chat_closed') {
+            handleChatClosed('Agent ended the chat.');
+        }
+    };
+}
+
+function startChat() {
+    var name = document.getElementById('nameInput').value.trim();
+    if (!name) { document.getElementById('nameInput').style.borderColor='#ef4444'; return; }
+    visitorName = name;
+    var email = document.getElementById('emailInput').value.trim();
+    var subject = document.getElementById('subjectInput').value.trim();
+
+    post('/api/widget/start-chat/', {name:name, email:email, subject:subject})
+    .then(function(data) {
+        if (data.error) { addMsg(data.error, 'system'); return; }
+        roomId = data.room_id; wsToken = data.ws_token || '';
+        document.getElementById('prechat').classList.add('hidden');
+        document.getElementById('messages').classList.remove('hidden');
+        document.getElementById('chatInput').classList.remove('hidden');
+        if (data.messages) {
+            data.messages.forEach(function(m) {
+                var cls = m.sender_type === 'visitor' ? 'visitor' : m.sender_type === 'system' ? 'system' : 'agent';
+                addMsg(m.content, cls, m.timestamp, m.msg_type, m.file_url, m.file_name);
+            });
+        }
+        connectWs();
+    });
+}
+
+function sendMsg() {
+    if (!socket || socket.readyState !== 1) return;
+    var input = document.getElementById('msgInput');
+    var text = input.value.trim();
+    if (!text) return;
+    socket.send(JSON.stringify({type:'chat_message',message:text,sender_type:'visitor',sender_name:visitorName,msg_type:'text'}));
+    addMsg(text, 'visitor', new Date().toISOString());
+    input.value = '';
+    input.focus();
+}
+
+function uploadFile(input) {
+    var file = input.files[0];
+    if (!file || !roomId) return;
+    if (file.size > 10*1024*1024) { alert('File too large (max 10MB)'); return; }
+    var fd = new FormData();
+    fd.append('file', file);
+    fetch(BASE + '/api/chat/upload/' + roomId + '/', {method:'POST',body:fd,credentials:'include'})
+    .then(function(r){return r.json();})
+    .then(function(data) {
+        if (data.file_url) {
+            addMsg(data.file_name, 'visitor', new Date().toISOString(), data.msg_type, data.file_url, data.file_name);
+            socket.send(JSON.stringify({type:'chat_message',message:data.file_name,sender_type:'visitor',sender_name:visitorName,msg_type:data.msg_type,file_url:data.file_url,file_name:data.file_name}));
+        }
+    });
+    input.value = '';
+}
+
+function endChat() {
+    if (!socket || socket.readyState !== 1) return;
+    if (!confirm('End this chat?')) return;
+    socket.send(JSON.stringify({type:'close_chat'}));
+    handleChatClosed('You ended the chat.');
+}
+
+function handleChatClosed(msg) {
+    addMsg(msg || 'Chat ended.', 'system', new Date().toISOString());
+    document.getElementById('chatInput').classList.add('hidden');
+    document.getElementById('typing').style.display = 'none';
+    document.getElementById('endArea').style.display = 'block';
+    if (socket) { socket.close(); socket = null; }
+    roomId = null; wsToken = '';
+}
+
+function newChat() {
+    document.getElementById('endArea').style.display = 'none';
+    document.getElementById('chatInput').classList.add('hidden');
+    document.getElementById('messages').classList.add('hidden');
+    document.getElementById('messages').innerHTML = '';
+    document.getElementById('prechat').classList.remove('hidden');
+    roomId = null; wsToken = '';
+}
+
+function toggleMenu() {}
+
+// Auto-restore chat on load
+post('/api/widget/start-chat/', {name:'',email:'',subject:'',restore_only:true})
+.then(function(data) {
+    if (data.reused && data.messages && data.messages.length > 0) {
+        roomId = data.room_id; wsToken = data.ws_token || '';
+        document.getElementById('prechat').classList.add('hidden');
+        document.getElementById('messages').classList.remove('hidden');
+        document.getElementById('chatInput').classList.remove('hidden');
+        data.messages.forEach(function(m) {
+            var cls = m.sender_type === 'visitor' ? 'visitor' : m.sender_type === 'system' ? 'system' : 'agent';
+            addMsg(m.content, cls, m.timestamp, m.msg_type, m.file_url, m.file_name);
+            if (m.sender_type === 'visitor' && m.sender_name) visitorName = m.sender_name;
+        });
+        connectWs();
+    }
+}).catch(function(){});
+
+// ═══════ AUDIO/VIDEO CALL + SCREEN SHARE ═══════
+var callPC = null, localStream = null, screenStr = null, callSecs = 0, callTimer = null, isMuted = false, isCamOff = false;
+var rtcCfg = {iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
+
+async function startVisitorCall(type) {
+    if (!socket || socket.readyState !== 1) { alert('Start chat first'); return; }
+    try { localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:type==='video'}); } catch(e) { alert('Allow '+(type==='video'?'camera & microphone':'microphone')+' access'); return; }
+    showCallUI(type);
+    if (type==='video') { document.getElementById('videoBox').style.display='block'; document.getElementById('localVid').srcObject=localStream; }
+    callPC = new RTCPeerConnection(rtcCfg);
+    localStream.getTracks().forEach(function(t){callPC.addTrack(t,localStream);});
+    callPC.ontrack = function(e) { startCallTimer(); document.getElementById('callTitle').textContent='Connected'; if(e.streams[0]){document.getElementById('remoteVid').srcObject=e.streams[0];} };
+    callPC.onicecandidate = function(e) { if(e.candidate) socket.send(JSON.stringify({type:'ice_candidate',data:{candidate:e.candidate.toJSON(),context:'call'}})); };
+    callPC.oniceconnectionstatechange = function() { if(['disconnected','failed','closed'].includes(callPC.iceConnectionState)) endCallVisitor(); };
+    var offer = await callPC.createOffer();
+    await callPC.setLocalDescription(offer);
+    socket.send(JSON.stringify({type:'call_offer',data:{sdp:callPC.localDescription.toJSON(),call_type:type,caller:visitorName}}));
+    addMsg('Calling agent...','system',new Date().toISOString());
+}
+
+async function startVisitorScreenShare() {
+    if (!socket || socket.readyState !== 1) { alert('Start chat first'); return; }
+    try { screenStr = await navigator.mediaDevices.getDisplayMedia({video:true}); } catch(e) { return; }
+    document.getElementById('btnScreenShare').style.color = '#10b981';
+    addMsg('Screen sharing started','system',new Date().toISOString());
+    // Create peer connection for screen
+    if (!callPC) {
+        callPC = new RTCPeerConnection(rtcCfg);
+        callPC.onicecandidate = function(e) { if(e.candidate) socket.send(JSON.stringify({type:'ice_candidate',data:{candidate:e.candidate.toJSON()}})); };
+    }
+    screenStr.getTracks().forEach(function(t){callPC.addTrack(t,screenStr);});
+    var offer = await callPC.createOffer();
+    await callPC.setLocalDescription(offer);
+    socket.send(JSON.stringify({type:'screen_share_offer',data:{sdp:callPC.localDescription.toJSON()}}));
+    screenStr.getVideoTracks()[0].onended = function() { stopScreenShare(); };
+}
+
+function stopScreenShare() {
+    if(screenStr){screenStr.getTracks().forEach(function(t){t.stop();}); screenStr=null;}
+    document.getElementById('btnScreenShare').style.color = '';
+    socket.send(JSON.stringify({type:'screen_share_stop',data:{}}));
+    addMsg('Screen sharing stopped','system',new Date().toISOString());
+}
+
+function showCallUI(type) {
+    document.getElementById('callOverlay').style.display='flex';
+    document.getElementById('callTitle').textContent='Calling...';
+    document.getElementById('callTimer').textContent='00:00';
+    document.getElementById('callIcon').className = type==='video' ? 'fas fa-video' : 'fas fa-phone';
+}
+
+function endCallVisitor() {
+    document.getElementById('callOverlay').style.display='none';
+    document.getElementById('videoBox').style.display='none';
+    document.getElementById('screenBox').style.display='none';
+    document.getElementById('incomingCall').style.display='none';
+    if(localStream){localStream.getTracks().forEach(function(t){t.stop();}); localStream=null;}
+    if(screenStr){screenStr.getTracks().forEach(function(t){t.stop();}); screenStr=null;}
+    if(callPC){callPC.close(); callPC=null;}
+    if(callTimer){clearInterval(callTimer); callTimer=null;} callSecs=0;
+    isMuted=false; isCamOff=false;
+    if(socket && socket.readyState===1) socket.send(JSON.stringify({type:'call_end',data:{}}));
+    addMsg('Call ended','system',new Date().toISOString());
+}
+
+function toggleMute() {
+    if(!localStream) return;
+    isMuted=!isMuted;
+    localStream.getAudioTracks().forEach(function(t){t.enabled=!isMuted;});
+    document.getElementById('muteIcon').className = isMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
+    document.getElementById('muteBtn').style.background = isMuted ? '#ef4444' : 'rgba(255,255,255,0.1)';
+}
+
+function toggleCam() {
+    if(!localStream) return;
+    isCamOff=!isCamOff;
+    localStream.getVideoTracks().forEach(function(t){t.enabled=!isCamOff;});
+    document.getElementById('camIcon').className = isCamOff ? 'fas fa-video-slash' : 'fas fa-video';
+    document.getElementById('camBtn').style.background = isCamOff ? '#ef4444' : 'rgba(255,255,255,0.1)';
+}
+
+function startCallTimer() {
+    callSecs=0; if(callTimer) clearInterval(callTimer);
+    callTimer = setInterval(function(){ callSecs++; var m=Math.floor(callSecs/60),s=callSecs%60; document.getElementById('callTimer').textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s; },1000);
+}
+
+// Handle incoming call from agent
+var pendingOffer = null;
+function handleIncomingCall(data) {
+    pendingOffer = data;
+    document.getElementById('incomingCall').style.display='block';
+    document.getElementById('inCallName').textContent = (data.caller||'Agent') + ' is calling';
+    document.getElementById('inCallType').textContent = (data.call_type==='video'?'Video':'Audio') + ' Call';
+}
+
+async function acceptIncomingCall() {
+    document.getElementById('incomingCall').style.display='none';
+    if(!pendingOffer) return;
+    var type = pendingOffer.call_type || 'audio';
+    try { localStream = await navigator.mediaDevices.getUserMedia({audio:true,video:type==='video'}); } catch(e) { return; }
+    showCallUI(type);
+    if(type==='video'){document.getElementById('videoBox').style.display='block'; document.getElementById('localVid').srcObject=localStream;}
+    callPC = new RTCPeerConnection(rtcCfg);
+    localStream.getTracks().forEach(function(t){callPC.addTrack(t,localStream);});
+    callPC.ontrack = function(e) { startCallTimer(); document.getElementById('callTitle').textContent='Connected'; if(e.streams[0]) document.getElementById('remoteVid').srcObject=e.streams[0]; };
+    callPC.onicecandidate = function(e) { if(e.candidate) socket.send(JSON.stringify({type:'ice_candidate',data:{candidate:e.candidate.toJSON(),context:'call'}})); };
+    await callPC.setRemoteDescription(new RTCSessionDescription(pendingOffer.sdp));
+    var answer = await callPC.createAnswer();
+    await callPC.setLocalDescription(answer);
+    socket.send(JSON.stringify({type:'call_answer',data:{sdp:callPC.localDescription.toJSON()}}));
+    addMsg('Call connected','system',new Date().toISOString());
+}
+
+function rejectIncomingCall() {
+    document.getElementById('incomingCall').style.display='none';
+    pendingOffer=null;
+    socket.send(JSON.stringify({type:'call_reject',data:{}}));
+}
+
+// Patch WebSocket to handle call messages
+var _origWsMsg = null;
+function patchCallHandler() {
+    if(!socket) return;
+    _origWsMsg = socket.onmessage;
+    socket.onmessage = function(e) {
+        var d = JSON.parse(e.data);
+        if(d.type==='call_offer' && d.sender_type!=='visitor') { handleIncomingCall(d.data||d); return; }
+        if(d.type==='call_answer' && callPC) { callPC.setRemoteDescription(new RTCSessionDescription((d.data||d).sdp)); startCallTimer(); document.getElementById('callTitle').textContent='Connected'; return; }
+        if(d.type==='call_end') { endCallVisitor(); return; }
+        if(d.type==='call_reject') { endCallVisitor(); addMsg('Call rejected','system',new Date().toISOString()); return; }
+        if(d.type==='ice_candidate' && d.data && d.data.context==='call' && callPC) { callPC.addIceCandidate(new RTCIceCandidate(d.data.candidate)).catch(function(){}); return; }
+        if(d.type==='screen_share_answer' && callPC) { callPC.setRemoteDescription(new RTCSessionDescription((d.data||d).sdp)).catch(function(){}); return; }
+        if(_origWsMsg) _origWsMsg.call(socket,e);
+    };
+}
+
+// Patch after WebSocket connects
+var _origConnectWs = connectWs;
+connectWs = function() { _origConnectWs(); setTimeout(patchCallHandler, 300); };
+</script>
+</body>
+</html>

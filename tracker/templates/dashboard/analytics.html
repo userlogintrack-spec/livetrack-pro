@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Analytics{% endblock %}
-{% block page_title %}Chat Analytics{% endblock %}
+{% block page_title %}Analytics{% endblock %}
 
 {% block content %}
 <!-- Top Stats -->
@@ -17,43 +17,52 @@
     </div>
     <div class="stat-card orange">
         <div class="stat-icon"><i class="fas fa-star"></i></div>
-        <div class="stat-value">{% if avg_rating %}{{ avg_rating|floatformat:1 }}{% else %}-{% endif %}</div>
+        <div class="stat-value">{% if avg_rating %}{{ avg_rating|floatformat:1 }}/5{% else %}-{% endif %}</div>
         <div class="stat-label">Avg CSAT</div>
     </div>
     <div class="stat-card blue">
         <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-        <div class="stat-value">{{ status_counts.closed }}</div>
-        <div class="stat-label">Resolved Chats</div>
+        <div class="stat-value">{{ completion_rate }}%</div>
+        <div class="stat-label">Completion Rate</div>
     </div>
 </div>
 
-<div class="grid-2" style="margin-bottom:20px;">
+<!-- Charts Row 1 -->
+<div class="grid-2" style="margin-bottom:16px;">
     <!-- 7-Day Chat Volume -->
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Chat Volume (7 days)</h3></div>
+        <div class="card-header">
+            <h3><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Chat Volume</h3>
+            <span style="font-size:11px;color:var(--text-muted);">Last 7 days</span>
+        </div>
         <div class="card-body">
-            <div style="display:flex;align-items:flex-end;gap:8px;height:150px;padding:0 4px;">
+            <div style="display:flex;align-items:flex-end;gap:6px;height:160px;padding:0 4px;">
                 {% for d in daily_chats %}
                 <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                    <div style="font-size:10px;font-weight:700;color:var(--primary);">{{ d.count }}</div>
-                    <div style="width:100%;max-width:36px;background:linear-gradient(180deg,#818cf8,#6366f1);border-radius:6px 6px 0 0;min-height:4px;height:{% if d.count %}{{ d.count }}{% else %}2{% endif %}0px;max-height:120px;transition:height .5s;"></div>
-                    <div style="font-size:9px;color:var(--text-muted);font-weight:600;">{{ d.day }}</div>
+                    <div style="font-size:11px;font-weight:700;color:var(--primary);">{{ d.count }}</div>
+                    <div style="width:100%;max-width:40px;background:linear-gradient(180deg,#818cf8,#6366f1);border-radius:8px 8px 0 0;min-height:4px;height:{% if d.count %}{{ d.count }}{% else %}2{% endif %}0px;max-height:130px;transition:height .5s;position:relative;" title="{{ d.date }}: {{ d.count }} chats">
+                    </div>
+                    <div style="font-size:10px;color:var(--text-muted);font-weight:600;">{{ d.day }}</div>
+                    <div style="font-size:8px;color:var(--text-muted);">{{ d.date }}</div>
                 </div>
                 {% endfor %}
             </div>
         </div>
     </div>
 
-    <!-- 7-Day CSAT Trend -->
+    <!-- CSAT Trend -->
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-star" style="color:#f59e0b;"></i> CSAT Trend (7 days)</h3></div>
+        <div class="card-header">
+            <h3><i class="fas fa-star" style="color:#f59e0b;"></i> CSAT Trend</h3>
+            <span style="font-size:11px;color:var(--text-muted);">Last 7 days</span>
+        </div>
         <div class="card-body">
-            <div style="display:flex;align-items:flex-end;gap:8px;height:150px;padding:0 4px;">
+            <div style="display:flex;align-items:flex-end;gap:6px;height:160px;padding:0 4px;">
                 {% for d in daily_csat %}
                 <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
-                    <div style="font-size:10px;font-weight:700;color:#f59e0b;">{% if d.avg %}{{ d.avg }}{% else %}-{% endif %}</div>
-                    <div style="width:100%;max-width:36px;background:linear-gradient(180deg,#fbbf24,#f59e0b);border-radius:6px 6px 0 0;min-height:4px;height:{% if d.avg %}{{ d.avg }}{% else %}0{% endif %}0px;max-height:120px;transition:height .5s;"></div>
-                    <div style="font-size:9px;color:var(--text-muted);font-weight:600;">{{ d.day }}</div>
+                    <div style="font-size:11px;font-weight:700;color:#f59e0b;">{% if d.avg %}{{ d.avg }}{% else %}-{% endif %}</div>
+                    <div style="width:100%;max-width:40px;background:linear-gradient(180deg,#fbbf24,#f59e0b);border-radius:8px 8px 0 0;min-height:4px;height:{% if d.avg %}{{ d.avg }}{% else %}0{% endif %}0px;max-height:130px;transition:height .5s;" title="{{ d.day }}: {{ d.avg }}/5"></div>
+                    <div style="font-size:10px;color:var(--text-muted);font-weight:600;">{{ d.day }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -61,77 +70,171 @@
     </div>
 </div>
 
-<div class="grid-2" style="margin-bottom:20px;">
-    <!-- Chat Status Breakdown -->
+<!-- Charts Row 2 -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;">
+    <!-- Chat Status -->
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-pie-chart" style="color:var(--info);"></i> Chat Status</h3></div>
+        <div class="card-header"><h3><i class="fas fa-pie-chart" style="color:var(--info);"></i> Status</h3></div>
         <div class="card-body">
-            <div style="display:flex;flex-direction:column;gap:12px;">
+            <!-- Donut-like visual -->
+            <div style="display:flex;justify-content:center;gap:16px;margin-bottom:16px;">
                 {% with total=status_counts.waiting|add:status_counts.active|add:status_counts.closed %}
-                <div>
-                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:6px;"></span>Waiting</span>
-                        <span style="font-weight:700;">{{ status_counts.waiting }}</span>
-                    </div>
-                    <div style="height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden;">
-                        <div style="height:100%;background:#f59e0b;border-radius:4px;width:{% widthratio status_counts.waiting total 100 %}%;"></div>
-                    </div>
-                </div>
-                <div>
-                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:6px;"></span>Active</span>
-                        <span style="font-weight:700;">{{ status_counts.active }}</span>
-                    </div>
-                    <div style="height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden;">
-                        <div style="height:100%;background:#10b981;border-radius:4px;width:{% widthratio status_counts.active total 100 %}%;"></div>
-                    </div>
-                </div>
-                <div>
-                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6366f1;margin-right:6px;"></span>Closed</span>
-                        <span style="font-weight:700;">{{ status_counts.closed }}</span>
-                    </div>
-                    <div style="height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden;">
-                        <div style="height:100%;background:#6366f1;border-radius:4px;width:{% widthratio status_counts.closed total 100 %}%;"></div>
+                <div style="text-align:center;">
+                    <div style="width:52px;height:52px;border-radius:50%;background:conic-gradient(#f59e0b 0% {% widthratio status_counts.waiting total 100 %}%, #10b981 {% widthratio status_counts.waiting total 100 %}% {% widthratio status_counts.waiting|add:status_counts.active total 100 %}%, #6366f1 {% widthratio status_counts.waiting|add:status_counts.active total 100 %}% 100%);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;">
+                        <div style="width:32px;height:32px;border-radius:50%;background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--text-primary);">{{ total }}</div>
                     </div>
                 </div>
                 {% endwith %}
             </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+                    <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#f59e0b;margin-right:6px;"></span>Waiting</span>
+                    <span style="font-weight:700;">{{ status_counts.waiting }}</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+                    <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#10b981;margin-right:6px;"></span>Active</span>
+                    <span style="font-weight:700;">{{ status_counts.active }}</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+                    <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#6366f1;margin-right:6px;"></span>Closed</span>
+                    <span style="font-weight:700;">{{ status_counts.closed }}</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Top Countries -->
+    <!-- Browser Stats -->
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-globe" style="color:var(--success);"></i> Top Visitor Countries</h3></div>
-        <div class="card-body" style="padding:0;">
-            {% for c in country_stats %}
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:11px;font-weight:600;color:var(--text-muted);">{{ forloop.counter }}.</span>
-                    <span style="font-size:13px;font-weight:600;">{{ c.country }}</span>
+        <div class="card-header"><h3><i class="fas fa-globe" style="color:var(--primary);"></i> Browsers</h3></div>
+        <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                {% for b in browser_stats %}
+                <div>
+                    <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+                        <span style="font-weight:600;">{{ b.browser|default:"Unknown" }}</span>
+                        <span style="color:var(--text-muted);">{% widthratio b.count total_browser 100 %}%</span>
+                    </div>
+                    <div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;">
+                        <div style="height:100%;background:linear-gradient(90deg,#818cf8,#6366f1);border-radius:3px;width:{% widthratio b.count total_browser 100 %}%;transition:width .5s;"></div>
+                    </div>
                 </div>
-                <span style="font-size:13px;font-weight:700;color:var(--primary);">{{ c.count }}</span>
+                {% empty %}
+                <div style="text-align:center;color:var(--text-muted);font-size:12px;padding:10px;">No data</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Stats -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-laptop" style="color:var(--success);"></i> Devices</h3></div>
+        <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                {% for d in device_stats %}
+                <div>
+                    <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+                        <span style="font-weight:600;display:flex;align-items:center;gap:5px;">
+                            <i class="fas {% if d.device_type == 'desktop' %}fa-desktop{% elif d.device_type == 'mobile' %}fa-mobile-alt{% elif d.device_type == 'tablet' %}fa-tablet-alt{% else %}fa-question{% endif %}" style="color:var(--text-muted);font-size:10px;width:14px;"></i>
+                            {{ d.device_type|title }}
+                        </span>
+                        <span style="color:var(--text-muted);">{% widthratio d.count total_device 100 %}%</span>
+                    </div>
+                    <div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;">
+                        <div style="height:100%;background:linear-gradient(90deg,#34d399,#10b981);border-radius:3px;width:{% widthratio d.count total_device 100 %}%;transition:width .5s;"></div>
+                    </div>
+                </div>
+                {% empty %}
+                <div style="text-align:center;color:var(--text-muted);font-size:12px;padding:10px;">No data</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 3 -->
+<div class="grid-2" style="margin-bottom:16px;">
+    <!-- Top Agents -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-trophy" style="color:#f59e0b;"></i> Top Agents</h3></div>
+        <div class="card-body" style="padding:0;">
+            {% for agent in top_agents %}
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}">
+                <div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;flex-shrink:0;{% if forloop.counter == 1 %}background:linear-gradient(135deg,#f59e0b,#fbbf24);{% elif forloop.counter == 2 %}background:linear-gradient(135deg,#94a3b8,#cbd5e1);{% elif forloop.counter == 3 %}background:linear-gradient(135deg,#d97706,#b45309);{% else %}background:var(--bg-primary);color:var(--text-muted);{% endif %}">
+                    {{ forloop.counter }}
+                </div>
+                <div style="width:32px;height:32px;border-radius:50%;background:{{ agent.agent_profile.avatar_color }};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:12px;flex-shrink:0;">
+                    {{ agent.first_name|default:agent.username|first|upper }}
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:600;font-size:13px;">{{ agent.get_full_name|default:agent.username }}</div>
+                    <div style="font-size:10px;color:var(--text-muted);">{% if agent.avg_agent_rating %}{{ agent.avg_agent_rating|floatformat:1 }} <i class="fas fa-star" style="color:#f59e0b;font-size:8px;"></i>{% else %}-{% endif %}</div>
+                </div>
+                <div style="font-size:18px;font-weight:800;color:var(--primary);">{{ agent.chats_count }}</div>
             </div>
             {% empty %}
-            <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">No location data yet</div>
+            <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px;">No agent data</div>
             {% endfor %}
+        </div>
+    </div>
+
+    <!-- Rating Distribution + Countries -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+        <!-- Rating Distribution -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-star-half-alt" style="color:#f59e0b;"></i> Rating Distribution</h3></div>
+            <div class="card-body">
+                {% for r in rating_dist %}
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <span style="font-size:12px;font-weight:600;width:20px;color:var(--text-muted);">{{ r.stars }}<i class="fas fa-star" style="color:#f59e0b;font-size:8px;margin-left:1px;"></i></span>
+                    <div style="flex:1;height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden;">
+                        <div style="height:100%;background:#fbbf24;border-radius:4px;width:{% if r.count %}{{ r.count }}0{% else %}0{% endif %}%;max-width:100%;"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:600;color:var(--text-secondary);width:20px;text-align:right;">{{ r.count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Top Countries -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-map-marker-alt" style="color:var(--danger);"></i> Top Countries</h3></div>
+            <div class="card-body" style="padding:0;">
+                {% for c in country_stats %}
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}">
+                    <span style="width:20px;height:20px;border-radius:50%;background:rgba(99,102,241,0.08);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--primary);flex-shrink:0;">{{ forloop.counter }}</span>
+                    <span style="flex:1;font-size:13px;font-weight:500;">{{ c.country }}</span>
+                    <span style="font-size:13px;font-weight:700;color:var(--primary);">{{ c.count }}</span>
+                </div>
+                {% empty %}
+                <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px;">No location data</div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Busiest Hours -->
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-clock" style="color:var(--warning);"></i> Busiest Hours</h3></div>
+    <div class="card-header">
+        <h3><i class="fas fa-clock" style="color:var(--warning);"></i> Busiest Hours</h3>
+        <span style="font-size:11px;color:var(--text-muted);">Chat activity by hour of day</span>
+    </div>
     <div class="card-body">
-        <div style="display:flex;align-items:flex-end;gap:3px;height:100px;">
+        <div style="display:flex;align-items:flex-end;gap:2px;height:110px;">
             {% for h in hourly_chats %}
-            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;" title="{{ h.hour }}:00 - {{ h.count }} chats">
-                <div style="width:100%;background:linear-gradient(180deg,#a78bfa,#7c3aed);border-radius:3px 3px 0 0;min-height:2px;height:{{ h.count }}0px;max-height:80px;"></div>
-                {% if forloop.counter|divisibleby:3 %}
-                <div style="font-size:8px;color:var(--text-muted);">{{ h.hour }}h</div>
-                {% endif %}
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;" title="{{ h.hour }}:00 — {{ h.count }} chats">
+                <div style="font-size:8px;font-weight:700;color:var(--primary);{% if h.count == 0 %}opacity:0;{% endif %}">{{ h.count }}</div>
+                <div style="width:100%;background:linear-gradient(180deg,#a78bfa,#7c3aed);border-radius:4px 4px 0 0;min-height:2px;height:{{ h.count }}0px;max-height:80px;transition:all .3s;opacity:{% if h.count %}1{% else %}0.15{% endif %};"></div>
+                <div style="font-size:7px;color:var(--text-muted);{% if h.hour|divisibleby:2 %}font-weight:600;{% else %}opacity:0.5;{% endif %}">{{ h.hour }}</div>
             </div>
             {% endfor %}
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;padding:0 2px;">
+            <span style="font-size:9px;color:var(--text-muted);">12 AM</span>
+            <span style="font-size:9px;color:var(--text-muted);">6 AM</span>
+            <span style="font-size:9px;color:var(--text-muted);">12 PM</span>
+            <span style="font-size:9px;color:var(--text-muted);">6 PM</span>
+            <span style="font-size:9px;color:var(--text-muted);">12 AM</span>
         </div>
     </div>
 </div>

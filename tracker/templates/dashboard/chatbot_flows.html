@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Chatbot Flow Builder{% endblock %}
+{% block page_title %}Chatbot Flow Builder{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <p style="color:var(--text-muted);font-size:14px;">Build automated conversation flows with drag-and-drop — no code required.</p>
+    <button onclick="createFlow()" class="btn btn-primary"><i class="fas fa-plus"></i> New Flow</button>
+</div>
+
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+    {% for flow in flows %}
+    <div class="card" style="overflow:visible;">
+        <div class="card-body" style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:start;">
+                <div>
+                    <div style="font-weight:700;font-size:16px;">{{ flow.name }}</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">{{ flow.description|truncatewords:12|default:"No description" }}</div>
+                </div>
+                <span class="status {% if flow.is_active %}status-online{% else %}status-offline{% endif %}"><span class="dot"></span> {% if flow.is_active %}Active{% else %}Draft{% endif %}</span>
+            </div>
+
+            <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;">
+                <span style="background:var(--primary-soft);color:var(--primary);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;">
+                    <i class="fas fa-{% if flow.trigger_type == 'greeting' %}comment{% elif flow.trigger_type == 'keyword' %}key{% elif flow.trigger_type == 'page' %}globe{% else %}clock{% endif %}"></i>
+                    {{ flow.get_trigger_type_display }}
+                </span>
+                {% if flow.trigger_value %}
+                <span style="background:var(--bg-hover);padding:3px 8px;border-radius:6px;font-size:11px;color:var(--text-secondary);">{{ flow.trigger_value|truncatewords:3 }}</span>
+                {% endif %}
+                <span style="background:var(--info-soft);color:var(--info);padding:3px 8px;border-radius:6px;font-size:11px;">
+                    {{ flow.flow_data.nodes|length|default:0 }} nodes
+                </span>
+            </div>
+
+            <div style="margin-top:14px;display:flex;gap:6px;">
+                <a href="{% url 'dashboard:chatbot_flow_editor' flow.id %}" class="btn btn-sm btn-primary" style="flex:1;justify-content:center;"><i class="fas fa-edit"></i> Edit Flow</a>
+                <button onclick="toggleFlow({{ flow.id }})" class="btn btn-sm btn-secondary"><i class="fas fa-{% if flow.is_active %}pause{% else %}play{% endif %}"></i></button>
+                <button onclick="deleteFlow({{ flow.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+            </div>
+
+            <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Updated {{ flow.updated_at|timesince }} ago</div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state" style="grid-column:1/-1;">
+        <i class="fas fa-project-diagram" style="font-size:48px;"></i>
+        <p style="margin-top:12px;">No chatbot flows yet. Create your first automated conversation flow.</p>
+        <button onclick="createFlow()" class="btn btn-primary" style="margin-top:12px;"><i class="fas fa-plus"></i> Create First Flow</button>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+function postJSON(url, data) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json());
+}
+function createFlow() {
+    var name = prompt('Flow name:', 'New Chat Flow');
+    if (!name) return;
+    postJSON('', {action:'create', name: name}).then(d => {
+        if (d.id) window.location.href = d.id + '/editor/';
+        else location.reload();
+    });
+}
+function deleteFlow(id) { if(confirm('Delete this flow?')) postJSON('', {action:'delete', flow_id:id}).then(()=>location.reload()); }
+function toggleFlow(id) { postJSON('', {action:'toggle', flow_id:id}).then(()=>location.reload()); }
+</script>
+{% endblock %}

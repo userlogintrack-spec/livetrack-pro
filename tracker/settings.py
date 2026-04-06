@@ -1,14 +1,31 @@
 import os
+import secrets
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production-k3y!@#$%^&*()')
+# Load .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / '.env')
+except ImportError:
+    pass
+
+# Security: Generate a random key if not set (safe for dev, MUST set in production)
+_default_key = secrets.token_urlsafe(50)
+SECRET_KEY = os.getenv('SECRET_KEY', _default_key)
 
 DEBUG = os.getenv('DEBUG', 'True').lower() in {'1', 'true', 'yes', 'on'}
 
+# Production validation
+if not DEBUG:
+    if not os.getenv('SECRET_KEY'):
+        raise ValueError("SECRET_KEY environment variable is REQUIRED in production. Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(50))\"")
+    if not os.getenv('ALLOWED_HOSTS'):
+        raise ValueError("ALLOWED_HOSTS environment variable is REQUIRED in production. Example: ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com")
+
 ALLOWED_HOSTS = [
-    host.strip() for host in os.getenv('ALLOWED_HOSTS', '*').split(',') if host.strip()
+    host.strip() for host in os.getenv('ALLOWED_HOSTS', '*' if DEBUG else '').split(',') if host.strip()
 ]
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
@@ -18,6 +35,7 @@ CHAT_SLA_MINUTES = int(os.getenv('CHAT_SLA_MINUTES', '5'))
 
 INSTALLED_APPS = [
     'daphne',
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -34,6 +52,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -82,6 +101,21 @@ else:
         },
     }
 
+# Cache - Redis for production, local memory for dev
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+
 # Database - PostgreSQL for production, SQLite for dev
 DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
 if DATABASE_URL:
@@ -123,7 +157,9 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@livetrack.app')
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'tracker' / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Use WhiteNoise compressed storage only in production
+if not DEBUG:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -136,6 +172,28 @@ LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 GEOIP_PATH = os.path.join(BASE_DIR, 'geoip')
 
+# CORS — allow widget to work on any website
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_URLS_REGEX = r'^/api/.*$'  # Only allow CORS on /api/ endpoints
+
+# Session cookie for cross-origin widget embedding
+# In dev (HTTP): SameSite must be Lax or None won't work without HTTPS
+# In prod (HTTPS): SameSite=None + Secure=True allows cross-origin cookies
+if DEBUG:
+    SESSION_COOKIE_SAMESITE = False  # Django 4.1+ False = don't set SameSite at all
+    CSRF_COOKIE_SAMESITE = False
+else:
+    SESSION_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SAMESITE = 'None'
+
+# Stripe
+STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY', '')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_PRICE_PRO = os.getenv('STRIPE_PRICE_PRO', '')  # Stripe Price ID for Pro plan
+STRIPE_PRICE_ENTERPRISE = os.getenv('STRIPE_PRICE_ENTERPRISE', '')  # Stripe Price ID for Enterprise plan
+
 # Production security
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
@@ -144,6 +202,15 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'SAMEORIGIN'
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Database connection pooling
+if not DEBUG and os.getenv('DATABASE_URL'):
+    DATABASES.get('default', {})['CONN_MAX_AGE'] = 600  # 10 minutes
 
 # Logging
 LOG_DIR = BASE_DIR / 'logs'

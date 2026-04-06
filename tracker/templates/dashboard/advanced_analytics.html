@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+{% block title %}Advanced Analytics{% endblock %}
+{% block page_title %}Advanced Analytics{% endblock %}
+
+{% block top_actions %}
+<!-- Date Range Picker -->
+<form method="GET" style="display:flex;gap:6px;align-items:center;" id="dateForm">
+    <select name="period" onchange="this.form.submit()" class="form-control" style="width:auto;padding:6px 10px;font-size:12px;">
+        <option value="1d" {% if period == '1d' %}selected{% endif %}>Today</option>
+        <option value="7d" {% if period == '7d' %}selected{% endif %}>Last 7 days</option>
+        <option value="14d" {% if period == '14d' %}selected{% endif %}>Last 14 days</option>
+        <option value="30d" {% if period == '30d' %}selected{% endif %}>Last 30 days</option>
+        <option value="90d" {% if period == '90d' %}selected{% endif %}>Last 90 days</option>
+        <option value="custom" {% if period == 'custom' %}selected{% endif %}>Custom</option>
+    </select>
+    <input type="date" name="from" value="{{ date_from }}" class="form-control" style="width:auto;padding:6px;font-size:12px;">
+    <input type="date" name="to" value="{{ date_to }}" class="form-control" style="width:auto;padding:6px;font-size:12px;">
+    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter"></i></button>
+</form>
+{% endblock %}
+
+{% block content %}
+<!-- KPI Cards -->
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-users"></i></div>
+        <div class="stat-value">{{ total_visitors }}</div>
+        <div class="stat-label">Visitors <span style="font-size:11px;color:{% if visitor_change >= 0 %}var(--success){% else %}var(--danger){% endif %};">{% if visitor_change > 0 %}+{% endif %}{{ visitor_change }}%</span></div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-eye"></i></div>
+        <div class="stat-value">{{ total_pageviews }}</div>
+        <div class="stat-label">Pageviews <span style="font-size:11px;color:{% if pv_change >= 0 %}var(--success){% else %}var(--danger){% endif %};">{% if pv_change > 0 %}+{% endif %}{{ pv_change }}%</span></div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-sign-out-alt"></i></div>
+        <div class="stat-value">{{ bounce_rate }}%</div>
+        <div class="stat-label">Bounce Rate</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        <div class="stat-value">{{ avg_duration_min }}m {{ avg_duration_sec }}s</div>
+        <div class="stat-label">Avg Session Duration</div>
+    </div>
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
+        <div class="stat-value">{{ avg_pages }}</div>
+        <div class="stat-label">Pages / Session</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-bullseye"></i></div>
+        <div class="stat-value">{{ total_conversions }}</div>
+        <div class="stat-label">Conversions ({{ conversion_rate }}%)</div>
+    </div>
+</div>
+
+<!-- Daily Trend Chart -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3><i class="fas fa-chart-line"></i> Visitors & Pageviews Trend</h3></div>
+    <div class="card-body">
+        <div style="display:flex;align-items:end;gap:3px;height:160px;overflow-x:auto;">
+            {% for d in daily_data %}
+            <div style="flex:1;min-width:24px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">
+                <div style="width:100%;max-width:30px;background:var(--primary-soft);border-radius:4px 4px 0 0;height:{% widthratio d.pageviews total_pageviews 120 %}px;min-height:2px;" title="{{ d.pageviews }} pageviews"></div>
+                <div style="width:60%;max-width:18px;background:var(--primary);border-radius:4px;height:{% widthratio d.visitors total_visitors 80 %}px;min-height:2px;" title="{{ d.visitors }} visitors"></div>
+                <div style="font-size:9px;color:var(--text-muted);margin-top:2px;white-space:nowrap;">{{ d.day }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="display:flex;gap:16px;justify-content:center;margin-top:10px;font-size:11px;color:var(--text-muted);">
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--primary);border-radius:2px;margin-right:4px;"></span>Visitors</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--primary-soft);border-radius:2px;margin-right:4px;"></span>Pageviews</span>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- New vs Returning -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-user-friends"></i> New vs Returning</h3></div>
+        <div class="card-body" style="display:flex;align-items:center;gap:24px;">
+            <div style="position:relative;width:120px;height:120px;">
+                {% with total=new_visitors|add:returning_visitors %}
+                <svg viewBox="0 0 36 36" style="width:120px;height:120px;transform:rotate(-90deg);">
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--primary-soft)" stroke-width="3"/>
+                    {% if total > 0 %}<circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--primary)" stroke-width="3" stroke-dasharray="{% widthratio new_visitors total 100 %} 100"/>{% endif %}
+                </svg>
+                {% endwith %}
+            </div>
+            <div>
+                <div style="margin-bottom:8px;"><span style="display:inline-block;width:10px;height:10px;background:var(--primary);border-radius:2px;margin-right:6px;"></span><strong>{{ new_visitors }}</strong> New</div>
+                <div><span style="display:inline-block;width:10px;height:10px;background:var(--primary-soft);border-radius:2px;margin-right:6px;"></span><strong>{{ returning_visitors }}</strong> Returning</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Channel Grouping -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-layer-group"></i> Channels</h3></div>
+        <div class="card-body">
+            {% for ch in channel_data %}
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <span style="font-size:12px;width:100px;font-weight:500;color:var(--text-secondary);">{{ ch.channel }}</span>
+                <div style="flex:1;height:20px;background:var(--bg-hover);border-radius:4px;overflow:hidden;">
+                    <div style="height:100%;background:var(--gradient);border-radius:4px;width:{% widthratio ch.count total_visitors 100 %}%;min-width:2px;"></div>
+                </div>
+                <span style="font-size:12px;font-weight:600;min-width:30px;text-align:right;">{{ ch.count }}</span>
+            </div>
+            {% empty %}
+            <div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px;">No channel data yet</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- Top Pages -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-file-alt"></i> Top Pages</h3></div>
+        <div class="card-body"><div class="table-container"><table>
+            <thead><tr><th>Page</th><th>Views</th><th>Avg Time</th></tr></thead>
+            <tbody>
+            {% for p in top_pages %}
+            <tr><td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.page_title }}</td><td>{{ p.views }}</td><td>{{ p.avg_time|floatformat:0|default:"0" }}s</td></tr>
+            {% empty %}<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">No data</td></tr>{% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+
+    <!-- UTM Campaigns -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-bullhorn"></i> UTM Campaigns</h3></div>
+        <div class="card-body">
+            <div style="margin-bottom:12px;"><strong style="font-size:12px;color:var(--text-muted);">Sources</strong>
+            {% for u in utm_sources %}<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span>{{ u.utm_source }}</span><strong>{{ u.count }}</strong></div>{% empty %}<div style="font-size:12px;color:var(--text-muted);padding:4px 0;">No UTM data. Add ?utm_source=xxx to URLs</div>{% endfor %}</div>
+            <div style="margin-bottom:12px;"><strong style="font-size:12px;color:var(--text-muted);">Mediums</strong>
+            {% for u in utm_mediums %}<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span>{{ u.utm_medium }}</span><strong>{{ u.count }}</strong></div>{% endfor %}</div>
+            <div><strong style="font-size:12px;color:var(--text-muted);">Campaigns</strong>
+            {% for u in utm_campaigns %}<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;"><span>{{ u.utm_campaign }}</span><strong>{{ u.count }}</strong></div>{% endfor %}</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- Landing Pages -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-sign-in-alt"></i> Landing Pages</h3></div>
+        <div class="card-body"><div class="table-container"><table>
+            <thead><tr><th>Page</th><th>Entries</th></tr></thead>
+            <tbody>
+            {% for p in landing_pages %}<tr><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.page_title }}</td><td>{{ p.entries }}</td></tr>{% empty %}<tr><td colspan="2" style="text-align:center;color:var(--text-muted);">No data</td></tr>{% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+    <!-- Exit Pages -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-sign-out-alt"></i> Exit Pages</h3></div>
+        <div class="card-body"><div class="table-container"><table>
+            <thead><tr><th>Page</th><th>Exits</th></tr></thead>
+            <tbody>
+            {% for p in exit_pages %}<tr><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.page_title }}</td><td>{{ p.exits }}</td></tr>{% empty %}<tr><td colspan="2" style="text-align:center;color:var(--text-muted);">No data</td></tr>{% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+</div>
+
+<!-- World Map (Country Data) -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3><i class="fas fa-globe-americas"></i> Visitors by Country</h3></div>
+    <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% for c in country_data %}
+            <div style="background:var(--bg-hover);padding:8px 14px;border-radius:10px;display:flex;align-items:center;gap:8px;min-width:140px;">
+                <span style="font-size:18px;">{{ c.country|truncatechars:2 }}</span>
+                <div>
+                    <div style="font-weight:600;font-size:13px;">{{ c.country }}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">{{ c.count }} visitor{{ c.count|pluralize }}</div>
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align:center;color:var(--text-muted);padding:20px;width:100%;font-size:13px;">No geographic data yet</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- Languages -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-language"></i> Languages</h3></div>
+        <div class="card-body">
+            {% for l in languages %}
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+                <span>{{ l.language }}</span><strong>{{ l.count }}</strong>
+            </div>
+            {% empty %}<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:13px;">No language data yet</div>{% endfor %}
+        </div>
+    </div>
+
+    <!-- Hourly Distribution -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-clock"></i> Hourly Activity</h3></div>
+        <div class="card-body">
+            <div style="display:flex;align-items:end;gap:2px;height:100px;">
+                {% for h in hourly %}
+                <div style="flex:1;background:var(--gradient);border-radius:3px 3px 0 0;height:{% widthratio h.count total_pageviews 100 %}px;min-height:2px;" title="{{ h.hour }}:00 - {{ h.count }} views"></div>
+                {% endfor %}
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-top:4px;">
+                <span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- Custom Events -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-mouse-pointer"></i> Custom Events <span style="font-size:12px;color:var(--text-muted);font-weight:400;">({{ total_events }} total)</span></h3></div>
+        <div class="card-body"><div class="table-container"><table>
+            <thead><tr><th>Event</th><th>Count</th><th>Value</th></tr></thead>
+            <tbody>
+            {% for e in top_events %}<tr><td style="font-weight:500;">{{ e.event_name }}</td><td>{{ e.count }}</td><td>{{ e.total_value|floatformat:0|default:"0" }}</td></tr>{% empty %}<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:16px;">No events tracked yet. Use the tracking API to send events.</td></tr>{% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+
+    <!-- Page Performance -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-tachometer-alt"></i> Page Performance <span style="font-size:12px;color:var(--text-muted);font-weight:400;">Avg: {{ avg_load_time }}ms</span></h3></div>
+        <div class="card-body"><div class="table-container"><table>
+            <thead><tr><th>Page</th><th>Avg Load</th><th>Views</th></tr></thead>
+            <tbody>
+            {% for p in slow_pages %}
+            <tr>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.page_title }}</td>
+                <td><span style="color:{% if p.avg_load > 3000 %}var(--danger){% elif p.avg_load > 1500 %}var(--warning){% else %}var(--success){% endif %};font-weight:600;">{{ p.avg_load|floatformat:0 }}ms</span></td>
+                <td>{{ p.views }}</td>
+            </tr>
+            {% empty %}<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">No performance data yet</td></tr>{% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+</div>
+
+<!-- Goal Completions -->
+{% if goal_breakdown %}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3><i class="fas fa-bullseye"></i> Goal Completions</h3><a href="{% url 'dashboard:goals' %}" class="btn btn-sm btn-secondary">Manage Goals</a></div>
+    <div class="card-body">
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+            {% for g in goal_breakdown %}
+            <div style="padding:14px;background:var(--bg-hover);border-radius:var(--radius-sm);text-align:center;">
+                <div style="font-size:24px;font-weight:800;color:var(--primary);">{{ g.count }}</div>
+                <div style="font-size:13px;font-weight:600;">{{ g.name }}</div>
+                {% if g.value > 0 %}<div style="font-size:12px;color:var(--success);margin-top:2px;">Value: ${{ g.value|floatformat:0 }}</div>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- User Flow -->
+{% if user_flow %}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3><i class="fas fa-route"></i> User Flow (Page Transitions)</h3></div>
+    <div class="card-body">
+        {% for f in user_flow %}
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+            <span style="background:var(--primary-soft);padding:3px 10px;border-radius:6px;font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ f.from_page }}</span>
+            <i class="fas fa-arrow-right" style="color:var(--text-muted);font-size:11px;"></i>
+            <span style="background:var(--info-soft);padding:3px 10px;border-radius:6px;font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ f.to_page }}</span>
+            <span style="margin-left:auto;font-weight:600;">{{ f.count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Cohort Retention -->
+{% if cohort_data %}
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-redo"></i> Cohort Retention (Weekly)</h3></div>
+    <div class="card-body"><div class="table-container"><table>
+        <thead><tr><th>Cohort</th><th>Users</th><th>Week 1</th><th>Week 2</th><th>Week 3</th><th>Week 4</th></tr></thead>
+        <tbody>
+        {% for c in cohort_data %}
+        <tr>
+            <td style="font-weight:600;">{{ c.week }}</td>
+            <td>{{ c.total }}</td>
+            {% for r in c.retention %}
+            <td><span style="background:rgba(124,58,237,{{ r|divisibleby:1 }}{% if r > 50 %}0.3{% elif r > 20 %}0.15{% else %}0.05{% endif %});padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">{{ r }}%</span></td>
+            {% endfor %}
+            {% for i in "xxxx" %}{% if forloop.counter > c.retention|length %}<td style="color:var(--text-muted);font-size:11px;">-</td>{% endif %}{% endfor %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table></div></div>
+</div>
+{% endif %}
+
+{% endblock %}

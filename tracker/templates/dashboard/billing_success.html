@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Payment Successful{% endblock %}
+{% block page_title %}Payment Successful{% endblock %}
+
+{% block content %}
+<div style="max-width:520px;margin:30px auto;text-align:center;">
+    <!-- Success Animation -->
+    <div style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#10b981,#34d399);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;box-shadow:0 8px 30px rgba(16,185,129,0.3);animation:successPop .5s ease;">
+        <i class="fas fa-check" style="font-size:44px;color:white;"></i>
+    </div>
+
+    <h2 style="font-size:28px;font-weight:900;color:var(--text-primary);margin-bottom:8px;">Payment Successful!</h2>
+    <p style="font-size:15px;color:var(--text-muted);margin-bottom:28px;">
+        Your plan has been upgraded to <strong style="color:{% if plan == 'enterprise' %}var(--warning){% else %}var(--primary){% endif %};">{{ plan|title }}</strong>. All features are now unlocked.
+    </p>
+
+    <!-- What's Unlocked -->
+    <div class="card" style="text-align:left;margin-bottom:24px;">
+        <div class="card-header"><h3><i class="fas fa-unlock" style="color:var(--success);"></i> What's Unlocked</h3></div>
+        <div class="card-body">
+            {% if plan == 'pro' %}
+            <div style="display:grid;gap:8px;">
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> <strong>Unlimited</strong> visitors/month</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> Up to <strong>5 agents</strong></div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> <strong>Advanced analytics</strong> & heatmaps</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> <strong>Unlimited</strong> chat history</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> Custom widget branding</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> Email notifications</div>
+            </div>
+            {% elif plan == 'enterprise' %}
+            <div style="display:grid;gap:8px;">
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> Everything in Pro</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> <strong>Unlimited</strong> agents</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> <strong>AI chatbot</strong> integration</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> API access</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> White-label widget</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;"><i class="fas fa-check-circle" style="color:var(--success);"></i> Priority support & SLA</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Receipt Info -->
+    <div class="card" style="text-align:left;margin-bottom:24px;">
+        <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+            <div><span style="color:var(--text-muted);">Plan:</span> <strong>{{ plan|title }}</strong></div>
+            <div><span style="color:var(--text-muted);">Amount:</span> <strong>${% if plan == 'pro' %}19{% else %}79{% endif %}/mo</strong></div>
+            <div><span style="color:var(--text-muted);">Status:</span> <span style="color:var(--success);font-weight:700;"><i class="fas fa-check-circle"></i> Active</span></div>
+            <div><span style="color:var(--text-muted);">Billing:</span> <strong>Monthly</strong></div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;justify-content:center;">
+        <a href="{% url 'dashboard:home' %}" class="btn btn-primary btn-lg"><i class="fas fa-th-large"></i> Go to Dashboard</a>
+        <a href="{% url 'dashboard:billing' %}" class="btn btn-secondary"><i class="fas fa-receipt"></i> View Billing</a>
+    </div>
+</div>
+
+<style>
+@keyframes successPop {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+}
+</style>
+{% endblock %}

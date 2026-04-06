@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Center - {{ org.name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Inter',sans-serif; background:#f5f3ff; color:#1e1b4b; }
+        .hero { background:linear-gradient(135deg, #7c3aed, #a855f7); padding:60px 20px; text-align:center; color:white; }
+        .hero h1 { font-size:32px; font-weight:800; margin-bottom:8px; }
+        .hero p { font-size:16px; opacity:0.9; margin-bottom:24px; }
+        .search-box { max-width:500px; margin:0 auto; position:relative; }
+        .search-box input { width:100%; padding:14px 20px 14px 48px; border:none; border-radius:12px; font-size:15px; font-family:inherit; box-shadow:0 8px 32px rgba(0,0,0,0.15); }
+        .search-box i { position:absolute; left:18px; top:50%; transform:translateY(-50%); color:#9ca3af; }
+        .container { max-width:900px; margin:0 auto; padding:40px 20px; }
+        .categories { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:40px; }
+        .cat-card { background:white; border:1px solid #e5e2ff; border-radius:14px; padding:24px; transition:all 0.2s; cursor:pointer; text-decoration:none; color:inherit; }
+        .cat-card:hover { border-color:#c4b5fd; box-shadow:0 4px 12px rgba(124,58,237,0.08); transform:translateY(-2px); }
+        .cat-icon { width:48px; height:48px; background:#ede9fe; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:20px; color:#7c3aed; margin-bottom:12px; }
+        .cat-card h3 { font-size:16px; font-weight:700; margin-bottom:4px; }
+        .cat-card p { font-size:13px; color:#6b7280; }
+        .cat-count { font-size:12px; color:#9ca3af; margin-top:8px; }
+        .article-list { background:white; border:1px solid #e5e2ff; border-radius:14px; overflow:hidden; }
+        .article-item { padding:16px 20px; border-bottom:1px solid #f0eeff; display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; transition:background 0.2s; }
+        .article-item:hover { background:#f5f3ff; }
+        .article-item:last-child { border-bottom:none; }
+        .article-item i { color:#7c3aed; font-size:14px; }
+        .article-item .title { font-weight:600; font-size:14px; }
+        .article-item .meta { font-size:12px; color:#9ca3af; margin-left:auto; }
+        .footer { text-align:center; padding:40px; color:#9ca3af; font-size:13px; }
+        .footer a { color:#7c3aed; text-decoration:none; font-weight:600; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>{{ org.name }} Help Center</h1>
+        <p>Find answers to your questions</p>
+        <form class="search-box" method="GET">
+            <i class="fas fa-search"></i>
+            <input type="text" name="q" placeholder="Search articles..." value="{{ search }}">
+        </form>
+    </div>
+
+    <div class="container">
+        {% if search %}
+        <h2 style="font-size:18px;margin-bottom:16px;">Search results for "{{ search }}"</h2>
+        <div class="article-list">
+            {% for article in articles %}
+            <a href="{% url 'kb_article' org_slug=org.slug article_slug=article.slug %}" class="article-item">
+                <i class="fas fa-file-alt"></i>
+                <span class="title">{{ article.title }}</span>
+                <span class="meta">{{ article.category.name }}</span>
+            </a>
+            {% empty %}
+            <div style="padding:40px;text-align:center;color:#9ca3af;">
+                <i class="fas fa-search" style="font-size:32px;margin-bottom:12px;opacity:0.3;"></i>
+                <p>No articles found for "{{ search }}"</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="categories">
+            {% for cat in categories %}
+            <a href="?q={{ cat.name }}" class="cat-card">
+                <div class="cat-icon"><i class="{{ cat.icon }}"></i></div>
+                <h3>{{ cat.name }}</h3>
+                <p>{{ cat.description|truncatewords:15|default:"Browse articles" }}</p>
+                <div class="cat-count">{{ cat.article_count }} article{{ cat.article_count|pluralize }}</div>
+            </a>
+            {% endfor %}
+        </div>
+
+        {% if articles %}
+        <h2 style="font-size:18px;margin-bottom:16px;">All Articles</h2>
+        <div class="article-list">
+            {% for article in articles %}
+            <a href="{% url 'kb_article' org_slug=org.slug article_slug=article.slug %}" class="article-item">
+                <i class="fas fa-file-alt"></i>
+                <span class="title">{{ article.title }}</span>
+                <span class="meta">{{ article.views_count }} views</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        Powered by <a href="/">LiveTrack</a>
+    </div>
+</body>
+</html>

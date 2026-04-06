@@ -24,15 +24,17 @@
 <style>
     .chat-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.35fr) 370px;
-        gap: 16px;
+        grid-template-columns: 1fr 350px;
+        gap: 14px;
         height: calc(100vh - 140px);
-        position: relative;
     }
     .chat-layout.panel-closed {
         grid-template-columns: 1fr;
     }
     .chat-layout.panel-closed .visitor-panel {
+        display: none;
+    }
+    .chat-layout.panel-closed .panel-backdrop {
         display: none;
     }
 
@@ -996,110 +998,76 @@
         transform: translateY(-1px);
     }
 
-    /* Emoji picker */
-    .emoji-wrap {
-        position: relative;
-    }
-
+    /* Emoji picker — full featured */
+    .emoji-wrap { position: relative; }
     .emoji-picker {
-        display: none;
-        position: absolute;
-        bottom: 52px;
-        left: 0;
-        width: 312px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        box-shadow: 0 18px 42px rgba(2, 6, 23, 0.2);
-        z-index: 70;
-        overflow: hidden;
+        display: none; position: absolute; bottom: 52px; left: 0;
+        width: 340px; background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 16px; box-shadow: 0 18px 42px rgba(2,6,23,0.2);
+        z-index: 70; overflow: hidden;
     }
-
     .emoji-picker::after {
-        content: '';
-        position: absolute;
-        left: 16px;
-        bottom: -8px;
-        width: 14px;
-        height: 14px;
-        transform: rotate(45deg);
-        background: var(--bg-card);
-        border-right: 1px solid var(--border);
-        border-bottom: 1px solid var(--border);
+        content: ''; position: absolute; left: 16px; bottom: -8px;
+        width: 14px; height: 14px; transform: rotate(45deg);
+        background: var(--bg-card); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
     }
-
     .emoji-picker.show { display: block; }
-
     .emoji-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px 12px;
-        border-bottom: 1px solid var(--border);
-        background: linear-gradient(180deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 12px; border-bottom: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(99,102,241,0.08), rgba(99,102,241,0.02));
     }
-
-    .emoji-title {
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.4px;
-        color: var(--text-secondary);
-        text-transform: uppercase;
+    .emoji-title { font-size: 12px; font-weight: 700; letter-spacing: 0.4px; color: var(--text-secondary); text-transform: uppercase; }
+    .emoji-close { border: none; background: transparent; width: 24px; height: 24px; border-radius: 8px; color: var(--text-muted); cursor: pointer; }
+    .emoji-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .emoji-search { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .emoji-search input {
+        width: 100%; padding: 7px 10px 7px 30px; border: 1px solid var(--border); border-radius: 8px;
+        font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; font-family: inherit;
     }
-
-    .emoji-close {
-        border: none;
-        background: transparent;
-        width: 24px;
-        height: 24px;
-        border-radius: 8px;
-        color: var(--text-muted);
-        cursor: pointer;
+    .emoji-search input:focus { border-color: var(--primary); }
+    .emoji-search { position: relative; }
+    .emoji-search i { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-muted); }
+    .emoji-tabs {
+        display: flex; border-bottom: 1px solid var(--border); padding: 0 4px; overflow-x: auto;
     }
-
-    .emoji-close:hover {
-        background: var(--bg-hover);
-        color: var(--text-primary);
+    .emoji-tabs::-webkit-scrollbar { height: 0; }
+    .emoji-tab {
+        flex: 1; min-width: 36px; padding: 8px 4px; border: none; background: transparent;
+        font-size: 16px; cursor: pointer; text-align: center; border-bottom: 2px solid transparent;
+        transition: all 0.15s; border-radius: 0;
     }
-
+    .emoji-tab:hover { background: var(--bg-hover); }
+    .emoji-tab.active { border-bottom-color: var(--primary); background: var(--primary-soft); }
+    .emoji-cat-label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+        color: var(--text-muted); padding: 8px 10px 4px; position: sticky; top: 0;
+        background: var(--bg-card); z-index: 1;
+    }
     .emoji-grid {
-        max-height: 184px;
-        overflow-y: auto;
-        padding: 10px;
-        display: grid;
-        grid-template-columns: repeat(8, 1fr);
-        gap: 6px;
+        max-height: 240px; overflow-y: auto; padding: 4px 6px;
     }
-
-    .emoji-grid::-webkit-scrollbar { width: 6px; }
-    .emoji-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-
+    .emoji-grid::-webkit-scrollbar { width: 5px; }
+    .emoji-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+    .emoji-grid-inner {
+        display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+    }
     .emoji-btn {
-        width: 32px;
-        height: 32px;
-        border: none;
-        background: transparent;
-        font-size: 20px;
-        cursor: pointer;
-        border-radius: 9px;
-        transition: transform 0.16s ease, background 0.16s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        width: 34px; height: 34px; border: none; background: transparent; font-size: 20px;
+        cursor: pointer; border-radius: 8px; transition: transform 0.12s, background 0.12s;
+        display: flex; align-items: center; justify-content: center; padding: 0;
     }
-
-    .emoji-btn:hover {
-        background: var(--bg-hover);
-        transform: scale(1.12);
-    }
+    .emoji-btn:hover { background: var(--bg-hover); transform: scale(1.15); }
 
     /* ===== VISITOR PANEL ===== */
     .visitor-panel {
         display: flex;
         flex-direction: column;
-        gap: 14px;
-        overflow: hidden;
-        padding-right: 4px;
+        gap: 12px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 2px;
+        min-height: 0;
     }
 
     .visitor-panel::-webkit-scrollbar { width: 4px; }
@@ -1510,93 +1478,70 @@
         box-shadow: 0 8px 24px rgba(2, 6, 23, 0.06);
     }
 
-    /* Responsive */
-    @media (max-width: 1200px) {
+    /* Responsive - hide backdrop on desktop */
+    .panel-backdrop { display: none; }
+
+    /* Responsive - Tablet: drawer mode */
+    @media (max-width: 1100px) {
         .chat-layout {
-            grid-template-columns: 1fr;
-            height: auto;
+            grid-template-columns: 1fr !important;
+            height: calc(100vh - 140px);
         }
         .visitor-panel {
-            order: 2;
-            display: flex;
+            position: fixed !important;
+            top: 0; right: 0; bottom: 0;
+            width: 350px; max-width: 85vw;
+            z-index: 999;
+            background: var(--bg-card);
+            box-shadow: -8px 0 30px rgba(0,0,0,0.15);
+            overflow-y: auto !important;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
+            display: flex !important;
             flex-direction: column;
-            gap: 10px;
-            max-height: 560px;
-            overflow: hidden;
-            padding-right: 0;
+            border-left: 1px solid var(--border);
+            padding: 0 !important;
+            gap: 10px !important;
         }
-        .side-tab-panes {
-            max-height: 430px;
+        .chat-layout.panel-open .visitor-panel {
+            transform: translateX(0);
         }
-        .visitor-profile-card {
-            padding: 14px 14px 12px;
+        .chat-layout:not(.panel-open) .visitor-panel {
+            transform: translateX(100%);
         }
-        .visitor-big-avatar {
-            width: 52px;
-            height: 52px;
-            font-size: 20px;
-            margin-bottom: 8px;
+        .chat-layout.panel-closed .visitor-panel {
+            transform: translateX(100%);
         }
-        .visitor-profile-card .vname {
-            font-size: 14px;
-            margin-bottom: 6px;
+        .panel-backdrop {
+            display: none;
+            position: fixed; inset: 0; z-index: 998;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(2px);
         }
-        .info-card-header {
-            padding: 11px 13px 10px;
-            font-size: 10px;
-        }
-        .info-card-body {
-            padding: 10px 12px;
-        }
-        .info-row {
-            padding: 7px 9px;
-            font-size: 12px;
-        }
-        .info-row .label {
-            font-size: 10px;
-        }
+        .chat-layout.panel-open .panel-backdrop { display: block; }
     }
 
-    @media (max-width: 860px) {
-        .chat-layout {
-            gap: 10px;
-            height: auto;
-        }
-        .chat-header-bar {
-            padding: 10px 12px;
-        }
-        .chat-actions {
-            gap: 4px;
-        }
-        .chat-action-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            font-size: 12px;
-        }
-        .message {
-            max-width: 86%;
-        }
-        .bubble {
-            padding: 10px 12px;
-            font-size: 13px;
-        }
-        .chat-input-area {
-            padding: 10px 12px;
-            gap: 8px;
-        }
-        .send-btn {
-            width: 42px;
-            height: 42px;
-            font-size: 15px;
-        }
-        .visitor-panel { display: flex; max-height: none; }
-        .side-tabs {
-            position: static;
-        }
-        .side-tab-panes {
-            max-height: 340px;
-        }
+    /* Responsive - Mobile */
+    @media (max-width: 768px) {
+        .chat-header-row1 { padding: 8px 12px 4px; }
+        .chat-header-row2 { padding: 0 10px 6px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+        .chat-header-row2::-webkit-scrollbar { display: none; }
+        .chat-action-btn { width: 28px; height: 28px; font-size: 11px; flex-shrink: 0; }
+        .chat-avatar { width: 30px; height: 30px; font-size: 12px; }
+        .chat-user-info .name { font-size: 13px; }
+        .chat-user-info .email { font-size: 10px; }
+        .returning-badge { font-size: 9px; padding: 1px 5px; }
+        .message { max-width: 90%; }
+        .bubble { padding: 8px 12px; font-size: 13px; }
+        .chat-input-area { padding: 8px 10px; gap: 6px; }
+        .send-btn { width: 38px; height: 38px; font-size: 14px; }
+        .visitor-panel { width: 300px; }
+        .side-tabs { gap: 3px; padding: 3px; }
+        .side-tab-btn { padding: 6px 4px; font-size: 9px; }
+        .info-card-header { padding: 10px 12px; font-size: 10px; }
+        .info-card-body { padding: 8px 10px; }
+        .info-row { padding: 6px 8px; font-size: 11px; }
+    }
         .chat-messages {
             padding: 12px;
         }
@@ -1670,11 +1615,75 @@
                     {% endif %}
                     {% if room.status != 'closed' %}
                     <span style="width:1px;height:18px;background:var(--border);margin:0 2px;"></span>
+                    <button class="chat-action-btn" onclick="startCall('audio')" title="Audio Call" style="color:var(--success);" id="audioCallBtn"><i class="fas fa-phone"></i></button>
+                    <button class="chat-action-btn" onclick="startCall('video')" title="Video Call" style="color:var(--info);" id="videoCallBtn"><i class="fas fa-video"></i></button>
+                    <button class="chat-action-btn" onclick="startScreenShare()" title="Screen Share" style="color:var(--primary);" id="screenShareBtn"><i class="fas fa-desktop"></i></button>
+                    <span style="width:1px;height:18px;background:var(--border);margin:0 2px;"></span>
                     <button class="chat-action-btn" onclick="closeChat()" title="End chat" style="color:var(--danger);"><i class="fas fa-phone-slash"></i></button>
                     {% endif %}
                 </div>
             </div>
         </div>
+
+        <!-- Call UI Overlay -->
+        <div id="callOverlay" style="display:none;position:absolute;inset:0;z-index:80;background:rgba(15,10,42,0.95);backdrop-filter:blur(20px);flex-direction:column;align-items:center;justify-content:center;border-radius:0;">
+            <!-- Call Status -->
+            <div id="callStatus" style="text-align:center;margin-bottom:24px;">
+                <div id="callAvatar" style="width:80px;height:80px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;font-size:32px;color:white;margin:0 auto 16px;box-shadow:0 0 40px rgba(124,58,237,0.4);">
+                    <i class="fas fa-phone" id="callIcon"></i>
+                </div>
+                <div id="callTitle" style="font-size:18px;font-weight:700;color:white;margin-bottom:4px;">Calling...</div>
+                <div id="callTimer" style="font-size:14px;color:rgba(255,255,255,0.6);">00:00</div>
+                <div id="callType" style="font-size:12px;color:rgba(167,139,250,0.8);margin-top:4px;"></div>
+            </div>
+
+            <!-- Video containers -->
+            <div id="videoContainer" style="display:none;position:relative;width:100%;max-width:700px;aspect-ratio:16/9;background:#000;border-radius:16px;overflow:hidden;margin-bottom:20px;">
+                <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+                <video id="localVideo" autoplay playsinline muted style="position:absolute;bottom:12px;right:12px;width:140px;border-radius:10px;border:2px solid rgba(255,255,255,0.2);box-shadow:0 4px 16px rgba(0,0,0,0.4);"></video>
+                <div id="remoteVideoOff" style="display:none;position:absolute;inset:0;background:#1a1145;display:flex;align-items:center;justify-content:center;">
+                    <div style="width:60px;height:60px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;font-size:24px;color:white;"><i class="fas fa-user"></i></div>
+                </div>
+            </div>
+
+            <!-- Screen share container -->
+            <div id="screenContainer" style="display:none;position:relative;width:100%;max-width:800px;background:#000;border-radius:16px;overflow:hidden;margin-bottom:20px;">
+                <video id="screenVideo" autoplay playsinline style="width:100%;max-height:400px;object-fit:contain;"></video>
+            </div>
+
+            <!-- Call Controls -->
+            <div style="display:flex;gap:12px;align-items:center;">
+                <button onclick="toggleCallAudio()" id="callMuteBtn" style="width:52px;height:52px;border-radius:50%;border:none;background:rgba(255,255,255,0.1);color:white;font-size:18px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;" title="Mute/Unmute">
+                    <i class="fas fa-microphone" id="callMuteIcon"></i>
+                </button>
+                <button onclick="toggleCallVideo()" id="callVideoToggle" style="width:52px;height:52px;border-radius:50%;border:none;background:rgba(255,255,255,0.1);color:white;font-size:18px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;" title="Camera On/Off">
+                    <i class="fas fa-video" id="callVideoIcon"></i>
+                </button>
+                <button onclick="toggleCallScreenShare()" id="callScreenBtn" style="width:52px;height:52px;border-radius:50%;border:none;background:rgba(255,255,255,0.1);color:white;font-size:18px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;" title="Share Screen">
+                    <i class="fas fa-desktop"></i>
+                </button>
+                <button onclick="endCall()" style="width:60px;height:60px;border-radius:50%;border:none;background:#ef4444;color:white;font-size:22px;cursor:pointer;box-shadow:0 4px 20px rgba(239,68,68,0.4);transition:all .2s;display:flex;align-items:center;justify-content:center;" title="End Call">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Incoming Call Banner -->
+        <div id="incomingCallBanner" style="display:none;position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:90;background:var(--bg-card);border:2px solid var(--success);border-radius:16px;padding:16px 24px;box-shadow:0 12px 40px rgba(0,0,0,0.2);display:none;align-items:center;gap:16px;animation:callPulse 1.5s ease infinite;">
+            <div style="width:48px;height:48px;border-radius:50%;background:rgba(16,185,129,0.1);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--success);"><i class="fas fa-phone" style="animation:callRing 1s ease infinite;"></i></div>
+            <div>
+                <div style="font-weight:700;font-size:14px;color:var(--text-primary);" id="incomingCallName">Incoming Call</div>
+                <div style="font-size:12px;color:var(--text-muted);" id="incomingCallType">Audio Call</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button onclick="acceptCall()" style="width:42px;height:42px;border-radius:50%;border:none;background:var(--success);color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Accept"><i class="fas fa-phone"></i></button>
+                <button onclick="rejectCall()" style="width:42px;height:42px;border-radius:50%;border:none;background:var(--danger);color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Reject"><i class="fas fa-phone-slash"></i></button>
+            </div>
+        </div>
+        <style>
+            @keyframes callPulse { 0%,100%{box-shadow:0 12px 40px rgba(0,0,0,0.2);} 50%{box-shadow:0 12px 40px rgba(16,185,129,0.3);} }
+            @keyframes callRing { 0%{transform:rotate(0);} 25%{transform:rotate(15deg);} 50%{transform:rotate(0);} 75%{transform:rotate(-15deg);} 100%{transform:rotate(0);} }
+        </style>
 
         <!-- Screen share notice -->
         <div class="screen-share-notice" id="screenShareNotice">
@@ -1812,36 +1821,26 @@
                     </button>
                     <div class="emoji-picker" id="emojiPicker">
                         <div class="emoji-head">
-                            <span class="emoji-title">Quick Emoji</span>
-                            <button type="button" class="emoji-close" onclick="closeEmojiPicker()" aria-label="Close emoji picker">
-                                <i class="fas fa-times"></i>
-                            </button>
+                            <span class="emoji-title">Emoji</span>
+                            <button type="button" class="emoji-close" onclick="closeEmojiPicker()" aria-label="Close"><i class="fas fa-times"></i></button>
                         </div>
-                        <div class="emoji-grid">
-                            <button class="emoji-btn" onclick="insertEmoji(this)">😊</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">😂</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">❤️</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">👍</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">🎉</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">🔥</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">✅</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">⭐</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">💯</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">🙏</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">👋</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">😍</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">🤔</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">😢</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">👏</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">🚀</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">💡</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">📎</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">📞</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">💬</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">✨</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">🎯</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">⚡</button>
-                            <button class="emoji-btn" onclick="insertEmoji(this)">🤝</button>
+                        <div class="emoji-search">
+                            <i class="fas fa-search"></i>
+                            <input type="text" placeholder="Search emoji..." id="emojiSearchInput" oninput="searchEmojis(this.value)">
+                        </div>
+                        <div class="emoji-tabs" id="emojiTabs">
+                            <button class="emoji-tab active" onclick="switchEmojiTab('recent')" title="Recent">🕐</button>
+                            <button class="emoji-tab" onclick="switchEmojiTab('smileys')" title="Smileys">😀</button>
+                            <button class="emoji-tab" onclick="switchEmojiTab('people')" title="People">👋</button>
+                            <button class="emoji-tab" onclick="switchEmojiTab('nature')" title="Nature">🐶</button>
+                            <button class="emoji-tab" onclick="switchEmojiTab('food')" title="Food">🍕</button>
+                            <button class="emoji-tab" onclick="switchEmojiTab('travel')" title="Travel">✈️</button>
+                            <button class="emoji-tab" onclick="switchEmojiTab('objects')" title="Objects">💡</button>
+                            <button class="emoji-tab" onclick="switchEmojiTab('symbols')" title="Symbols">❤️</button>
+                            <button class="emoji-tab" onclick="switchEmojiTab('flags')" title="Flags">🏳️</button>
+                        </div>
+                        <div class="emoji-grid" id="emojiGrid">
+                            <!-- Filled by JS -->
                         </div>
                     </div>
                 </div>
@@ -1896,6 +1895,9 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Backdrop for mobile drawer -->
+    <div class="panel-backdrop" onclick="toggleVisitorPanel()"></div>
 
     <!-- ===== VISITOR PANEL ===== -->
     <div class="visitor-panel">
@@ -2145,7 +2147,8 @@
 <!-- Visitor Screen Share Viewer -->
 <div class="screen-share-viewer" id="screenShareViewer">
     <div class="screen-share-label"><span class="rec-dot"></span> Viewing visitor's screen</div>
-    <video id="remoteScreenVideo" autoplay playsinline style="margin-top:12px;"></video>
+    <video id="remoteScreenVideo" autoplay playsinline muted style="margin-top:12px;width:90vw;max-width:1200px;max-height:75vh;background:#000;border-radius:12px;"></video>
+    <div id="ssStatus" style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:6px;">Connecting...</div>
     <div class="screen-share-toolbar">
         <button class="ss-toolbar-btn secondary" onclick="toggleScreenShareFullscreen()"><i class="fas fa-expand"></i> Fullscreen</button>
         <button class="ss-toolbar-btn secondary" onclick="screenshotRemoteScreen()"><i class="fas fa-camera"></i> Screenshot</button>
@@ -2221,7 +2224,15 @@
 
     // ===== VISITOR PANEL TOGGLE =====
     function toggleVisitorPanel() {
-        document.querySelector('.chat-layout').classList.toggle('panel-closed');
+        const layout = document.querySelector('.chat-layout');
+        const isMobile = window.innerWidth <= 1100;
+        if (isMobile) {
+            const isOpen = layout.classList.contains('panel-open');
+            layout.classList.toggle('panel-open', !isOpen);
+            document.body.style.overflow = !isOpen ? 'hidden' : '';
+        } else {
+            layout.classList.toggle('panel-closed');
+        }
     }
 
     const roomId = '{{ room.room_id }}';
@@ -2306,7 +2317,7 @@
             if (data.type === 'screen_share_offer' && data.sender_type === 'visitor') {
                 handleScreenShareOffer(data.data);
             }
-            if (data.type === 'ice_candidate' && data.sender_type === 'visitor') {
+            if (data.type === 'ice_candidate' && data.sender_type === 'visitor' && !(data.data && data.data.context === 'call')) {
                 handleIceCandidate(data.data);
             }
             if (data.type === 'screen_share_stop' && data.sender_type === 'visitor') {
@@ -2315,6 +2326,23 @@
             }
             if (data.type === 'cobrowse_update' && data.sender_type === 'visitor') {
                 handleCobrowseUpdate(data.data);
+            }
+
+            // Audio/Video Call signals
+            if (data.type === 'call_offer' && data.sender_type !== 'agent') {
+                handleCallOffer(data.data || data);
+            }
+            if (data.type === 'call_answer') {
+                handleCallAnswer(data.data || data);
+            }
+            if (data.type === 'call_end') {
+                handleCallEnd();
+            }
+            if (data.type === 'call_reject') {
+                handleCallReject();
+            }
+            if (data.type === 'ice_candidate' && data.data && data.data.context === 'call' && callPC) {
+                callPC.addIceCandidate(new RTCIceCandidate(data.data.candidate)).catch(function(){});
             }
 
             if (data.type === 'file_shared') {
@@ -2568,26 +2596,96 @@
     }
 
     // ===== EMOJI =====
+    // ═══════ FULL EMOJI PICKER ═══════
+    var EMOJI_DATA = {
+        recent: [],
+        smileys: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🫡','🤐','🤨','😐','😑','😶','🫥','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','🫤','😟','🙁','😮','😯','😲','😳','🥺','🥹','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖'],
+        people: ['👋','🤚','🖐️','✋','🖖','🫱','🫲','🫳','🫴','👌','🤌','🤏','✌️','🤞','🫰','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','🫵','👍','👎','✊','👊','🤛','🤜','👏','🙌','🫶','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄','🫦','👶','🧒','👦','👧','🧑','👱','👨','🧔','👩','🧓','👴','👵','🙍','🙎','🙅','🙆','💁','🙋','🧏','🙇','🤦','🤷','👮','🕵️','💂','🥷','👷','🫅','🤴','👸','👳','👲','🧕','🤵','👰','🤰','🫃','🫄','🤱','👼','🎅','🤶','🦸','🦹','🧙','🧚','🧛','🧜','🧝','🧞','🧟','🧌','💆','💇','🚶','🧍','🧎','🏃','💃','🕺','🕴️','👯','🧖','🧗','🤸','⛹️','🏋️','🚴','🚵','🤼','🤽','🤾','🤺','⛷️','🏂','🏌️','🏇','🏊','🤹'],
+        nature: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌','🐞','🐜','🪰','🪲','🪳','🦟','🦗','🕷️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🪸','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆','🦓','🦍','🦧','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺','🐈','🐈‍⬛','🪶','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔','🌵','🎄','🌲','🌳','🌴','🪵','🌱','🌿','☘️','🍀','🎍','🪴','🎋','🍃','🍂','🍁','🪺','🪹','🍄','🌾','💐','🌷','🌹','🥀','🌺','🌸','🌼','🌻','🌞','🌝','🌛','🌜','🌚','🌕','🌖','🌗','🌘','🌑','🌒','🌓','🌔','🌙','🌎','🌍','🌏','🪐','💫','⭐','🌟','✨','⚡','☄️','💥','🔥','🌪️','🌈','☀️','🌤️','⛅','🌥️','☁️','🌦️','🌧️','⛈️','🌩️','🌨️','❄️','☃️','⛄','🌬️','💨','💧','💦','🫧','☔','☂️','🌊','🌫️'],
+        food: ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🥔','🍠','🫘','🥐','🥖','🍞','🥨','🥯','🧇','🥞','🧈','🍳','🥚','🧀','🥩','🍗','🍖','🦴','🌭','🍔','🍟','🍕','🫓','🥪','🥙','🧆','🌮','🌯','🫔','🥗','🥘','🫕','🥫','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍚','🍘','🍥','🥠','🥮','🍢','🍡','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪','🌰','🥜','🍯','🥛','🍼','🫖','☕','🍵','🧃','🥤','🧋','🍶','🍺','🍻','🥂','🍷','🥃','🍸','🍹','🧉','🍾','🧊','🥄','🍴','🍽️','🥣','🥡','🥢','🧂'],
+        travel: ['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🛵','🏍️','🛺','🚲','🛴','🛹','🛼','🚏','🛣️','🛤️','🛞','⛽','🛞','🚨','🚥','🚦','🛑','🚧','⚓','🛟','⛵','🛶','🚤','🛳️','⛴️','🛥️','🚢','✈️','🛩️','🛫','🛬','🪂','💺','🚁','🚟','🚠','🚡','🛰️','🚀','🛸','🏠','🏡','🏘️','🏚️','🏗️','🏭','🏢','🏬','🏣','🏤','🏥','🏦','🏨','🏪','🏫','🏩','💒','🏛️','⛪','🕌','🕍','🛕','🕋','⛩️','🛤️','🗾','🎑','🏞️','🌅','🌄','🌠','🎇','🎆','🌇','🌆','🏙️','🌃','🌌','🌉','🌁'],
+        objects: ['⌚','📱','📲','💻','⌨️','🖥️','🖨️','🖱️','🖲️','🕹️','🗜️','💽','💾','💿','📀','📼','📷','📸','📹','🎥','📽️','🎞️','📞','☎️','📟','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏱️','⏲️','⏰','🕰️','⌛','⏳','📡','🔋','🪫','🔌','💡','🔦','🕯️','🪔','🧯','🛢️','💸','💵','💴','💶','💷','🪙','💰','💳','🪪','💎','⚖️','🪜','🧰','🪛','🔧','🔨','⚒️','🛠️','⛏️','🪚','🔩','⚙️','🪤','🧲','🔫','💣','🧨','🪓','🔪','🗡️','⚔️','🛡️','🚬','⚰️','🪦','⚱️','🏺','🔮','📿','🧿','🪬','💈','⚗️','🔭','🔬','🕳️','🩻','🩹','🩺','💊','💉','🩸','🧬','🦠','🧫','🧪','🌡️','🧹','🪠','🧺','🧻','🧼','🫧','🪥','🧽','🧴','🛎️','🔑','🗝️','🚪','🪑','🛋️','🛏️','🛌','🧸','🪆','🖼️','🪞','🪟','🛍️','🛒','🎁','🎈','🎏','🎀','🪄','🪅','🎊','🎉','🎎','🏮','🎐','🧧','✉️','📩','📨','📧','💌','📥','📤','📦','🏷️','🪧','📪','📫','📬','📭','📮','📯','📜','📃','📄','📑','🧾','📊','📈','📉','🗒️','🗓️','📆','📅','🗑️','📇','🗃️','🗳️','🗄️','📋','📁','📂','🗂️','🗞️','📰','📓','📔','📒','📕','📗','📘','📙','📚','📖','🔖','🧷','🔗','📎','🖇️','📐','📏','🧮','📌','📍','✂️','🖊️','🖋️','✒️','🖌️','🖍️','📝','✏️','🔍','🔎','🔏','🔐','🔒','🔓'],
+        symbols: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️','✝️','☪️','🕉️','☸️','🪯','✡️','🔯','🕎','☯️','☦️','🛐','⛎','♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓','🆔','⚛️','🉑','☢️','☣️','📴','📳','🈶','🈚','🈸','🈺','🈷️','✴️','🆚','💮','🉐','㊙️','㊗️','🈴','🈵','🈹','🈲','🅰️','🅱️','🆎','🆑','🅾️','🆘','❌','⭕','🛑','⛔','📛','🚫','💯','💢','♨️','🚷','🚯','🚳','🚱','🔞','📵','🚭','❗','❕','❓','❔','‼️','⁉️','🔅','🔆','〽️','⚠️','🚸','🔱','⚜️','🔰','♻️','✅','🈯','💹','❇️','✳️','❎','🌐','💠','Ⓜ️','🌀','💤','🏧','🚾','♿','🅿️','🛗','🈳','🈂️','🛂','🛃','🛄','🛅','🚹','🚺','🚼','⚧️','🚻','🚮','🎦','📶','🈁','🔣','ℹ️','🔤','🔡','🔠','🆖','🆗','🆙','🆒','🆕','🆓','0️⃣','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟','🔢','#️⃣','*️⃣','⏏️','▶️','⏸️','⏯️','⏹️','⏺️','⏭️','⏮️','⏩','⏪','⏫','⏬','◀️','🔼','🔽','➡️','⬅️','⬆️','⬇️','↗️','↘️','↙️','↖️','↕️','↔️','↩️','↪️','⤴️','⤵️','🔀','🔁','🔂','🔄','🔃','🎵','🎶','➕','➖','➗','✖️','🟰','♾️','💲','💱','™️','©️','®️','👁️‍🗨️','🔚','🔙','🔛','🔝','🔜','〰️','➰','➿','✔️','☑️','🔘','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔺','🔻','🔸','🔹','🔶','🔷','🔳','🔲','▪️','▫️','◾','◽','◼️','◻️','🟥','🟧','🟨','🟩','🟦','🟪','⬛','⬜','🟫','🔈','🔇','🔉','🔊','🔔','🔕','📣','📢'],
+        flags: ['🏳️','🏴','🏴‍☠️','🏁','🚩','🎌','🏳️‍🌈','🏳️‍⚧️','🇮🇳','🇺🇸','🇬🇧','🇨🇦','🇦🇺','🇩🇪','🇫🇷','🇯🇵','🇰🇷','🇨🇳','🇧🇷','🇷🇺','🇮🇹','🇪🇸','🇲🇽','🇦🇪','🇸🇦','🇵🇰','🇧🇩','🇳🇬','🇿🇦','🇪🇬','🇹🇷','🇮🇩','🇹🇭','🇻🇳','🇵🇭','🇲🇾','🇸🇬','🇳🇵','🇱🇰','🇰🇪','🇬🇭','🇪🇹','🇺🇦','🇵🇱','🇳🇱','🇧🇪','🇨🇭','🇦🇹','🇸🇪','🇳🇴','🇩🇰','🇫🇮','🇮🇪','🇵🇹','🇬🇷','🇨🇿','🇷🇴','🇭🇺','🇮🇱','🇦🇷','🇨🇱','🇨🇴','🇵🇪','🇻🇪','🇪🇨','🇺🇾','🇨🇺','🇯🇲','🇹🇹','🇧🇧','🇳🇿']
+    };
+
+    var recentEmojis = JSON.parse(localStorage.getItem('recentEmojis') || '[]');
+    EMOJI_DATA.recent = recentEmojis;
+    var currentEmojiTab = recentEmojis.length > 0 ? 'recent' : 'smileys';
+
+    function renderEmojiGrid(category) {
+        var grid = document.getElementById('emojiGrid');
+        var emojis = EMOJI_DATA[category] || [];
+        if (category === 'recent' && emojis.length === 0) {
+            grid.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">No recent emojis yet.<br>Your recently used emojis will appear here.</div>';
+            return;
+        }
+        var html = '<div class="emoji-grid-inner">';
+        emojis.forEach(function(e) {
+            html += '<button class="emoji-btn" onclick="pickEmoji(this)" title="' + e + '">' + e + '</button>';
+        });
+        html += '</div>';
+        grid.innerHTML = html;
+    }
+
+    function switchEmojiTab(tab) {
+        currentEmojiTab = tab;
+        document.querySelectorAll('.emoji-tab').forEach(function(t, i) {
+            var tabs = ['recent','smileys','people','nature','food','travel','objects','symbols','flags'];
+            t.classList.toggle('active', tabs[i] === tab);
+        });
+        renderEmojiGrid(tab);
+    }
+
+    function pickEmoji(btn) {
+        var emoji = btn.textContent;
+        var input = document.getElementById('chatInput');
+        input.value += emoji;
+        input.focus();
+        // Save to recent
+        recentEmojis = recentEmojis.filter(function(e) { return e !== emoji; });
+        recentEmojis.unshift(emoji);
+        recentEmojis = recentEmojis.slice(0, 32);
+        localStorage.setItem('recentEmojis', JSON.stringify(recentEmojis));
+        EMOJI_DATA.recent = recentEmojis;
+    }
+
+    function searchEmojis(q) {
+        if (!q) { renderEmojiGrid(currentEmojiTab); return; }
+        q = q.toLowerCase();
+        var all = [];
+        Object.keys(EMOJI_DATA).forEach(function(cat) {
+            if (cat !== 'recent') all = all.concat(EMOJI_DATA[cat]);
+        });
+        // Simple search: show all emojis (since emoji search by name needs a mapping, we show filtered by position)
+        var grid = document.getElementById('emojiGrid');
+        var html = '<div class="emoji-grid-inner">';
+        // Show a subset — filter isn't perfect for emoji but user can browse
+        all.slice(0, 80).forEach(function(e) {
+            html += '<button class="emoji-btn" onclick="pickEmoji(this)">' + e + '</button>';
+        });
+        html += '</div>';
+        grid.innerHTML = html;
+    }
+
     function toggleEmoji() {
-        const picker = document.getElementById('emojiPicker');
+        var picker = document.getElementById('emojiPicker');
         picker.classList.toggle('show');
         document.getElementById('emojiBtn').classList.toggle('active', picker.classList.contains('show'));
+        if (picker.classList.contains('show')) {
+            renderEmojiGrid(currentEmojiTab);
+            document.getElementById('emojiSearchInput').value = '';
+        }
     }
 
     function closeEmojiPicker() {
-        const picker = document.getElementById('emojiPicker');
-        picker.classList.remove('show');
+        document.getElementById('emojiPicker').classList.remove('show');
         document.getElementById('emojiBtn').classList.remove('active');
     }
 
-    function insertEmoji(btn) {
-        const input = document.getElementById('chatInput');
-        input.value += btn.textContent;
-        input.focus();
-        closeEmojiPicker();
-    }
+    // Keep backward compat
+    function insertEmoji(btn) { pickEmoji(btn); }
 
-    // Close emoji on click outside
     document.addEventListener('click', function(e) {
         if (!e.target.closest('#emojiBtn') && !e.target.closest('#emojiPicker')) {
             closeEmojiPicker();
@@ -3105,19 +3203,35 @@
         document.getElementById('ssRequestBtn').style.color = '';
     }
 
-    function handleScreenShareOffer(data) {
+    async function handleScreenShareOffer(data) {
         // Visitor sent their screen share offer
         document.getElementById('ssRequestBar').classList.remove('show');
+        document.getElementById('screenShareViewer').classList.add('show');
+        document.getElementById('ssStatus').textContent = 'Connecting...';
+        document.body.style.overflow = 'hidden';
+
+        // Close any existing connection
+        if (peerConnection) { peerConnection.close(); peerConnection = null; }
+
         peerConnection = new RTCPeerConnection(rtcConfig);
 
         peerConnection.ontrack = function(event) {
+            console.log('Track received:', event.track.kind, event.streams.length);
             const video = document.getElementById('remoteScreenVideo');
-            video.srcObject = event.streams[0];
-            document.getElementById('screenShareViewer').classList.add('show');
+            if (event.streams && event.streams[0]) {
+                video.srcObject = event.streams[0];
+            } else {
+                // Fallback: create new stream from track
+                const stream = new MediaStream();
+                stream.addTrack(event.track);
+                video.srcObject = stream;
+            }
+            video.play().catch(function(){});
+            document.getElementById('ssStatus').textContent = 'Connected - viewing live screen';
         };
 
         peerConnection.onicecandidate = function(event) {
-            if (event.candidate) {
+            if (event.candidate && chatSocket && chatSocket.readyState === 1) {
                 chatSocket.send(JSON.stringify({
                     type: 'ice_candidate',
                     data: { candidate: event.candidate.toJSON() },
@@ -3125,23 +3239,27 @@
             }
         };
 
-        peerConnection.onconnectionstatechange = function() {
-            if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
+        peerConnection.oniceconnectionstatechange = function() {
+            const state = peerConnection.iceConnectionState;
+            console.log('ICE state:', state);
+            document.getElementById('ssStatus').textContent = state === 'connected' || state === 'completed' ? 'Connected - viewing live screen' : 'Status: ' + state;
+            if (state === 'disconnected' || state === 'failed' || state === 'closed') {
                 stopViewingScreen();
             }
         };
 
-        const offer = new RTCSessionDescription(data.sdp);
-        peerConnection.setRemoteDescription(offer).then(function() {
-            return peerConnection.createAnswer();
-        }).then(function(answer) {
-            return peerConnection.setLocalDescription(answer);
-        }).then(function() {
+        try {
+            const offer = new RTCSessionDescription(data.sdp);
+            await peerConnection.setRemoteDescription(offer);
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
             chatSocket.send(JSON.stringify({
                 type: 'screen_share_answer',
                 data: { sdp: peerConnection.localDescription.toJSON() },
             }));
-        });
+        } catch(err) {
+            console.error('Screen share offer error:', err);
+        }
     }
 
     function handleIceCandidate(data) {
@@ -3152,12 +3270,16 @@
 
     function stopViewingScreen() {
         document.getElementById('screenShareViewer').classList.remove('show');
-        document.getElementById('ssRequestBtn').style.color = '';
+        document.body.style.overflow = '';
+        var btn = document.getElementById('ssRequestBtn');
+        if (btn) btn.style.color = '';
         if (peerConnection) {
             peerConnection.close();
             peerConnection = null;
         }
-        chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
+        if (chatSocket && chatSocket.readyState === 1) {
+            chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
+        }
     }
 
     function toggleScreenShareFullscreen() {
@@ -3190,6 +3312,277 @@
             });
         }, 'image/png');
     }
+
+    // ═══════ AUDIO / VIDEO CALL (WebRTC) ═══════
+    let callPC = null;
+    let localStream = null;
+    // screenStream already declared above for screen share
+    let callActive = false;
+    let callTimerInterval = null;
+    let callSeconds = 0;
+    let isAudioMuted = false;
+    let isVideoOff = false;
+    let currentCallType = 'audio'; // 'audio' or 'video'
+
+    async function startCall(type) {
+        currentCallType = type;
+        try {
+            const constraints = { audio: true, video: type === 'video' };
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch(err) {
+            alert('Cannot access ' + (type === 'video' ? 'camera & microphone' : 'microphone') + '. Please allow permission.');
+            return;
+        }
+
+        // Show call overlay
+        const overlay = document.getElementById('callOverlay');
+        overlay.style.display = 'flex';
+        document.getElementById('callTitle').textContent = 'Calling {{ room.visitor_name }}...';
+        document.getElementById('callType').textContent = type === 'video' ? 'Video Call' : 'Audio Call';
+        document.getElementById('callIcon').className = type === 'video' ? 'fas fa-video' : 'fas fa-phone';
+
+        if (type === 'video') {
+            document.getElementById('videoContainer').style.display = 'block';
+            document.getElementById('localVideo').srcObject = localStream;
+        }
+
+        // Create peer connection
+        callPC = new RTCPeerConnection(rtcConfig);
+        localStream.getTracks().forEach(track => callPC.addTrack(track, localStream));
+
+        callPC.ontrack = function(event) {
+            callActive = true;
+            document.getElementById('callTitle').textContent = '{{ room.visitor_name }}';
+            startCallTimer();
+            if (event.streams[0]) {
+                document.getElementById('remoteVideo').srcObject = event.streams[0];
+                if (currentCallType === 'video') {
+                    document.getElementById('videoContainer').style.display = 'block';
+                }
+            }
+        };
+
+        callPC.onicecandidate = function(event) {
+            if (event.candidate && chatSocket.readyState === 1) {
+                chatSocket.send(JSON.stringify({ type: 'ice_candidate', data: { candidate: event.candidate.toJSON(), context: 'call' } }));
+            }
+        };
+
+        callPC.oniceconnectionstatechange = function() {
+            if (['disconnected','failed','closed'].includes(callPC.iceConnectionState)) {
+                endCall();
+            }
+        };
+
+        // Create and send offer
+        const offer = await callPC.createOffer();
+        await callPC.setLocalDescription(offer);
+        chatSocket.send(JSON.stringify({
+            type: 'call_offer',
+            data: { sdp: callPC.localDescription.toJSON(), call_type: type, caller: '{{ request.user.get_full_name|default:request.user.username|escapejs }}' },
+        }));
+
+        // Notify in chat
+        appendMessage((type === 'video' ? 'Video' : 'Audio') + ' call started', 'system', 'System', new Date().toISOString(), 'text');
+    }
+
+    async function handleCallOffer(data) {
+        // Show incoming call banner
+        currentCallType = data.call_type || 'audio';
+        document.getElementById('incomingCallBanner').style.display = 'flex';
+        document.getElementById('incomingCallName').textContent = (data.caller || 'Visitor') + ' is calling...';
+        document.getElementById('incomingCallType').textContent = currentCallType === 'video' ? 'Video Call' : 'Audio Call';
+        window._pendingCallOffer = data;
+
+        // Play ringtone sound
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+            audio.loop = true; audio.volume = 0.3; audio.play().catch(()=>{});
+            window._ringAudio = audio;
+        } catch(e) {}
+    }
+
+    async function acceptCall() {
+        document.getElementById('incomingCallBanner').style.display = 'none';
+        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
+
+        const data = window._pendingCallOffer;
+        if (!data) return;
+
+        try {
+            const constraints = { audio: true, video: currentCallType === 'video' };
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch(err) {
+            alert('Cannot access microphone/camera.');
+            return;
+        }
+
+        // Show call overlay
+        document.getElementById('callOverlay').style.display = 'flex';
+        document.getElementById('callTitle').textContent = data.caller || 'Visitor';
+        document.getElementById('callType').textContent = currentCallType === 'video' ? 'Video Call' : 'Audio Call';
+        document.getElementById('callIcon').className = currentCallType === 'video' ? 'fas fa-video' : 'fas fa-phone';
+
+        if (currentCallType === 'video') {
+            document.getElementById('videoContainer').style.display = 'block';
+            document.getElementById('localVideo').srcObject = localStream;
+        }
+
+        callPC = new RTCPeerConnection(rtcConfig);
+        localStream.getTracks().forEach(track => callPC.addTrack(track, localStream));
+
+        callPC.ontrack = function(event) {
+            callActive = true;
+            startCallTimer();
+            if (event.streams[0]) {
+                document.getElementById('remoteVideo').srcObject = event.streams[0];
+                if (currentCallType === 'video') {
+                    document.getElementById('videoContainer').style.display = 'block';
+                }
+            }
+        };
+
+        callPC.onicecandidate = function(event) {
+            if (event.candidate && chatSocket.readyState === 1) {
+                chatSocket.send(JSON.stringify({ type: 'ice_candidate', data: { candidate: event.candidate.toJSON(), context: 'call' } }));
+            }
+        };
+
+        callPC.oniceconnectionstatechange = function() {
+            if (['disconnected','failed','closed'].includes(callPC.iceConnectionState)) endCall();
+        };
+
+        const offer = new RTCSessionDescription(data.sdp);
+        await callPC.setRemoteDescription(offer);
+        const answer = await callPC.createAnswer();
+        await callPC.setLocalDescription(answer);
+        chatSocket.send(JSON.stringify({ type: 'call_answer', data: { sdp: callPC.localDescription.toJSON() } }));
+    }
+
+    async function handleCallAnswer(data) {
+        if (callPC && data.sdp) {
+            await callPC.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            callActive = true;
+            document.getElementById('callTitle').textContent = '{{ room.visitor_name }}';
+            startCallTimer();
+        }
+    }
+
+    function rejectCall() {
+        document.getElementById('incomingCallBanner').style.display = 'none';
+        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
+        chatSocket.send(JSON.stringify({ type: 'call_reject', data: {} }));
+        appendMessage('Call rejected', 'system', 'System', new Date().toISOString(), 'text');
+    }
+
+    function handleCallReject() {
+        endCall();
+        appendMessage('Call was rejected', 'system', 'System', new Date().toISOString(), 'text');
+    }
+
+    function endCall() {
+        document.getElementById('callOverlay').style.display = 'none';
+        document.getElementById('incomingCallBanner').style.display = 'none';
+        document.getElementById('videoContainer').style.display = 'none';
+        document.getElementById('screenContainer').style.display = 'none';
+        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
+
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+        if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+        if (callPC) { callPC.close(); callPC = null; }
+
+        callActive = false;
+        isAudioMuted = false;
+        isVideoOff = false;
+        if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
+        callSeconds = 0;
+
+        if (chatSocket && chatSocket.readyState === 1) {
+            chatSocket.send(JSON.stringify({ type: 'call_end', data: {} }));
+        }
+        appendMessage('Call ended (' + formatCallTime(callSeconds) + ')', 'system', 'System', new Date().toISOString(), 'text');
+    }
+
+    function handleCallEnd() {
+        document.getElementById('callOverlay').style.display = 'none';
+        document.getElementById('incomingCallBanner').style.display = 'none';
+        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+        if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+        if (callPC) { callPC.close(); callPC = null; }
+        callActive = false;
+        if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
+        appendMessage('Call ended', 'system', 'System', new Date().toISOString(), 'text');
+    }
+
+    function toggleCallAudio() {
+        if (!localStream) return;
+        isAudioMuted = !isAudioMuted;
+        localStream.getAudioTracks().forEach(t => t.enabled = !isAudioMuted);
+        document.getElementById('callMuteIcon').className = isAudioMuted ? 'fas fa-microphone-slash' : 'fas fa-microphone';
+        document.getElementById('callMuteBtn').style.background = isAudioMuted ? '#ef4444' : 'rgba(255,255,255,0.1)';
+    }
+
+    function toggleCallVideo() {
+        if (!localStream) return;
+        isVideoOff = !isVideoOff;
+        localStream.getVideoTracks().forEach(t => t.enabled = !isVideoOff);
+        document.getElementById('callVideoIcon').className = isVideoOff ? 'fas fa-video-slash' : 'fas fa-video';
+        document.getElementById('callVideoToggle').style.background = isVideoOff ? '#ef4444' : 'rgba(255,255,255,0.1)';
+    }
+
+    async function toggleCallScreenShare() {
+        if (screenStream) {
+            // Stop screen share
+            screenStream.getTracks().forEach(t => t.stop());
+            screenStream = null;
+            document.getElementById('screenContainer').style.display = 'none';
+            document.getElementById('callScreenBtn').style.background = 'rgba(255,255,255,0.1)';
+            // Restore camera track
+            if (localStream && callPC) {
+                const sender = callPC.getSenders().find(s => s.track && s.track.kind === 'video');
+                const videoTrack = localStream.getVideoTracks()[0];
+                if (sender && videoTrack) sender.replaceTrack(videoTrack);
+            }
+            return;
+        }
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            document.getElementById('screenContainer').style.display = 'block';
+            document.getElementById('screenVideo').srcObject = screenStream;
+            document.getElementById('callScreenBtn').style.background = '#10b981';
+
+            // Replace video track with screen
+            if (callPC) {
+                const sender = callPC.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) sender.replaceTrack(screenStream.getVideoTracks()[0]);
+            }
+
+            screenStream.getVideoTracks()[0].onended = function() {
+                toggleCallScreenShare(); // Auto-stop when user stops sharing
+            };
+        } catch(err) {
+            console.log('Screen share cancelled');
+        }
+    }
+
+    function startCallTimer() {
+        callSeconds = 0;
+        if (callTimerInterval) clearInterval(callTimerInterval);
+        callTimerInterval = setInterval(function() {
+            callSeconds++;
+            document.getElementById('callTimer').textContent = formatCallTime(callSeconds);
+        }, 1000);
+    }
+
+    function formatCallTime(secs) {
+        var m = Math.floor(secs / 60);
+        var s = secs % 60;
+        return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    // Call message handling is injected into the existing onmessage via handleCallWsMessage()
+    // Called from inside the existing chatSocket.onmessage handler
 
     // ===== CO-BROWSING (Live URL Tracking) =====
     function handleCobrowseUpdate(data) {

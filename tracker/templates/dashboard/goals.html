@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% block title %}Goals & Conversions{% endblock %}
+{% block page_title %}Goals & Conversions{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-bullseye"></i> Active Goals</h3></div>
+        <div class="card-body">
+            {% for goal in goals %}
+            <div style="padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <div style="font-weight:700;font-size:15px;">{{ goal.name }}</div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+                            <span class="status" style="font-size:10px;background:var(--primary-soft);color:var(--primary);">{{ goal.get_goal_type_display }}</span>
+                            {% if goal.target_url %}&middot; URL: {{ goal.target_url|truncatechars:40 }}{% endif %}
+                            {% if goal.target_event %}&middot; Event: {{ goal.target_event }}{% endif %}
+                            {% if goal.monetary_value > 0 %}&middot; Value: ${{ goal.monetary_value|floatformat:0 }}{% endif %}
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                        <button onclick="toggleGoal({{ goal.id }})" class="btn btn-sm {% if goal.is_active %}btn-success{% else %}btn-secondary{% endif %}"><i class="fas fa-{% if goal.is_active %}check{% else %}play{% endif %}"></i></button>
+                        <button onclick="deleteGoal({{ goal.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div style="display:flex;gap:16px;margin-top:10px;">
+                    <div style="text-align:center;padding:8px 14px;background:var(--bg-hover);border-radius:8px;">
+                        <div style="font-size:18px;font-weight:800;color:var(--primary);">{{ goal.today_count }}</div>
+                        <div style="font-size:10px;color:var(--text-muted);">Today</div>
+                    </div>
+                    <div style="text-align:center;padding:8px 14px;background:var(--bg-hover);border-radius:8px;">
+                        <div style="font-size:18px;font-weight:800;color:var(--info);">{{ goal.week_count }}</div>
+                        <div style="font-size:10px;color:var(--text-muted);">This Week</div>
+                    </div>
+                    <div style="text-align:center;padding:8px 14px;background:var(--bg-hover);border-radius:8px;">
+                        <div style="font-size:18px;font-weight:800;color:var(--success);">{{ goal.completion_count }}</div>
+                        <div style="font-size:10px;color:var(--text-muted);">All Time</div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="padding:30px;"><i class="fas fa-bullseye"></i><p>No goals yet. Create your first conversion goal.</p></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-plus-circle"></i> Create Goal</h3></div>
+        <div class="card-body">
+            <div class="form-group"><label>Goal Name</label><input type="text" id="goalName" class="form-control" placeholder="e.g. Sign Up Completed"></div>
+            <div class="form-group"><label>Description</label><input type="text" id="goalDesc" class="form-control" placeholder="Optional"></div>
+            <div class="form-group"><label>Goal Type</label>
+                <select id="goalType" class="form-control" onchange="updateGoalFields()">
+                    <option value="pageview">Page View (URL match)</option>
+                    <option value="event">Custom Event</option>
+                    <option value="duration">Session Duration</option>
+                    <option value="pages">Pages Per Session</option>
+                </select>
+            </div>
+            <div class="form-group" id="urlField"><label>Target URL (contains)</label><input type="text" id="goalURL" class="form-control" placeholder="/thank-you/"></div>
+            <div class="form-group" id="eventField" style="display:none;"><label>Event Name</label><input type="text" id="goalEvent" class="form-control" placeholder="signup_complete"></div>
+            <div class="form-group" id="valueField" style="display:none;"><label>Threshold Value</label><input type="number" id="goalThreshold" class="form-control" value="0"></div>
+            <div class="form-group"><label>Monetary Value (per conversion)</label><input type="number" id="goalMoney" class="form-control" value="0" step="0.01" placeholder="$0.00"></div>
+            <button onclick="createGoal()" class="btn btn-primary"><i class="fas fa-plus"></i> Create Goal</button>
+        </div>
+    </div>
+</div>
+
+<!-- Event Tracking Code Snippet -->
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><h3><i class="fas fa-code"></i> Event Tracking Code</h3></div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Add this JavaScript to your website to track custom events:</p>
+        <pre style="background:var(--bg-hover);padding:16px;border-radius:var(--radius-sm);font-size:12px;overflow-x:auto;color:var(--text-primary);"><code>// Track a custom event
+fetch('/api/track/event/', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  credentials: 'include',
+  body: JSON.stringify({
+    name: 'button_click',
+    category: 'engagement',
+    label: 'Sign Up Button',
+    value: 1,
+    page_url: window.location.href
+  })
+});
+
+// Track page performance
+fetch('/api/track/performance/', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  credentials: 'include',
+  body: JSON.stringify({
+    url: window.location.pathname,
+    load_time_ms: performance.timing.loadEventEnd - performance.timing.navigationStart,
+    time_spent: 30
+  })
+});</code></pre>
+    </div>
+</div>
+
+<script>
+function updateGoalFields() {
+    var type = document.getElementById('goalType').value;
+    document.getElementById('urlField').style.display = type === 'pageview' ? 'block' : 'none';
+    document.getElementById('eventField').style.display = type === 'event' ? 'block' : 'none';
+    document.getElementById('valueField').style.display = (type === 'duration' || type === 'pages') ? 'block' : 'none';
+}
+function postJSON(url, data) { return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json()); }
+function createGoal() {
+    postJSON('', {action:'create', name:document.getElementById('goalName').value, description:document.getElementById('goalDesc').value, goal_type:document.getElementById('goalType').value, target_url:document.getElementById('goalURL').value, target_event:document.getElementById('goalEvent').value, target_value:document.getElementById('goalThreshold').value, monetary_value:document.getElementById('goalMoney').value}).then(()=>location.reload());
+}
+function deleteGoal(id) { if(confirm('Delete?')) postJSON('', {action:'delete', goal_id:id}).then(()=>location.reload()); }
+function toggleGoal(id) { postJSON('', {action:'toggle', goal_id:id}).then(()=>location.reload()); }
+</script>
+{% endblock %}

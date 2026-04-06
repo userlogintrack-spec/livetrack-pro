@@ -70,64 +70,110 @@
         /* ==================== NAVBAR ==================== */
         .navbar {
             position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-            padding: 0 48px; height: 72px;
+            padding: 0 40px; height: 68px;
             display: flex; align-items: center; justify-content: space-between;
-            background: rgba(255,255,255,0.7);
-            backdrop-filter: blur(20px) saturate(180%);
-            border-bottom: 1px solid rgba(124, 58, 237, 0.08);
-            transition: all 0.3s;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(24px) saturate(200%);
+            -webkit-backdrop-filter: blur(24px) saturate(200%);
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+            transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
         }
-        .navbar.scrolled { box-shadow: 0 2px 20px rgba(0,0,0,0.06); }
+        .navbar.scrolled {
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 1px 16px rgba(0,0,0,0.06);
+            height: 60px;
+        }
 
         .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .nav-brand .logo-icon {
-            width: 40px; height: 40px; background: var(--gradient-primary);
-            border-radius: 12px; display: flex; align-items: center; justify-content: center;
-            font-size: 17px; color: white;
-            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+            width: 36px; height: 36px; background: var(--gradient-primary);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-size: 15px; color: white;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+            transition: transform 0.3s;
         }
+        .nav-brand:hover .logo-icon { transform: rotate(-8deg) scale(1.05); }
         .nav-brand h1 {
-            font-size: 20px; font-weight: 800; color: var(--text-dark); letter-spacing: -0.5px;
+            font-size: 19px; font-weight: 800; color: var(--text-dark); letter-spacing: -0.5px;
         }
         .nav-brand h1 em {
             font-style: normal; background: var(--gradient-primary);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
 
-        .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
+        .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
         .nav-links a {
             color: var(--text-muted); text-decoration: none;
-            font-size: 14px; font-weight: 500; transition: color 0.2s;
+            font-size: 13px; font-weight: 500; transition: all 0.2s;
+            padding: 6px 14px; border-radius: 8px;
         }
-        .nav-links a:hover { color: var(--primary); }
+        .nav-links a:hover { color: var(--primary); background: rgba(99,102,241,0.06); }
+        .nav-links a.active { color: var(--primary); background: rgba(99,102,241,0.08); font-weight: 600; }
 
-        .nav-actions { display: flex; align-items: center; gap: 10px; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
 
         .btn {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 10px 22px; border-radius: 12px; font-size: 14px; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 9px 20px; border-radius: 10px; font-size: 13px; font-weight: 600;
             text-decoration: none; border: none; cursor: pointer;
-            font-family: inherit; transition: all 0.3s;
+            font-family: inherit; transition: all 0.25s;
         }
-        .btn-ghost { color: var(--text-dark); background: transparent; }
-        .btn-ghost:hover { background: var(--bg-soft); color: var(--primary); }
+        .btn-ghost {
+            color: var(--text-dark); background: transparent;
+            border: 1.5px solid var(--border-light);
+        }
+        .btn-ghost:hover { background: var(--bg-soft); color: var(--primary); border-color: rgba(99,102,241,0.2); }
         .btn-primary {
             background: var(--gradient-primary); color: white;
-            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+            box-shadow: 0 3px 12px rgba(124, 58, 237, 0.25);
         }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(124, 58, 237, 0.4); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35); }
         .btn-outline { border: 2px solid var(--primary); color: var(--primary); background: transparent; }
         .btn-outline:hover { background: var(--primary); color: white; }
         .btn-white { background: white; color: var(--text-dark); font-weight: 700; box-shadow: var(--shadow-md); }
         .btn-white:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-        .btn-lg { padding: 14px 32px; font-size: 16px; border-radius: 14px; }
-        .btn-xl { padding: 18px 40px; font-size: 17px; border-radius: 16px; }
+        .btn-lg { padding: 13px 30px; font-size: 15px; border-radius: 12px; }
+        .btn-xl { padding: 16px 36px; font-size: 16px; border-radius: 14px; }
 
         /* Light-on-dark variants */
         .btn-outline-light { border: 2px solid rgba(255,255,255,0.3); color: white; background: transparent; }
         .btn-outline-light:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.6); }
 
-        .mobile-menu-btn { display: none; background: none; border: none; color: var(--text-dark); font-size: 22px; cursor: pointer; }
+        .mobile-menu-btn { display: none; background: none; border: none; color: var(--text-dark); font-size: 20px; cursor: pointer; padding: 8px; border-radius: 8px; transition: background 0.2s; z-index: 1001; }
+        .mobile-menu-btn:hover { background: rgba(99,102,241,0.06); }
+
+        /* Mobile menu dropdown */
+        .nav-links.show {
+            display: flex !important;
+            flex-direction: column;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.98);
+            backdrop-filter: blur(24px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 80px 24px 40px;
+            animation: mobileMenuIn 0.3s ease;
+        }
+        .nav-links.show a {
+            font-size: 18px;
+            padding: 14px 32px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+            color: var(--text-dark);
+        }
+        .nav-links.show a:hover {
+            background: var(--bg-soft);
+            color: var(--primary);
+        }
+        @keyframes mobileMenuIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
         /* ==================== HERO (DARK) ==================== */
         .hero {
@@ -568,7 +614,7 @@
 
         .chat-widget {
             position: fixed; bottom: 100px; right: 28px;
-            width: 380px; height: 580px;
+            width: 380px; max-height: 580px; height: calc(100vh - 140px);
             background: white;
             border-radius: 20px;
             box-shadow: 0 12px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.04);
@@ -604,8 +650,10 @@
             background: rgba(255,255,255,0.12); border: none; color: rgba(255,255,255,0.9); cursor: pointer;
             width: 32px; height: 32px; border-radius: 10px;
             display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 13px;
+            outline: none;
         }
         .widget-header .close-btn:hover { background: rgba(255,255,255,0.25); }
+        .widget-header .close-btn:focus { outline: none; box-shadow: none; }
 
         /* Pre-chat Form */
         .prechat-form {
@@ -617,14 +665,13 @@
             font-size: 13px; color: var(--text-muted); margin: 0 0 4px; line-height: 1.6;
         }
         .prechat-form input, .prechat-form textarea {
-            padding: 13px 16px; background: #fafafa;
+            padding: 12px 16px; background: #fafafa;
             border: 1.5px solid #e5e7eb; border-radius: 12px;
             color: var(--text-dark); font-size: 14px; font-family: inherit;
-            outline: none; transition: all 0.2s; width: 100%; box-sizing: border-box;
+            outline: none; transition: border-color 0.2s; width: 100%; box-sizing: border-box;
         }
         .prechat-form input:focus, .prechat-form textarea:focus {
-            border-color: var(--primary); background: white;
-            box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+            border-color: #c4b5fd; background: white;
         }
         .prechat-form input::placeholder, .prechat-form textarea::placeholder {
             color: #a1a1aa;
@@ -733,32 +780,232 @@
         .widget-send-btn:hover { transform: scale(1.06); box-shadow: 0 6px 20px rgba(124,58,237,0.4); }
 
         /* ==================== RESPONSIVE ==================== */
+
+        /* Large desktops / wide screens (1440px+) */
+        @media (min-width: 1440px) {
+            .hero h1 { font-size: 76px; }
+            .hero p.subtitle { font-size: 21px; max-width: 680px; }
+            section { padding: 120px 80px; }
+            .features-grid { max-width: 1400px; }
+            .section-title { font-size: 50px; }
+        }
+
+        /* Laptops / small desktops (1024px - 1279px) */
+        @media (max-width: 1280px) {
+            .navbar { padding: 0 28px; }
+            .nav-links a { font-size: 12px; padding: 6px 10px; }
+            section { padding: 80px 32px; }
+            .hero { padding: 120px 32px 80px; }
+            .hero h1 { font-size: 56px; }
+            .features-grid { gap: 18px; }
+            .showcase-grid { gap: 48px; }
+            .pricing-grid { max-width: 900px; }
+            .footer-grid { gap: 28px; }
+        }
+
+        /* Tablets landscape (1024px) */
         @media (max-width: 1024px) {
             .features-grid, .pricing-grid, .testimonial-grid { grid-template-columns: 1fr 1fr; }
             .footer-grid { grid-template-columns: 1fr 1fr; }
+            .hero h1 { font-size: 48px; letter-spacing: -1.5px; }
+            .hero p.subtitle { font-size: 17px; }
+            .section-title { font-size: 36px; }
+            .showcase-grid { grid-template-columns: 1fr; gap: 40px; }
+            .showcase-preview { max-width: 560px; margin: 0 auto; }
+            .stats-bar { gap: 32px; }
+            .stat-item .number { font-size: 32px; }
+            .nav-links { gap: 2px; }
+            .nav-actions .btn { padding: 8px 14px; font-size: 12px; }
         }
+
+        /* Tablets portrait (768px) */
         @media (max-width: 768px) {
-            .navbar { padding: 0 20px; }
+            .navbar { padding: 0 16px; height: 60px; }
+            .navbar.scrolled { height: 56px; }
             .nav-links { display: none; }
             .mobile-menu-btn { display: block; }
+            .nav-actions .btn-ghost { display: none; }
+
             section, .hero { padding: 60px 20px; }
-            .hero { padding-top: 120px; }
-            .hero h1 { font-size: 38px; letter-spacing: -1px; }
-            .hero p.subtitle { font-size: 16px; }
-            .hero-cta { flex-direction: column; }
-            .stats-bar { flex-direction: column; gap: 20px; }
-            .section-title { font-size: 30px; }
-            .features-grid, .pricing-grid, .testimonial-grid { grid-template-columns: 1fr; }
-            .showcase-grid { grid-template-columns: 1fr; }
-            .footer-grid { grid-template-columns: 1fr; }
-            .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
+            .hero { padding-top: 110px; padding-bottom: 60px; }
+            .hero h1 { font-size: 36px; letter-spacing: -1px; }
+            .hero p.subtitle { font-size: 15px; max-width: 420px; }
+            .hero-cta { flex-direction: column; gap: 10px; }
+            .hero-cta .btn { width: 100%; justify-content: center; }
+            .hero-badge { font-size: 11px; padding: 6px 14px; }
+
+            .stats-bar { flex-direction: row; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 40px; padding-top: 32px; }
+            .stat-item .number { font-size: 28px; }
+            .stat-item .label { font-size: 11px; }
+
+            .section-header { margin-bottom: 36px; }
+            .section-title { font-size: 28px; letter-spacing: -0.8px; }
+            .section-desc { font-size: 14px; }
+            .section-label { font-size: 11px; padding: 5px 12px; }
+
+            .features-grid, .pricing-grid, .testimonial-grid { grid-template-columns: 1fr; gap: 14px; }
+            .feature-card { padding: 24px; }
+            .feature-card h3 { font-size: 16px; }
+            .feature-card p { font-size: 13px; }
+            .feature-icon { width: 48px; height: 48px; font-size: 20px; border-radius: 12px; margin-bottom: 14px; }
+
+            .showcase-grid { grid-template-columns: 1fr; gap: 28px; }
+            .showcase-preview { max-width: 100%; }
+            .showcase-features li { font-size: 14px; }
+
+            .price-card { padding: 28px 24px; }
             .price-card.featured { transform: none; }
             .price-card.featured:hover { transform: translateY(-6px); }
-            .chat-widget { width: calc(100% - 24px); right: 12px; bottom: 96px; height: calc(100vh - 130px); max-height: 580px; border-radius: 16px; }
-            .chat-widget-btn { bottom: 20px; right: 16px; width: 54px; height: 54px; }
+            .price-card .price { font-size: 42px; }
+            .price-features li { font-size: 13px; padding: 8px 0; }
+
+            .testimonial-card { padding: 24px; }
+            .testimonial-card blockquote { font-size: 14px; }
+
+            .step { flex-direction: column; gap: 16px; padding: 24px; }
+            .step-number { width: 52px; height: 52px; min-width: 52px; font-size: 20px; }
+            .step-content h3 { font-size: 17px; }
+            .step-content p { font-size: 13px; }
+
+            .faq-question { font-size: 14px; padding: 16px 18px; }
+            .faq-answer-inner { font-size: 13px; padding: 0 18px 16px; }
+
+            .footer { padding: 40px 20px; }
+            .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+            .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
+
+            .trusted { padding: 32px 20px; }
+            .trusted-logos { gap: 24px; }
+            .trusted-logos span { font-size: 16px; }
+
+            .chat-widget { width: calc(100% - 24px); right: 12px; bottom: 76px; height: auto; max-height: calc(100vh - 100px); min-height: 320px; border-radius: 16px; }
+            .chat-widget-btn { bottom: 16px; right: 14px; width: 52px; height: 52px; font-size: 20px; }
+            .prechat-form { padding: 18px; gap: 10px; }
+            .prechat-form input, .prechat-form textarea { padding: 11px 14px; font-size: 13px; border-radius: 10px; }
+            .prechat-form textarea { min-height: 60px; }
+            .prechat-form .start-btn { padding: 12px; font-size: 14px; border-radius: 12px; }
+            .widget-header { padding: 12px 16px; min-height: 48px; border-radius: 16px 16px 0 0; }
+            .widget-header h3 { font-size: 14px; }
+            .widget-header .w-avatar { width: 32px; height: 32px; font-size: 14px; }
+            .widget-messages { padding: 14px; }
+            .widget-send-row input { padding: 10px 14px; font-size: 13px; }
+            .widget-send-btn { width: 38px; height: 38px; font-size: 14px; }
+            .widget-status-bar { padding: 8px 14px; font-size: 11px; }
             .widget-emoji-grid { grid-template-columns: repeat(7, 1fr); }
             .cta-btns { flex-direction: column; align-items: center; }
-            .step { flex-direction: column; gap: 16px; }
+        }
+
+        /* Large phones (480px - 767px) */
+        @media (max-width: 480px) {
+            .navbar { padding: 0 12px; height: 56px; }
+            .nav-brand h1 { font-size: 16px; }
+            .nav-brand .logo-icon { width: 32px; height: 32px; font-size: 13px; }
+            .nav-actions .btn-primary { padding: 7px 12px; font-size: 11px; }
+
+            .hero { padding: 100px 16px 50px; }
+            .hero h1 { font-size: 28px; letter-spacing: -0.8px; line-height: 1.15; }
+            .hero p.subtitle { font-size: 14px; max-width: 320px; margin-bottom: 28px; }
+            .hero-badge { font-size: 10px; padding: 5px 12px; margin-bottom: 20px; }
+            .hero .orb-1 { width: 300px; height: 300px; }
+            .hero .orb-2 { width: 250px; height: 250px; }
+            .hero .orb-3 { width: 200px; height: 200px; }
+
+            .stats-bar { gap: 12px; margin-top: 28px; padding-top: 24px; }
+            .stat-item .number { font-size: 24px; }
+            .stat-item .label { font-size: 10px; }
+
+            section { padding: 48px 16px; }
+            .section-title { font-size: 24px; }
+            .section-desc { font-size: 13px; }
+
+            .features-grid { gap: 12px; }
+            .feature-card { padding: 20px; border-radius: 16px; }
+            .feature-card:hover { transform: translateY(-4px); }
+            .feature-icon { width: 42px; height: 42px; font-size: 18px; margin-bottom: 12px; }
+            .feature-card h3 { font-size: 15px; }
+            .feature-card p { font-size: 12px; line-height: 1.6; }
+
+            .price-card { padding: 24px 20px; border-radius: 16px; }
+            .price-card .price { font-size: 36px; margin: 14px 0; }
+            .price-card h3 { font-size: 17px; }
+            .price-features li { font-size: 12px; }
+
+            .testimonial-card { padding: 20px; border-radius: 16px; }
+            .testimonial-card blockquote { font-size: 13px; line-height: 1.7; }
+            .testimonial-avatar { width: 38px; height: 38px; font-size: 14px; }
+
+            .step { padding: 20px; border-radius: 14px; margin-bottom: 12px; }
+
+            .footer { padding: 32px 16px; }
+            .footer-brand h3 { font-size: 17px; }
+            .footer-brand p { font-size: 13px; }
+            .footer-col h4 { font-size: 13px; margin-bottom: 10px; }
+            .footer-col a { font-size: 12px; }
+            .footer-bottom { font-size: 11px; }
+
+            .trusted-logos span { font-size: 14px; letter-spacing: 1px; }
+
+            .chat-widget {
+                width: calc(100% - 16px); right: 8px; left: 8px;
+                bottom: 64px; height: auto;
+                max-height: calc(100vh - 80px); min-height: 280px;
+                border-radius: 14px;
+            }
+            .chat-widget-btn { bottom: 10px; right: 10px; width: 46px; height: 46px; font-size: 16px; }
+            .prechat-form { padding: 14px; gap: 8px; }
+            .prechat-form p { font-size: 12px; margin-bottom: 2px; }
+            .prechat-form input, .prechat-form textarea { padding: 10px 12px; font-size: 12px; border-radius: 8px; }
+            .prechat-form textarea { min-height: 50px; }
+            .prechat-form .start-btn { padding: 11px; font-size: 13px; border-radius: 10px; }
+            .widget-header { padding: 10px 14px; min-height: 44px; border-radius: 14px 14px 0 0; }
+            .widget-header h3 { font-size: 13px; }
+            .widget-header .w-avatar { width: 28px; height: 28px; font-size: 12px; }
+            .widget-header .w-status { font-size: 10px; }
+            .widget-header .close-btn { width: 28px; height: 28px; font-size: 11px; }
+            .widget-messages { padding: 10px; gap: 6px; }
+            .w-msg { font-size: 12px; }
+            .widget-send-row { gap: 6px; }
+            .widget-send-row input { padding: 9px 12px; font-size: 12px; }
+            .widget-send-btn { width: 34px; height: 34px; font-size: 13px; }
+            .widget-status-bar { padding: 6px 12px; font-size: 10px; }
+            .widget-emoji-grid { grid-template-columns: repeat(6, 1fr); }
+            .widget-toolbar { gap: 2px; }
+            .widget-tool-btn { width: 28px; height: 28px; font-size: 13px; }
+
+            .browser-frame { border-radius: 10px; }
+            .browser-topbar { padding: 8px 12px; }
+            .browser-dots span { width: 8px; height: 8px; }
+            .browser-url { font-size: 9px; padding: 4px 10px; }
+        }
+
+        /* Small phones (375px and below) */
+        @media (max-width: 375px) {
+            .hero h1 { font-size: 24px; }
+            .hero p.subtitle { font-size: 13px; }
+            .btn { padding: 8px 14px; font-size: 12px; }
+            .btn-lg { padding: 10px 20px; font-size: 13px; }
+            .btn-xl { padding: 12px 24px; font-size: 14px; }
+            .section-title { font-size: 22px; }
+            .stats-bar { gap: 8px; }
+            .stat-item .number { font-size: 20px; }
+            .feature-card { padding: 16px; }
+            .price-card .price { font-size: 32px; }
+            .chat-widget {
+                width: calc(100% - 12px); right: 6px; left: 6px;
+                bottom: 58px; max-height: calc(100vh - 70px);
+                border-radius: 12px;
+            }
+            .chat-widget-btn { bottom: 8px; right: 8px; width: 42px; height: 42px; font-size: 15px; }
+            .widget-header { padding: 8px 12px; min-height: 40px; border-radius: 12px 12px 0 0; }
+            .widget-header h3 { font-size: 12px; }
+            .widget-header .w-avatar { width: 26px; height: 26px; font-size: 11px; }
+            .widget-header .close-btn { width: 26px; height: 26px; font-size: 10px; border-radius: 8px; }
+            .prechat-form { padding: 12px; gap: 6px; }
+            .prechat-form p { font-size: 11px; }
+            .prechat-form input, .prechat-form textarea { padding: 9px 10px; font-size: 12px; border-radius: 8px; }
+            .prechat-form textarea { min-height: 44px; }
+            .prechat-form .start-btn { padding: 10px; font-size: 12px; border-radius: 8px; }
+            .widget-status-bar { padding: 5px 10px; font-size: 9px; }
         }
     </style>
 </head>
@@ -770,10 +1017,12 @@
         <div class="logo-icon"><i class="fas fa-bolt"></i></div>
         <h1>Live<em>Track</em> Pro</h1>
     </a>
-    <ul class="nav-links">
-        <li><a href="#features">Features</a></li>
-        <li><a href="#how-it-works">How It Works</a></li>
-        <li><a href="#pricing">Pricing</a></li>
+    <ul class="nav-links" id="navLinks">
+        <li><a href="{% url 'pages:features' %}">Features</a></li>
+        <li><a href="{% url 'pages:compare' %}">Compare</a></li>
+        <li><a href="#integrations" class="nav-link-item">Integrations</a></li>
+        <li><a href="#pricing" class="nav-link-item">Pricing</a></li>
+        <li><a href="#faq" class="nav-link-item">FAQ</a></li>
         <li><a href="{% url 'pages:about' %}">About</a></li>
         <li><a href="{% url 'pages:contact' %}">Contact</a></li>
     </ul>
@@ -782,10 +1031,10 @@
         <a href="{% url 'dashboard:home' %}" class="btn btn-primary"><i class="fas fa-th-large"></i> Dashboard</a>
         {% else %}
         <a href="{% url 'core:login' %}" class="btn btn-ghost">Sign In</a>
-        <a href="{% url 'core:register' %}" class="btn btn-primary">Get Started Free</a>
+        <a href="{% url 'core:register' %}" class="btn btn-primary"><i class="fas fa-rocket"></i> Get Started Free</a>
         {% endif %}
     </div>
-    <button class="mobile-menu-btn" onclick="document.querySelector('.nav-links').classList.toggle('show')">
+    <button class="mobile-menu-btn" onclick="document.getElementById('navLinks').classList.toggle('show');this.querySelector('i').classList.toggle('fa-bars');this.querySelector('i').classList.toggle('fa-times');">
         <i class="fas fa-bars"></i>
     </button>
 </nav>
@@ -927,7 +1176,7 @@
 </section>
 
 <!-- INTEGRATIONS -->
-<section style="padding:60px 80px;text-align:center;background:white;">
+<section id="integrations" style="padding:60px 80px;text-align:center;background:white;">
     <div class="section-header">
         <div class="section-label"><i class="fas fa-puzzle-piece"></i> Integrations</div>
         <h2 class="section-title">Works With Your Stack</h2>
@@ -962,7 +1211,7 @@
 </section>
 
 <!-- USE CASES -->
-<section style="padding:80px;background:var(--bg-soft);">
+<section id="use-cases" style="padding:80px;background:var(--bg-soft);">
     <div class="section-header">
         <div class="section-label"><i class="fas fa-briefcase"></i> Use Cases</div>
         <h2 class="section-title">Built for Every Industry</h2>
@@ -1000,75 +1249,110 @@
 </section>
 
 <!-- COMPARISON -->
-<section style="padding:80px;background:white;">
+<section id="compare" style="padding:80px 40px;background:linear-gradient(180deg,#fafbff,white);">
     <div class="section-header">
-        <div class="section-label"><i class="fas fa-balance-scale"></i> Compare</div>
-        <h2 class="section-title">Why Choose LiveTrack?</h2>
-        <p class="section-desc">See how we compare to alternatives</p>
+        <div class="section-label"><i class="fas fa-trophy"></i> Compare</div>
+        <h2 class="section-title">Why Teams Switch to LiveTrack</h2>
+        <p class="section-desc">More features, better pricing, zero compromise. See for yourself.</p>
     </div>
-    <div style="max-width:900px;margin:30px auto 0;overflow-x:auto;">
+    <div style="max-width:950px;margin:40px auto 0;overflow-x:auto;border-radius:20px;border:1px solid #e5e7eb;box-shadow:0 8px 30px rgba(0,0,0,0.06);background:white;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead>
-                <tr style="background:#f8f7ff;">
-                    <th style="padding:14px 16px;text-align:left;font-weight:700;color:#1e1b4b;border-bottom:2px solid #e5e7eb;">Feature</th>
-                    <th style="padding:14px 16px;text-align:center;font-weight:700;color:#6366f1;border-bottom:2px solid #6366f1;background:rgba(99,102,241,0.05);">LiveTrack</th>
-                    <th style="padding:14px 16px;text-align:center;font-weight:600;color:#6b7280;border-bottom:2px solid #e5e7eb;">Tawk.to</th>
-                    <th style="padding:14px 16px;text-align:center;font-weight:600;color:#6b7280;border-bottom:2px solid #e5e7eb;">Zendesk</th>
-                    <th style="padding:14px 16px;text-align:center;font-weight:600;color:#6b7280;border-bottom:2px solid #e5e7eb;">Crisp</th>
+                <tr>
+                    <th style="padding:18px 20px;text-align:left;font-weight:700;font-size:14px;color:#1e1b4b;background:#fafbff;border-bottom:2px solid #e5e7eb;width:200px;">Feature</th>
+                    <th style="padding:18px 16px;text-align:center;background:linear-gradient(180deg,rgba(99,102,241,0.08),rgba(99,102,241,0.03));border-bottom:2px solid #6366f1;position:relative;">
+                        <div style="font-size:15px;font-weight:800;color:#4f46e5;">LiveTrack</div>
+                        <div style="font-size:9px;color:#6366f1;margin-top:2px;text-transform:uppercase;letter-spacing:1px;">Recommended</div>
+                    </th>
+                    <th style="padding:18px 16px;text-align:center;font-weight:600;color:#6b7280;background:#fafbff;border-bottom:2px solid #e5e7eb;">
+                        <div style="font-size:14px;">Tawk.to</div>
+                    </th>
+                    <th style="padding:18px 16px;text-align:center;font-weight:600;color:#6b7280;background:#fafbff;border-bottom:2px solid #e5e7eb;">
+                        <div style="font-size:14px;">Zendesk</div>
+                    </th>
+                    <th style="padding:18px 16px;text-align:center;font-weight:600;color:#6b7280;background:#fafbff;border-bottom:2px solid #e5e7eb;">
+                        <div style="font-size:14px;">Crisp</div>
+                    </th>
                 </tr>
             </thead>
             <tbody>
                 <tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:12px 16px;font-weight:500;">Free Plan</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;font-weight:700;background:rgba(99,102,241,0.02);"><i class="fas fa-check-circle"></i> Forever Free</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;"><i class="fas fa-check"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;"><i class="fas fa-check"></i></td>
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-gift" style="color:#6366f1;width:20px;font-size:12px;"></i> Free Plan</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="background:rgba(16,185,129,0.1);color:#10b981;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px;">Forever Free</span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check"></i></span></td>
                 </tr>
                 <tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:12px 16px;font-weight:500;">Visitor Tracking</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;font-weight:700;background:rgba(99,102,241,0.02);"><i class="fas fa-check-circle"></i> Built-in</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;"><i class="fas fa-check"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#f59e0b;"><i class="fas fa-minus"></i> Add-on</td>
-                    <td style="padding:12px 16px;text-align:center;color:#f59e0b;"><i class="fas fa-minus"></i> Basic</td>
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-eye" style="color:#6366f1;width:20px;font-size:12px;"></i> Real-time Visitor Tracking</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="background:rgba(16,185,129,0.1);color:#10b981;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px;">Built-in</span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#f59e0b;font-size:11px;font-weight:600;">Add-on</span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#f59e0b;font-size:11px;font-weight:600;">Basic</span></td>
                 </tr>
                 <tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:12px 16px;font-weight:500;">AI Smart Replies</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;font-weight:700;background:rgba(99,102,241,0.02);"><i class="fas fa-check-circle"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#f59e0b;"><i class="fas fa-minus"></i> Paid</td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-magic" style="color:#6366f1;width:20px;font-size:12px;"></i> AI Smart Replies</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check-circle"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#f59e0b;font-size:11px;font-weight:600;">$$ Paid</span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
                 </tr>
                 <tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:12px 16px;font-weight:500;">Webhooks</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;font-weight:700;background:rgba(99,102,241,0.02);"><i class="fas fa-check-circle"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#f59e0b;"><i class="fas fa-minus"></i> Paid</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;"><i class="fas fa-check"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;"><i class="fas fa-check"></i></td>
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-plug" style="color:#6366f1;width:20px;font-size:12px;"></i> Webhooks & API</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check-circle"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#f59e0b;font-size:11px;font-weight:600;">$$ Paid</span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check"></i></span></td>
                 </tr>
                 <tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:12px 16px;font-weight:500;">Sentiment Detection</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;font-weight:700;background:rgba(99,102,241,0.02);"><i class="fas fa-check-circle"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-smile" style="color:#6366f1;width:20px;font-size:12px;"></i> Sentiment Detection</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check-circle"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
                 </tr>
                 <tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:12px 16px;font-weight:500;">Voice Notes</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;font-weight:700;background:rgba(99,102,241,0.02);"><i class="fas fa-check-circle"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-microphone" style="color:#6366f1;width:20px;font-size:12px;"></i> Voice Notes</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check-circle"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                </tr>
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-desktop" style="color:#6366f1;width:20px;font-size:12px;"></i> Screen Share (WebRTC)</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check-circle"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#f59e0b;font-size:11px;font-weight:600;">$$ Paid</span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                </tr>
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-user-secret" style="color:#6366f1;width:20px;font-size:12px;"></i> Whisper / Internal Notes</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check-circle"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                </tr>
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-fire" style="color:#6366f1;width:20px;font-size:12px;"></i> Visitor Scoring (Hot/Warm/Cold)</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="color:#10b981;font-size:16px;"><i class="fas fa-check-circle"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
                 </tr>
                 <tr>
-                    <td style="padding:12px 16px;font-weight:500;">Self-Hosted Option</td>
-                    <td style="padding:12px 16px;text-align:center;color:#10b981;font-weight:700;background:rgba(99,102,241,0.02);"><i class="fas fa-check-circle"></i> Open Source</td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
-                    <td style="padding:12px 16px;text-align:center;color:#ef4444;"><i class="fas fa-times"></i></td>
+                    <td style="padding:14px 20px;font-weight:600;color:#374151;"><i class="fas fa-server" style="color:#6366f1;width:20px;font-size:12px;"></i> Self-Hosted / Open Source</td>
+                    <td style="padding:14px 16px;text-align:center;background:rgba(99,102,241,0.02);"><span style="background:rgba(99,102,241,0.1);color:#6366f1;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px;">Open Source</span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
+                    <td style="padding:14px 16px;text-align:center;"><span style="color:#ef4444;font-size:16px;"><i class="fas fa-times"></i></span></td>
                 </tr>
             </tbody>
         </table>
+    </div>
+    <!-- CTA under table -->
+    <div style="text-align:center;margin-top:32px;">
+        <a href="{% url 'core:register' %}" class="btn btn-primary btn-lg"><i class="fas fa-rocket"></i> Start Free - No Card Required</a>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:10px;">200+ features included in every plan</p>
     </div>
 </section>
 
@@ -1114,7 +1398,7 @@
 </section>
 
 <!-- SHOWCASE -->
-<section class="showcase">
+<section class="showcase" id="showcase">
     <div class="showcase-grid">
         <div class="showcase-content">
             <div class="section-label"><i class="fas fa-desktop"></i> Dashboard</div>
@@ -1230,7 +1514,7 @@
                         </div>
                     </div>
                     <!-- Widget Preview -->
-                    <div class="placeholder-dash" id="previewWidget2" style="display:none;display:flex;align-items:center;justify-content:center;min-height:300px;background:#f0eef5;">
+                    <div class="placeholder-dash" id="previewWidget2" style="display:none;align-items:center;justify-content:center;min-height:300px;background:#f0eef5;">
                         <div style="width:260px;background:white;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.12);overflow:hidden;">
                             <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);padding:14px 16px;display:flex;align-items:center;gap:10px;">
                                 <div style="width:30px;height:30px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;"><i class="fas fa-headset"></i></div>
@@ -1274,7 +1558,7 @@
                 <li><i class="fas fa-check"></i> Chat history (30 days)</li>
                 <li><i class="fas fa-check"></i> Basic analytics</li>
             </ul>
-            <a href="{% url 'core:register' %}" class="btn btn-outline btn-lg">Get Started</a>
+            <a href="{% url 'core:register' %}?plan=free" class="btn btn-outline btn-lg">Get Started Free</a>
         </div>
         <div class="price-card featured">
             <h3>Pro</h3>
@@ -1289,7 +1573,7 @@
                 <li><i class="fas fa-check"></i> Custom widget branding</li>
                 <li><i class="fas fa-check"></i> Email notifications</li>
             </ul>
-            <a href="{% url 'core:register' %}" class="btn btn-primary btn-lg">Start 14-Day Trial</a>
+            <a href="{% url 'core:register' %}?plan=pro" class="btn btn-primary btn-lg">Start Pro — $19/mo</a>
         </div>
         <div class="price-card">
             <h3>Enterprise</h3>
@@ -1304,13 +1588,13 @@
                 <li><i class="fas fa-check"></i> Priority support</li>
                 <li><i class="fas fa-check"></i> SLA guarantee</li>
             </ul>
-            <a href="{% url 'pages:contact' %}" class="btn btn-outline btn-lg">Contact Sales</a>
+            <a href="{% url 'core:register' %}?plan=enterprise" class="btn btn-outline btn-lg">Start Enterprise — $79/mo</a>
         </div>
     </div>
 </section>
 
 <!-- TESTIMONIALS -->
-<section class="testimonials">
+<section class="testimonials" id="testimonials">
     <div class="section-header">
         <div class="section-label"><i class="fas fa-heart"></i> Testimonials</div>
         <h2 class="section-title">Loved by Businesses Everywhere</h2>
@@ -1410,19 +1694,26 @@
         </div>
         <div class="footer-col">
             <h4>Product</h4>
-            <a href="#features">Features</a><a href="#pricing">Pricing</a>
-            <a href="#how-it-works">How It Works</a><a href="#faq">FAQ</a>
-            <a href="{% url 'core:login' %}">Agent Login</a>
+            <a href="#features">Features</a>
+            <a href="#integrations">Integrations</a>
+            <a href="#compare">Compare</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#showcase">Dashboard Preview</a>
         </div>
         <div class="footer-col">
             <h4>Company</h4>
-            <a href="{% url 'pages:about' %}">About Us</a><a href="{% url 'pages:contact' %}">Contact</a>
-            <a href="#">Careers</a><a href="#">Blog</a><a href="#">Press Kit</a>
+            <a href="{% url 'pages:about' %}">About Us</a>
+            <a href="{% url 'pages:contact' %}">Contact</a>
+            <a href="#testimonials">Testimonials</a>
+            <a href="#faq">FAQ</a>
+            <a href="{% url 'core:login' %}">Agent Login</a>
         </div>
         <div class="footer-col">
             <h4>Resources</h4>
-            <a href="#">Documentation</a><a href="#">API Reference</a>
-            <a href="#">Help Center</a><a href="#">Community</a>
+            <a href="#how-it-works">How It Works</a>
+            <a href="#use-cases">Use Cases</a>
+            <a href="{% url 'pages:contact' %}">Help Center</a>
+            <a href="{% url 'core:register' %}">Get Started Free</a>
         </div>
         <div class="footer-col">
             <h4>Legal</h4>
@@ -1479,7 +1770,7 @@
         <button onclick="widgetEmailTranscript()" class="w-menu-item">
             <i class="fas fa-envelope"></i> Email Transcript
         </button>
-        <button onclick="endChatVisitor()" class="w-menu-item" id="endChatMenuItem" style="display:none;">
+        <button onclick="endChatVisitor()" class="w-menu-item" id="endChatMenuItem">
             <i class="fas fa-times-circle" style="color:#ef4444;"></i> End Chat
         </button>
     </div>
@@ -1514,30 +1805,66 @@
             <button class="widget-tool-btn" onclick="document.getElementById('widgetImgInput').click()" title="Send image"><i class="fas fa-image"></i></button>
             <div class="widget-sep"></div>
             <button class="widget-tool-btn" onclick="toggleWidgetEmoji()" id="widgetEmojiBtn" title="Emoji"><i class="fas fa-smile"></i></button>
-            <button class="widget-tool-btn" onclick="visitorStartScreenShare()" id="widgetScreenBtn" title="Share your screen"><i class="fas fa-desktop"></i></button>
+            <div class="widget-sep"></div>
+            <button class="widget-tool-btn" onclick="visitorStartCall('audio')" id="widgetAudioBtn" title="Audio call"><i class="fas fa-phone" style="font-size:13px;"></i></button>
+            <button class="widget-tool-btn" onclick="visitorStartCall('video')" id="widgetVideoBtn" title="Video call"><i class="fas fa-video" style="font-size:13px;"></i></button>
+            <button class="widget-tool-btn" onclick="visitorStartScreenShare()" id="widgetScreenBtn" title="Share screen"><i class="fas fa-desktop"></i></button>
         </div>
         <!-- Widget emoji picker -->
         <div id="widgetEmojiPicker" class="widget-emoji-picker">
-            <div class="widget-emoji-head">Quick Emoji</div>
-            <div class="widget-emoji-grid">
-                <button class="we-btn" onclick="wInsertEmoji(this)">😊</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">😂</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">❤️</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">👍</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">🎉</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">🔥</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">✅</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">🙏</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">👋</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">😍</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">🤔</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">😢</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">👏</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">🚀</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">💡</button>
-                <button class="we-btn" onclick="wInsertEmoji(this)">🤝</button>
+            <div class="widget-emoji-head" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Emoji</span>
+                <div style="display:flex;gap:2px;" id="wEmojiTabs">
+                    <button onclick="wSwitchTab('wRecent')" class="we-tab active" style="border:none;background:transparent;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;">🕐</button>
+                    <button onclick="wSwitchTab('wSmileys')" class="we-tab" style="border:none;background:transparent;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;">😀</button>
+                    <button onclick="wSwitchTab('wPeople')" class="we-tab" style="border:none;background:transparent;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;">👋</button>
+                    <button onclick="wSwitchTab('wNature')" class="we-tab" style="border:none;background:transparent;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;">🐶</button>
+                    <button onclick="wSwitchTab('wFood')" class="we-tab" style="border:none;background:transparent;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;">🍕</button>
+                    <button onclick="wSwitchTab('wSymbols')" class="we-tab" style="border:none;background:transparent;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;">❤️</button>
+                </div>
             </div>
+            <div class="widget-emoji-grid" id="wEmojiGrid"></div>
         </div>
+        <script>
+        var wEmojiSets = {
+            wRecent: JSON.parse(localStorage.getItem('wRecentEmoji')||'[]'),
+            wSmileys: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉','😊','😇','🥰','😍','🤩','😘','😋','😛','😜','🤪','😝','🤗','🤭','🤔','😐','😏','😒','🙄','😬','😌','😔','😪','😴','😷','🤒','🤕','🤢','🤮','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','😕','😟','🙁','😮','😲','😳','🥺','😦','😨','😰','😥','😢','😭','😱','😖','😣','😞','😩','😫','😤','😡','😈','💀','💩','🤡','👻','👽','🤖'],
+            wPeople: ['👋','🤚','✋','👌','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','👇','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤝','🙏','💪','👀','👅','👄','👶','👦','👧','👨','👩','👴','👵','🙍','🙎','🙅','🙆','💁','🙋','🙇','🤦','🤷','👮','💂','👷','🤴','👸','👳','👲','🧕','🤵','👰','🤰','👼','🎅','🤶','🦸','🦹','🧙','🧚','🧛','🧜','🧝','💆','💇','🚶','🏃','💃','🕺'],
+            wNature: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆','🦅','🦉','🐺','🐴','🦄','🐝','🦋','🐌','🐞','🐜','🐢','🐍','🐙','🐠','🐬','🐳','🦈','🐘','🦒','🌵','🌲','🌳','🌴','🌱','🌿','🍀','🍄','🌹','🌺','🌸','🌼','🌻','🌞','🌈','⚡','🔥','❄️','💧','🌊'],
+            wFood: ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🍈','🍒','🍑','🥭','🍍','🥝','🍅','🥑','🥦','🌽','🥕','🥐','🍞','🥯','🧇','🥞','🍳','🧀','🍗','🍖','🌭','🍔','🍟','🍕','🥪','🌮','🌯','🍝','🍜','🍣','🍱','🍤','🍙','🍚','🍘','🍧','🍨','🍦','🍰','🎂','🍩','🍪','🍫','🍬','🍭','☕','🍵','🥤','🍺','🍻','🥂','🍷','🍸','🍹'],
+            wSymbols: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','💯','💢','💥','💫','💦','💨','🕊️','✨','⭐','🌟','💫','🎵','🎶','💤','💬','💭','🗨️','♠️','♣️','♥️','♦️','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','✅','❌','❓','❗','⭕','🚫','♻️','✔️','➕','➖','➗','✖️','💲','©️','®️','™️']
+        };
+        var wCurrentTab = wEmojiSets.wRecent.length > 0 ? 'wRecent' : 'wSmileys';
+        function wRenderEmojis(tab) {
+            var g = document.getElementById('wEmojiGrid');
+            var emojis = wEmojiSets[tab] || [];
+            if (tab === 'wRecent' && emojis.length === 0) { g.innerHTML = '<div style="padding:12px;text-align:center;font-size:11px;color:#9ca3af;">Recently used emojis appear here</div>'; return; }
+            g.innerHTML = emojis.map(function(e){ return '<button class="we-btn" onclick="wInsertEmoji(this)">'+e+'</button>'; }).join('');
+        }
+        function wSwitchTab(tab) {
+            wCurrentTab = tab;
+            var tabs = document.querySelectorAll('#wEmojiTabs .we-tab');
+            var names = ['wRecent','wSmileys','wPeople','wNature','wFood','wSymbols'];
+            tabs.forEach(function(t,i){ t.style.background = names[i]===tab ? 'rgba(124,58,237,0.1)' : 'transparent'; });
+            wRenderEmojis(tab);
+        }
+        // Override wInsertEmoji to save recent
+        var _origWInsert = window.wInsertEmoji;
+        window.wInsertEmoji = function(btn) {
+            var emoji = btn.textContent;
+            var recent = wEmojiSets.wRecent.filter(function(e){return e!==emoji;});
+            recent.unshift(emoji); recent = recent.slice(0,24);
+            wEmojiSets.wRecent = recent;
+            localStorage.setItem('wRecentEmoji', JSON.stringify(recent));
+            if (typeof _origWInsert === 'function') _origWInsert(btn);
+        };
+        // Init on first open
+        var _origToggle = window.toggleWidgetEmoji;
+        window.toggleWidgetEmoji = function() {
+            if (typeof _origToggle === 'function') _origToggle();
+            wRenderEmojis(wCurrentTab);
+        };
+        </script>
         <div class="widget-send-row">
             <input type="text" id="widgetChatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendWidgetMessage()" oninput="handleVisitorTyping()">
             <button class="widget-send-btn" onclick="sendWidgetMessage()"><i class="fas fa-paper-plane"></i></button>
@@ -1611,14 +1938,29 @@
 </style>
 
 <script>
-    window.addEventListener('scroll', () => { document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50); });
+    window.addEventListener('scroll', () => {
+        document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
+        // Scroll spy - highlight active nav link
+        const sections = ['features','integrations','pricing','faq'];
+        let current = '';
+        sections.forEach(id => {
+            const el = document.getElementById(id);
+            if (el && window.scrollY >= el.offsetTop - 200) current = id;
+        });
+        document.querySelectorAll('.nav-link-item').forEach(a => {
+            a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+        });
+    });
     function toggleFaq(el) { el.parentElement.classList.toggle('open'); }
 
     function switchPreview(tab, btn) {
-        document.getElementById('previewDashboard').style.display = tab === 'dashboard' ? '' : 'none';
-        document.getElementById('previewChat').style.display = tab === 'chat' ? '' : 'none';
-        document.getElementById('previewWidget2').style.display = tab === 'widget' ? 'flex' : 'none';
-        document.querySelectorAll('.ss-tab').forEach(t => t.classList.remove('active'));
+        var d = document.getElementById('previewDashboard');
+        var c = document.getElementById('previewChat');
+        var w = document.getElementById('previewWidget2');
+        d.style.display = tab === 'dashboard' ? 'block' : 'none';
+        c.style.display = tab === 'chat' ? 'block' : 'none';
+        w.style.display = tab === 'widget' ? 'flex' : 'none';
+        document.querySelectorAll('.ss-tab').forEach(function(t) { t.classList.remove('active'); });
         btn.classList.add('active');
     }
 
@@ -1679,9 +2021,19 @@
 
     function widgetEmailTranscript() {
         const email = prompt('Enter email to receive transcript:');
-        if (email) addWidgetMessage('Transcript will be sent to ' + email, 'system', 'System');
+        if (!email || !currentRoomId) { document.getElementById('widgetMenu').style.display = 'none'; return; }
+        fetch('/dashboard/chats/' + currentRoomId + '/email-transcript/', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+            body: JSON.stringify({email: email})
+        }).then(function(r){return r.json();}).then(function(d) {
+            addWidgetMessage(d.status === 'ok' ? 'Transcript sent to ' + email : 'Could not send transcript', 'system', 'System');
+        }).catch(function() {
+            addWidgetMessage('Transcript will be sent to ' + email, 'system', 'System');
+        });
         document.getElementById('widgetMenu').style.display = 'none';
     }
+    function getCookie(name) { var v = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)'); return v ? v.pop() : ''; }
 
     function endChatVisitor() {
         if (!confirm('End this chat?')) return;
@@ -1806,13 +2158,13 @@
     let visitorScreenStream = null;
     const visitorRtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
 
-    function handleAgentScreenShareRequest() {
+    async function handleAgentScreenShareRequest() {
         if (!confirm('Agent wants to see your screen. Allow screen sharing?')) {
             chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
             return;
         }
-        addWidgetMessage('Screen sharing started. Agent can see your screen.', 'system', 'System');
-        navigator.mediaDevices.getDisplayMedia({ video: true }).then(function(stream) {
+        try {
+            var stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
             visitorScreenStream = stream;
             visitorPeerConnection = new RTCPeerConnection(visitorRtcConfig);
 
@@ -1821,7 +2173,7 @@
             });
 
             visitorPeerConnection.onicecandidate = function(event) {
-                if (event.candidate) {
+                if (event.candidate && chatSocket && chatSocket.readyState === 1) {
                     chatSocket.send(JSON.stringify({
                         type: 'ice_candidate',
                         data: { candidate: event.candidate.toJSON() },
@@ -1832,22 +2184,31 @@
             // When user stops sharing from browser UI
             stream.getVideoTracks()[0].onended = function() {
                 stopVisitorScreenShare();
-                chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
+                if (chatSocket && chatSocket.readyState === 1) {
+                    chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
+                }
                 addWidgetMessage('Screen sharing stopped.', 'system', 'System');
+                document.getElementById('widgetScreenBtn').style.color = '';
             };
 
-            return visitorPeerConnection.createOffer();
-        }).then(function(offer) {
-            return visitorPeerConnection.setLocalDescription(offer);
-        }).then(function() {
+            var offer = await visitorPeerConnection.createOffer();
+            await visitorPeerConnection.setLocalDescription(offer);
+
             chatSocket.send(JSON.stringify({
                 type: 'screen_share_offer',
                 data: { sdp: visitorPeerConnection.localDescription.toJSON() },
             }));
-        }).catch(function(err) {
+
+            addWidgetMessage('Screen sharing started. Agent can see your screen.', 'system', 'System');
+            document.getElementById('widgetScreenBtn').style.color = '#ef4444';
+        } catch(err) {
+            console.log('Screen share error:', err);
             addWidgetMessage('Screen sharing was cancelled.', 'system', 'System');
-            chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
-        });
+            if (chatSocket && chatSocket.readyState === 1) {
+                chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
+            }
+            document.getElementById('widgetScreenBtn').style.color = '';
+        }
     }
 
     function handleScreenShareAnswer(data) {
@@ -1885,6 +2246,83 @@
         }
         handleAgentScreenShareRequest();
         document.getElementById('widgetScreenBtn').style.color = '#ef4444';
+    }
+
+    // ═══════ VISITOR AUDIO/VIDEO CALL ═══════
+    let vCallPC = null, vLocalStream = null, vCallActive = false;
+
+    async function visitorStartCall(type) {
+        if (!chatSocket || chatSocket.readyState !== 1) { alert('Connect to chat first'); return; }
+        try {
+            vLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
+        } catch(e) { alert('Please allow ' + (type === 'video' ? 'camera & microphone' : 'microphone') + ' access'); return; }
+
+        vCallPC = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        vLocalStream.getTracks().forEach(t => vCallPC.addTrack(t, vLocalStream));
+
+        vCallPC.onicecandidate = e => { if (e.candidate) chatSocket.send(JSON.stringify({ type: 'ice_candidate', data: { candidate: e.candidate.toJSON(), context: 'call' } })); };
+        vCallPC.ontrack = e => { vCallActive = true; addWidgetMessage(type === 'video' ? 'Video call connected' : 'Audio call connected', 'system', 'System'); };
+        vCallPC.oniceconnectionstatechange = () => { if (['disconnected','failed','closed'].includes(vCallPC.iceConnectionState)) visitorEndCall(); };
+
+        const offer = await vCallPC.createOffer();
+        await vCallPC.setLocalDescription(offer);
+        chatSocket.send(JSON.stringify({ type: 'call_offer', data: { sdp: vCallPC.localDescription.toJSON(), call_type: type, caller: visitorName } }));
+        addWidgetMessage('Calling agent...', 'system', 'System');
+
+        document.getElementById('widget' + (type === 'video' ? 'Video' : 'Audio') + 'Btn').style.color = '#ef4444';
+    }
+
+    function visitorEndCall() {
+        if (vLocalStream) { vLocalStream.getTracks().forEach(t => t.stop()); vLocalStream = null; }
+        if (vCallPC) { vCallPC.close(); vCallPC = null; }
+        vCallActive = false;
+        document.getElementById('widgetAudioBtn').style.color = '';
+        document.getElementById('widgetVideoBtn').style.color = '';
+        chatSocket.send(JSON.stringify({ type: 'call_end', data: {} }));
+    }
+
+    // Add call handlers to widget WebSocket
+    var _origWidgetMsg = chatSocket ? chatSocket.onmessage : null;
+    function patchWidgetSocket() {
+        if (!chatSocket) return;
+        var _prev = chatSocket.onmessage;
+        chatSocket.onmessage = function(e) {
+            var d = JSON.parse(e.data);
+            if (d.type === 'call_offer' && d.sender_type !== 'visitor') {
+                // Incoming call from agent
+                if (confirm((d.data.caller || 'Agent') + ' is calling. Accept?')) {
+                    acceptVisitorCall(d.data);
+                } else {
+                    chatSocket.send(JSON.stringify({ type: 'call_reject', data: {} }));
+                }
+                return;
+            }
+            if (d.type === 'call_answer' && vCallPC) { vCallPC.setRemoteDescription(new RTCSessionDescription(d.data.sdp)); vCallActive = true; addWidgetMessage('Call connected', 'system', 'System'); return; }
+            if (d.type === 'call_end') { visitorEndCall(); addWidgetMessage('Call ended', 'system', 'System'); return; }
+            if (d.type === 'call_reject') { visitorEndCall(); addWidgetMessage('Call rejected', 'system', 'System'); return; }
+            if (d.type === 'ice_candidate' && d.data && d.data.context === 'call' && vCallPC) { vCallPC.addIceCandidate(new RTCIceCandidate(d.data.candidate)).catch(()=>{}); return; }
+            if (_prev) _prev.call(chatSocket, e);
+        };
+    }
+
+    async function acceptVisitorCall(data) {
+        var type = data.call_type || 'audio';
+        try { vLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' }); } catch(e) { return; }
+        vCallPC = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        vLocalStream.getTracks().forEach(t => vCallPC.addTrack(t, vLocalStream));
+        vCallPC.onicecandidate = e => { if (e.candidate) chatSocket.send(JSON.stringify({ type: 'ice_candidate', data: { candidate: e.candidate.toJSON(), context: 'call' } })); };
+        vCallPC.ontrack = () => { vCallActive = true; };
+        await vCallPC.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        var answer = await vCallPC.createAnswer();
+        await vCallPC.setLocalDescription(answer);
+        chatSocket.send(JSON.stringify({ type: 'call_answer', data: { sdp: vCallPC.localDescription.toJSON() } }));
+        addWidgetMessage('Call connected', 'system', 'System');
+    }
+
+    // Patch socket after connection
+    var _origOpenWs = window.openWidgetWs;
+    if (typeof openWidgetWs === 'function') {
+        window.openWidgetWs = function() { _origOpenWs(); setTimeout(patchWidgetSocket, 500); };
     }
 
     function handleVisitorTyping() {

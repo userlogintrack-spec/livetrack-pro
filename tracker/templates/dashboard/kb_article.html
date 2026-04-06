@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ article.title }} - {{ org.name }} Help Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Inter',sans-serif; background:#f5f3ff; color:#1e1b4b; }
+        .topbar { background:white; border-bottom:1px solid #e5e2ff; padding:16px 20px; }
+        .topbar a { color:#7c3aed; text-decoration:none; font-weight:600; font-size:14px; }
+        .container { max-width:800px; margin:0 auto; padding:40px 20px; }
+        .article-card { background:white; border:1px solid #e5e2ff; border-radius:14px; padding:32px; margin-bottom:24px; }
+        .breadcrumb { font-size:13px; color:#9ca3af; margin-bottom:16px; }
+        .breadcrumb a { color:#7c3aed; text-decoration:none; }
+        h1 { font-size:28px; font-weight:800; margin-bottom:8px; }
+        .meta { font-size:13px; color:#9ca3af; margin-bottom:24px; }
+        .content { font-size:15px; line-height:1.8; color:#374151; }
+        .content p { margin-bottom:16px; }
+        .content h2 { font-size:20px; margin:24px 0 12px; }
+        .content h3 { font-size:17px; margin:20px 0 10px; }
+        .content code { background:#ede9fe; padding:2px 6px; border-radius:4px; font-size:13px; }
+        .content pre { background:#1e1b4b; color:#e5e2ff; padding:16px; border-radius:8px; overflow-x:auto; margin:12px 0; }
+        .content ul, .content ol { padding-left:24px; margin-bottom:16px; }
+        .content li { margin-bottom:6px; }
+        .feedback { text-align:center; padding:24px; border-top:1px solid #e5e2ff; margin-top:24px; }
+        .feedback p { font-size:14px; color:#6b7280; margin-bottom:12px; }
+        .feedback button { padding:8px 20px; border:1px solid #e5e2ff; border-radius:8px; background:white; cursor:pointer; font-size:14px; margin:0 4px; transition:all 0.2s; font-family:inherit; }
+        .feedback button:hover { border-color:#7c3aed; color:#7c3aed; }
+        .feedback button.voted { background:#7c3aed; color:white; border-color:#7c3aed; }
+        .related { margin-top:24px; }
+        .related h3 { font-size:16px; font-weight:700; margin-bottom:12px; }
+        .related a { display:block; padding:10px 14px; background:white; border:1px solid #e5e2ff; border-radius:8px; margin-bottom:6px; text-decoration:none; color:#1e1b4b; font-size:14px; transition:all 0.2s; }
+        .related a:hover { border-color:#c4b5fd; background:#f5f3ff; }
+        .footer { text-align:center; padding:40px; color:#9ca3af; font-size:13px; }
+        .footer a { color:#7c3aed; text-decoration:none; font-weight:600; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{% url 'kb_public' org_slug=org.slug %}"><i class="fas fa-arrow-left"></i> {{ org.name }} Help Center</a>
+    </div>
+
+    <div class="container">
+        <div class="article-card">
+            <div class="breadcrumb">
+                <a href="{% url 'kb_public' org_slug=org.slug %}">Help Center</a> &raquo;
+                <a href="{% url 'kb_public' org_slug=org.slug %}?q={{ article.category.name }}">{{ article.category.name }}</a> &raquo;
+                {{ article.title }}
+            </div>
+            <h1>{{ article.title }}</h1>
+            <div class="meta">
+                {{ article.views_count }} views &middot; Updated {{ article.updated_at|timesince }} ago
+                {% if article.author %}&middot; By {{ article.author.get_full_name|default:article.author.username }}{% endif %}
+            </div>
+            <div class="content">{{ article.content|linebreaks }}</div>
+
+            <div class="feedback" id="feedbackSection">
+                <p>Was this article helpful?</p>
+                <button onclick="sendFeedback(true)" id="btnYes"><i class="fas fa-thumbs-up"></i> Yes ({{ article.helpful_yes }})</button>
+                <button onclick="sendFeedback(false)" id="btnNo"><i class="fas fa-thumbs-down"></i> No ({{ article.helpful_no }})</button>
+            </div>
+        </div>
+
+        {% if related %}
+        <div class="related">
+            <h3>Related Articles</h3>
+            {% for r in related %}
+            <a href="{% url 'kb_article' org_slug=org.slug article_slug=r.slug %}"><i class="fas fa-file-alt" style="color:#7c3aed;margin-right:8px;"></i> {{ r.title }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">Powered by <a href="/">LiveTrack</a></div>
+
+    <script>
+    function sendFeedback(helpful) {
+        fetch('/api/kb/feedback/{{ article.id }}/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({helpful: helpful})
+        }).then(function() {
+            document.getElementById('feedbackSection').innerHTML = '<p style="color:#7c3aed;font-weight:600;">Thank you for your feedback!</p>';
+        });
+    }
+    </script>
+</body>
+</html>

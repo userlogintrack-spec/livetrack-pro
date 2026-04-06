@@ -1,0 +1,1186 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LiveTrack Pro features — AI auto-reply bot, chatbot flow builder, knowledge base, WhatsApp integration, visitor segmentation, dark mode, departments, SLA management, surveys & NPS, mobile PWA and 170+ more features.">
+    <title>All Features — LiveTrack Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #7c3aed;
+            --primary-light: #a78bfa;
+            --primary-soft: #c4b5fd;
+            --primary-dark: #5b21b6;
+            --accent: #06b6d4;
+            --accent2: #f472b6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-body: #fafbff;
+            --bg-hero: linear-gradient(135deg, #0f0a2e 0%, #1a1145 40%, #2d1b69 70%, #1e1250 100%);
+            --text-dark: #1e1b4b;
+            --text-body: #4b5563;
+            --text-muted: #6b7280;
+            --text-muted-on-dark: #a09dc4;
+            --border-light: #e5e2ff;
+            --gradient-primary: linear-gradient(135deg, #7c3aed, #a855f7, #c084fc);
+            --gradient-accent: linear-gradient(135deg, #06b6d4, #3b82f6);
+            --gradient-warm: linear-gradient(135deg, #f59e0b, #ef4444);
+            --gradient-fresh: linear-gradient(135deg, #10b981, #06b6d4);
+            --gradient-pink: linear-gradient(135deg, #ec4899, #a855f7);
+            --shadow-md: 0 8px 30px rgba(124, 58, 237, 0.1);
+            --shadow-lg: 0 16px 50px rgba(124, 58, 237, 0.12);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-body); color: var(--text-body); line-height: 1.6; overflow-x: hidden; }
+
+        /* =================== NAVBAR =================== */
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            padding: 0 48px; height: 68px;
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(255,255,255,0.85); backdrop-filter: blur(24px) saturate(200%);
+            border-bottom: 1px solid rgba(0,0,0,0.04); transition: all 0.4s;
+        }
+        .navbar.scrolled { background: rgba(255,255,255,0.96); box-shadow: 0 1px 16px rgba(0,0,0,0.06); height: 60px; }
+        .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .nav-brand .logo-icon { width: 36px; height: 36px; background: var(--gradient-primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; color: white; box-shadow: 0 4px 12px rgba(124,58,237,0.25); }
+        .nav-brand h1 { font-size: 19px; font-weight: 800; color: var(--text-dark); }
+        .nav-brand h1 em { font-style: normal; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 14px; border-radius: 8px; transition: all 0.2s; }
+        .nav-links a:hover { color: var(--primary); background: rgba(99,102,241,0.06); }
+        .nav-links a.active { color: var(--primary); background: rgba(99,102,241,0.08); font-weight: 600; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; font-family: inherit; transition: all 0.25s; }
+        .btn-ghost { color: var(--text-dark); background: transparent; border: 1.5px solid var(--border-light); }
+        .btn-ghost:hover { background: #f1f0ff; color: var(--primary); }
+        .btn-primary { background: var(--gradient-primary); color: white; box-shadow: 0 3px 12px rgba(124,58,237,0.25); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.35); }
+        .btn-lg { padding: 14px 32px; font-size: 15px; border-radius: 12px; }
+        .btn-xl { padding: 16px 40px; font-size: 16px; border-radius: 14px; }
+        .btn-outline-light { border: 2px solid rgba(255,255,255,0.3); color: white; background: transparent; }
+        .btn-outline-light:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.6); }
+        .mobile-menu-btn { display: none; background: none; border: none; color: var(--text-dark); font-size: 20px; cursor: pointer; padding: 8px; border-radius: 8px; z-index: 1001; }
+        .nav-links.show {
+            display: flex !important; flex-direction: column; position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.98);
+            backdrop-filter: blur(24px); z-index: 1000; justify-content: center;
+            align-items: center; gap: 8px; padding: 80px 24px 40px;
+        }
+        .nav-links.show a { font-size: 18px; padding: 14px 32px; border-radius: 12px; width: 100%; max-width: 320px; text-align: center; color: var(--text-dark); }
+        .nav-links.show a:hover { background: #f1f0ff; color: var(--primary); }
+
+        /* =================== HERO =================== */
+        .hero {
+            position: relative; padding: 140px 48px 80px; text-align: center;
+            background: var(--bg-hero); color: white; overflow: hidden;
+        }
+        .hero .orb { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; }
+        .hero .orb-1 { top: -80px; left: -100px; width: 500px; height: 500px; background: rgba(124,58,237,0.25); }
+        .hero .orb-2 { bottom: -120px; right: -80px; width: 400px; height: 400px; background: rgba(6,182,212,0.15); }
+        .hero .orb-3 { top: 40%; left: 60%; width: 300px; height: 300px; background: rgba(236,72,153,0.1); }
+        .hero .grid-bg {
+            position: absolute; inset: 0;
+            background-image: linear-gradient(rgba(167,139,250,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(167,139,250,0.06) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+        }
+        .hero-inner { position: relative; z-index: 2; max-width: 900px; margin: 0 auto; }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 8px; padding: 8px 20px;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 50px; font-size: 13px; font-weight: 600; color: var(--primary-soft); margin-bottom: 28px;
+        }
+        .hero-badge .dot { width: 8px; height: 8px; background: #34d399; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .hero h1 { font-size: 60px; font-weight: 900; line-height: 1.1; letter-spacing: -2.5px; margin-bottom: 20px; }
+        .hero h1 .grad { background: linear-gradient(135deg, #c084fc, #f0abfc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero h1 .grad2 { background: linear-gradient(135deg, #22d3ee, #67e8f9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero p.sub { font-size: 19px; color: var(--text-muted-on-dark); max-width: 640px; margin: 0 auto 32px; line-height: 1.7; }
+        .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .hero-stats { display: flex; gap: 40px; justify-content: center; margin-top: 48px; }
+        .hero-stat { text-align: center; }
+        .hero-stat .num { font-size: 36px; font-weight: 900; background: linear-gradient(135deg, #c084fc, #67e8f9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero-stat .label { font-size: 13px; color: var(--text-muted-on-dark); }
+
+        /* =================== FILTER TABS =================== */
+        .filter-bar { display: flex; justify-content: center; gap: 8px; padding: 24px 48px; flex-wrap: wrap; background: white; border-bottom: 1px solid var(--border-light); position: sticky; top: 60px; z-index: 99; backdrop-filter: blur(20px); }
+        .filter-tab { padding: 8px 18px; border-radius: 50px; font-size: 13px; font-weight: 600; color: var(--text-muted); border: 1.5px solid var(--border-light); background: white; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+        .filter-tab:hover { color: var(--primary); border-color: var(--primary-light); }
+        .filter-tab.active { background: var(--gradient-primary); color: white; border-color: transparent; box-shadow: 0 4px 12px rgba(124,58,237,0.2); }
+
+        /* =================== SECTIONS =================== */
+        .section { padding: 80px 48px; max-width: 1240px; margin: 0 auto; }
+        .section-alt { background: #f6f5ff; }
+        .section-dark { background: #0f0a2e; color: white; }
+        .section-header { text-align: center; margin-bottom: 48px; }
+        .section-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--primary); margin-bottom: 12px; padding: 6px 16px; background: rgba(124,58,237,0.06); border-radius: 50px; }
+        .section-dark .section-label { background: rgba(167,139,250,0.12); color: var(--primary-soft); }
+        .section-title { font-size: 40px; font-weight: 900; color: var(--text-dark); letter-spacing: -1.5px; line-height: 1.15; margin-bottom: 14px; }
+        .section-dark .section-title { color: white; }
+        .section-desc { font-size: 17px; color: var(--text-muted); max-width: 600px; margin: 0 auto; }
+        .section-dark .section-desc { color: var(--text-muted-on-dark); }
+
+        /* =================== FEATURE MEGA CARDS =================== */
+        .mega-card {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-radius: 24px; overflow: hidden;
+            border: 1px solid var(--border-light); background: white; box-shadow: 0 4px 30px rgba(0,0,0,0.04);
+            margin-bottom: 40px; transition: all 0.3s;
+        }
+        .mega-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-4px); }
+        .mega-card.reverse { direction: rtl; }
+        .mega-card.reverse > * { direction: ltr; }
+        .mega-info { padding: 48px; display: flex; flex-direction: column; justify-content: center; }
+        .mega-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; padding: 5px 14px; border-radius: 50px; margin-bottom: 16px; width: fit-content; }
+        .mega-info h3 { font-size: 28px; font-weight: 800; color: var(--text-dark); letter-spacing: -0.8px; margin-bottom: 12px; line-height: 1.2; }
+        .mega-info p { font-size: 15px; color: var(--text-muted); line-height: 1.8; margin-bottom: 20px; }
+        .mega-features { list-style: none; margin-bottom: 24px; }
+        .mega-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text-body); padding: 6px 0; }
+        .mega-features li i { color: var(--success); margin-top: 3px; font-size: 13px; }
+        .mega-visual {
+            display: flex; align-items: center; justify-content: center; padding: 40px; min-height: 380px;
+            position: relative; overflow: hidden;
+        }
+        .mega-visual .mock {
+            width: 100%; max-width: 420px; border-radius: 16px; overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.1);
+        }
+        .mock-bar { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+        .mock-bar .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .mock-body { padding: 20px; min-height: 240px; }
+
+        /* =================== FEATURE GRID =================== */
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .feature-card {
+            background: white; border: 1px solid var(--border-light); border-radius: 20px; padding: 28px;
+            transition: all 0.3s; position: relative; overflow: hidden;
+        }
+        .feature-card::after { content: ''; position: absolute; inset: 0; border-radius: 20px; background: var(--gradient-primary); opacity: 0; transition: opacity 0.3s; z-index: 0; }
+        .feature-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+        .feature-card:hover::after { opacity: 0.03; }
+        .feature-card > * { position: relative; z-index: 1; }
+        .feature-icon {
+            width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+            font-size: 22px; margin-bottom: 16px;
+        }
+        .fi-purple { background: rgba(124,58,237,0.08); color: #7c3aed; }
+        .fi-cyan { background: rgba(6,182,212,0.08); color: #06b6d4; }
+        .fi-green { background: rgba(16,185,129,0.08); color: #10b981; }
+        .fi-orange { background: rgba(245,158,11,0.08); color: #f59e0b; }
+        .fi-pink { background: rgba(236,72,153,0.08); color: #ec4899; }
+        .fi-blue { background: rgba(59,130,246,0.08); color: #3b82f6; }
+        .fi-red { background: rgba(239,68,68,0.08); color: #ef4444; }
+        .feature-card h3 { font-size: 17px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; }
+        .feature-card p { font-size: 13px; color: var(--text-muted); line-height: 1.7; }
+        .feature-card .badge-new { position: absolute; top: 16px; right: 16px; font-size: 10px; font-weight: 700; background: var(--gradient-warm); color: white; padding: 3px 10px; border-radius: 50px; text-transform: uppercase; letter-spacing: 0.5px; z-index: 2; }
+
+        /* =================== COMPARISON =================== */
+        .compare-table { width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 16px; overflow: hidden; border: 1px solid var(--border-light); background: white; }
+        .compare-table th { padding: 14px 20px; font-size: 13px; font-weight: 700; text-align: left; background: #f6f5ff; color: var(--text-dark); border-bottom: 1px solid var(--border-light); }
+        .compare-table th:first-child { width: 40%; }
+        .compare-table td { padding: 12px 20px; font-size: 14px; border-bottom: 1px solid #f3f2ff; text-align: center; }
+        .compare-table td:first-child { text-align: left; font-weight: 500; color: var(--text-dark); }
+        .compare-table tr:last-child td { border-bottom: none; }
+        .compare-table .yes { color: var(--success); font-weight: 700; }
+        .compare-table .no { color: #d1d5db; }
+        .compare-table .highlight { background: rgba(124,58,237,0.03); }
+
+        /* =================== CTA =================== */
+        .cta-section {
+            padding: 80px 48px; text-align: center;
+            background: var(--bg-hero); position: relative; overflow: hidden;
+        }
+        .cta-section .orb { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; }
+        .cta-section .orb-1 { top: -80px; right: -100px; width: 400px; height: 400px; background: rgba(124,58,237,0.2); }
+        .cta-section .orb-2 { bottom: -80px; left: -60px; width: 300px; height: 300px; background: rgba(6,182,212,0.15); }
+        .cta-inner { position: relative; z-index: 2; max-width: 600px; margin: 0 auto; }
+        .cta-inner h2 { font-size: 40px; font-weight: 900; color: white; letter-spacing: -1.5px; margin-bottom: 16px; }
+        .cta-inner p { font-size: 17px; color: var(--text-muted-on-dark); margin-bottom: 32px; }
+
+        /* =================== FOOTER =================== */
+        .footer { background: #0a0a1a; border-top: 1px solid rgba(167,139,250,0.1); padding: 60px 48px; color: var(--text-muted-on-dark); }
+        .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 40px; max-width: 1200px; margin: 0 auto; }
+        .footer-brand h3 { font-size: 20px; font-weight: 800; margin-bottom: 12px; color: white; }
+        .footer-brand h3 i { color: var(--primary-light); }
+        .footer-brand p { font-size: 14px; line-height: 1.7; margin-bottom: 20px; }
+        .footer-social { display: flex; gap: 10px; }
+        .footer-social a { width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; color: var(--text-muted-on-dark); text-decoration: none; transition: all 0.2s; }
+        .footer-social a:hover { background: var(--primary); color: white; border-color: var(--primary); }
+        .footer-col h4 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: white; }
+        .footer-col a { display: block; color: var(--text-muted-on-dark); text-decoration: none; font-size: 13px; padding: 5px 0; transition: color 0.2s; }
+        .footer-col a:hover { color: var(--primary-light); }
+        .footer-bottom { max-width: 1200px; margin: 40px auto 0; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+
+        /* =================== RESPONSIVE =================== */
+
+        /* Large desktops */
+        @media (min-width: 1440px) {
+            .hero h1 { font-size: 72px; }
+            .hero p.sub { font-size: 21px; max-width: 720px; }
+            .section { max-width: 1400px; }
+            .section-title { font-size: 48px; }
+        }
+
+        /* Laptops (1024-1279) */
+        @media (max-width: 1280px) {
+            .navbar { padding: 0 28px; }
+            .nav-links a { font-size: 12px; padding: 6px 10px; }
+            .section { padding: 64px 32px; }
+            .hero { padding: 120px 32px 70px; }
+            .hero h1 { font-size: 50px; }
+            .mega-info { padding: 36px; }
+            .mega-info h3 { font-size: 24px; }
+        }
+
+        /* Tablets landscape (900-1024) */
+        @media (max-width: 1024px) {
+            .mega-card { grid-template-columns: 1fr; }
+            .mega-card.reverse { direction: ltr; }
+            .mega-visual { min-height: 300px; }
+            .hero h1 { font-size: 44px; }
+            .hero p.sub { font-size: 16px; }
+            .section-title { font-size: 34px; }
+            .feature-grid { grid-template-columns: 1fr 1fr; }
+            .compare-table th, .compare-table td { padding: 10px 12px; font-size: 12px; }
+            .hero-stats { gap: 24px; }
+            .hero-stat .num { font-size: 30px; }
+            .nav-actions .btn { padding: 8px 14px; font-size: 12px; }
+        }
+
+        /* Tablets portrait (768) */
+        @media (max-width: 768px) {
+            .navbar { padding: 0 16px; height: 60px; }
+            .navbar.scrolled { height: 56px; }
+            .nav-links { display: none; }
+            .mobile-menu-btn { display: block; }
+            .nav-actions .btn-ghost { display: none; }
+
+            .hero { padding: 110px 20px 60px; }
+            .hero h1 { font-size: 34px; letter-spacing: -1px; }
+            .hero p.sub { font-size: 15px; max-width: 420px; margin-bottom: 24px; }
+            .hero-badge { font-size: 11px; padding: 6px 14px; margin-bottom: 20px; }
+            .hero-actions { flex-direction: column; }
+            .hero-actions .btn { width: 100%; justify-content: center; }
+            .hero-stats { flex-direction: row; flex-wrap: wrap; gap: 16px; margin-top: 36px; }
+            .hero-stat .num { font-size: 28px; }
+            .hero-stat .label { font-size: 11px; }
+            .hero .orb-1 { width: 300px; height: 300px; }
+            .hero .orb-2 { width: 250px; height: 250px; }
+
+            .filter-bar { padding: 12px; top: 56px; gap: 6px; }
+            .filter-tab { padding: 6px 12px; font-size: 11px; }
+
+            .section { padding: 48px 20px; }
+            .section-header { margin-bottom: 32px; }
+            .section-title { font-size: 28px; letter-spacing: -0.8px; }
+            .section-desc { font-size: 14px; }
+            .section-label { font-size: 11px; padding: 5px 12px; }
+
+            .mega-card { grid-template-columns: 1fr; border-radius: 16px; margin-bottom: 24px; }
+            .mega-card.reverse { direction: ltr; }
+            .mega-info { padding: 28px; }
+            .mega-info h3 { font-size: 22px; }
+            .mega-info p { font-size: 14px; }
+            .mega-features li { font-size: 13px; }
+            .mega-tag { font-size: 10px; }
+            .mega-visual { min-height: 260px; padding: 24px; }
+            .mega-visual .mock { max-width: 320px; }
+
+            .feature-grid { grid-template-columns: 1fr; gap: 14px; }
+            .feature-card { padding: 24px; border-radius: 16px; }
+            .feature-card h3 { font-size: 15px; }
+            .feature-card p { font-size: 12px; }
+            .feature-icon { width: 44px; height: 44px; font-size: 18px; border-radius: 12px; margin-bottom: 12px; }
+            .feature-card .badge-new { font-size: 9px; padding: 2px 8px; top: 12px; right: 12px; }
+
+            .compare-table { font-size: 11px; border-radius: 12px; }
+            .compare-table th { padding: 10px 8px; font-size: 10px; }
+            .compare-table td { padding: 8px; }
+            .compare-table th:first-child { width: 30%; }
+
+            .cta-section { padding: 60px 20px; }
+            .cta-inner h2 { font-size: 28px; }
+            .cta-inner p { font-size: 15px; }
+
+            .footer { padding: 40px 20px; }
+            .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+            .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
+        }
+
+        /* Large phones (480px) */
+        @media (max-width: 480px) {
+            .navbar { padding: 0 12px; height: 54px; }
+            .nav-brand h1 { font-size: 16px; }
+            .nav-brand .logo-icon { width: 30px; height: 30px; font-size: 13px; border-radius: 8px; }
+            .nav-actions .btn-primary { padding: 6px 12px; font-size: 11px; border-radius: 8px; }
+
+            .hero { padding: 96px 14px 44px; }
+            .hero h1 { font-size: 26px; line-height: 1.15; letter-spacing: -0.6px; }
+            .hero p.sub { font-size: 13px; max-width: 300px; }
+            .hero-badge { font-size: 9px; padding: 4px 10px; }
+            .hero-stats { gap: 10px; }
+            .hero-stat .num { font-size: 22px; }
+            .hero-stat .label { font-size: 9px; }
+
+            .filter-bar { padding: 10px 8px; gap: 4px; top: 54px; }
+            .filter-tab { padding: 5px 8px; font-size: 10px; border-radius: 20px; }
+
+            .section { padding: 36px 14px; }
+            .section-title { font-size: 22px; }
+            .section-desc { font-size: 12px; }
+
+            .mega-card { border-radius: 14px; margin-bottom: 18px; }
+            .mega-info { padding: 20px; }
+            .mega-info h3 { font-size: 19px; }
+            .mega-info p { font-size: 13px; margin-bottom: 14px; }
+            .mega-features li { font-size: 12px; padding: 4px 0; }
+            .mega-features li i { font-size: 11px; }
+            .mega-visual { min-height: 220px; padding: 16px; }
+            .mega-visual .mock { max-width: 260px; border-radius: 12px; }
+            .mock-bar { height: 26px; }
+            .mock-body { padding: 12px; font-size: 11px; }
+
+            .feature-card { padding: 18px; border-radius: 14px; }
+            .feature-icon { width: 38px; height: 38px; font-size: 16px; margin-bottom: 10px; border-radius: 10px; }
+            .feature-card h3 { font-size: 14px; }
+            .feature-card p { font-size: 11px; line-height: 1.6; }
+
+            /* Hide less important comparison columns on small phones */
+            .compare-table th:nth-child(4), .compare-table td:nth-child(4),
+            .compare-table th:nth-child(5), .compare-table td:nth-child(5) { display: none; }
+            .compare-table th { padding: 8px 6px; font-size: 9px; }
+            .compare-table td { padding: 7px 6px; font-size: 11px; }
+
+            .cta-section { padding: 48px 14px; }
+            .cta-inner h2 { font-size: 24px; letter-spacing: -1px; }
+            .cta-inner p { font-size: 13px; margin-bottom: 24px; }
+
+            .footer { padding: 28px 14px; }
+            .footer-brand h3 { font-size: 16px; }
+            .footer-brand p { font-size: 12px; }
+            .footer-col h4 { font-size: 13px; }
+            .footer-col a { font-size: 11px; }
+            .footer-social a { width: 34px; height: 34px; }
+        }
+
+        /* Small phones (375px and below) */
+        @media (max-width: 375px) {
+            .hero h1 { font-size: 22px; }
+            .hero p.sub { font-size: 12px; }
+            .btn { padding: 7px 12px; font-size: 11px; }
+            .btn-lg { padding: 10px 18px; font-size: 12px; }
+            .btn-xl { padding: 12px 22px; font-size: 13px; }
+            .section-title { font-size: 20px; }
+            .filter-tab { font-size: 9px; padding: 4px 6px; }
+            .mega-info h3 { font-size: 17px; }
+            .feature-card { padding: 16px; }
+            .compare-table th:nth-child(3), .compare-table td:nth-child(3) { display: none; }
+        }
+
+        /* Animate on scroll */
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.7s cubic-bezier(0.16,1,0.3,1); }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar" id="navbar">
+    <a class="nav-brand" href="/">
+        <div class="logo-icon"><i class="fas fa-bolt"></i></div>
+        <h1>Live<em>Track</em> Pro</h1>
+    </a>
+    <ul class="nav-links" id="featNavLinks">
+        <li><a href="/#features">Overview</a></li>
+        <li><a href="{% url 'pages:features' %}" class="active">Features</a></li>
+        <li><a href="{% url 'pages:compare' %}">Compare</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="{% url 'pages:about' %}">About</a></li>
+        <li><a href="{% url 'pages:contact' %}">Contact</a></li>
+    </ul>
+    <div class="nav-actions">
+        <a href="{% url 'core:login' %}" class="btn btn-ghost">Sign In</a>
+        <a href="{% url 'core:register' %}" class="btn btn-primary">Get Started Free</a>
+        <button class="mobile-menu-btn" onclick="document.getElementById('featNavLinks').classList.toggle('show');this.querySelector('i').classList.toggle('fa-bars');this.querySelector('i').classList.toggle('fa-times');"><i class="fas fa-bars"></i></button>
+    </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
+    <div class="grid-bg"></div>
+    <div class="hero-inner">
+        <div class="hero-badge"><span class="dot"></span> 25 New Features Just Launched</div>
+        <h1>Every Feature Your<br>Support Team <span class="grad">Needs</span></h1>
+        <p class="sub">AI auto-replies, heatmaps, session recordings, UTM tracking, goals, WhatsApp — LiveTrack Pro combines Google Analytics + Microsoft Clarity + Intercom. 100% free.</p>
+        <div class="hero-actions">
+            <a href="{% url 'core:register' %}" class="btn btn-primary btn-xl">Start Free Now <i class="fas fa-arrow-right"></i></a>
+            <a href="#all-features" class="btn btn-outline-light btn-lg">Explore 200+ Features <i class="fas fa-chevron-down"></i></a>
+        </div>
+        <div class="hero-stats">
+            <div class="hero-stat"><div class="num">200+</div><div class="label">Total Features</div></div>
+            <div class="hero-stat"><div class="num">25</div><div class="label">New This Release</div></div>
+            <div class="hero-stat"><div class="num">$0</div><div class="label">Forever Free</div></div>
+            <div class="hero-stat"><div class="num">3-in-1</div><div class="label">GA + Clarity + Chat</div></div>
+        </div>
+    </div>
+</section>
+
+<!-- FILTER BAR -->
+<div class="filter-bar" id="all-features">
+    <a href="#ai-bot" class="filter-tab active">AI Bot</a>
+    <a href="#chatbot" class="filter-tab">Chatbot</a>
+    <a href="#kb" class="filter-tab">Knowledge Base</a>
+    <a href="#whatsapp" class="filter-tab">WhatsApp</a>
+    <a href="#analytics-section" class="filter-tab" style="background:rgba(59,130,246,0.08);color:#3b82f6;border-color:rgba(59,130,246,0.2);">Analytics (GA)</a>
+    <a href="#clarity-section" class="filter-tab" style="background:rgba(16,185,129,0.08);color:#10b981;border-color:rgba(16,185,129,0.2);">Heatmaps (Clarity)</a>
+    <a href="#segments" class="filter-tab">More Features</a>
+    <a href="#core" class="filter-tab">Core Platform</a>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- FEATURE 1: AI AUTO-REPLY BOT -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="ai-bot">
+<div class="section">
+    <div class="mega-card reveal">
+        <div class="mega-info">
+            <div class="mega-tag" style="background:rgba(124,58,237,0.08);color:#7c3aed;"><i class="fas fa-robot"></i> NEW — AI POWERED</div>
+            <h3>AI Auto-Reply Bot</h3>
+            <p>Your 24/7 first responder. Answers visitor questions instantly using your custom knowledge base — before a human agent even joins. Competitors charge $50+/mo for this.</p>
+            <ul class="mega-features">
+                <li><i class="fas fa-check-circle"></i> Custom Q&A knowledge base with keyword matching</li>
+                <li><i class="fas fa-check-circle"></i> Configurable bot name, greeting & fallback messages</li>
+                <li><i class="fas fa-check-circle"></i> Auto-handoff to human agent on keywords ("help", "agent")</li>
+                <li><i class="fas fa-check-circle"></i> Max auto-reply limit — prevents infinite bot loops</li>
+                <li><i class="fas fa-check-circle"></i> Natural response delay for human-like feel</li>
+                <li><i class="fas fa-check-circle"></i> Only responds when no human agent is assigned</li>
+            </ul>
+            <a href="{% url 'core:register' %}" class="btn btn-primary">Try AI Bot Free <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="mega-visual" style="background: linear-gradient(135deg, #7c3aed, #a855f7);">
+            <div class="mock" style="background: white;">
+                <div class="mock-bar" style="background: #f3f0ff;">
+                    <div class="dot" style="background:#ef4444;"></div>
+                    <div class="dot" style="background:#f59e0b;"></div>
+                    <div class="dot" style="background:#10b981;"></div>
+                    <span style="margin-left:auto;font-size:11px;color:#6b7280;">AI Bot Dashboard</span>
+                </div>
+                <div class="mock-body" style="font-size:13px;">
+                    <div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-circle" style="color:#10b981;font-size:8px;"></i>
+                        <span style="font-weight:600;color:#166534;">Bot Active</span>
+                    </div>
+                    <div style="background:#f5f3ff;padding:10px 14px;border-radius:10px;margin-bottom:6px;">
+                        <div style="font-size:11px;color:#7c3aed;font-weight:600;margin-bottom:2px;">Q: What are your business hours?</div>
+                        <div style="font-size:12px;color:#4b5563;">A: We're open Mon-Fri, 9AM-6PM IST!</div>
+                    </div>
+                    <div style="background:#f5f3ff;padding:10px 14px;border-radius:10px;margin-bottom:6px;">
+                        <div style="font-size:11px;color:#7c3aed;font-weight:600;margin-bottom:2px;">Q: How much does it cost?</div>
+                        <div style="font-size:12px;color:#4b5563;">A: LiveTrack Pro is 100% free, forever!</div>
+                    </div>
+                    <div style="background:#fef3c7;padding:10px 14px;border-radius:10px;">
+                        <div style="font-size:11px;color:#92400e;font-weight:600;">Keywords: agent, human, help</div>
+                        <div style="font-size:12px;color:#78716c;">→ Auto-handoff to human</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- FEATURE 2: CHATBOT FLOW BUILDER -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="chatbot" class="section-alt">
+<div class="section">
+    <div class="mega-card reverse reveal">
+        <div class="mega-info">
+            <div class="mega-tag" style="background:rgba(6,182,212,0.08);color:#06b6d4;"><i class="fas fa-project-diagram"></i> NEW — NO-CODE</div>
+            <h3>Chatbot Flow Builder</h3>
+            <p>Build automated conversation flows with a visual drag-and-drop editor. No coding needed — just draw the conversation path and activate.</p>
+            <ul class="mega-features">
+                <li><i class="fas fa-check-circle"></i> Visual drag-and-drop flow canvas</li>
+                <li><i class="fas fa-check-circle"></i> 7 node types: Message, Question, Options, Condition, Handoff, Delay, Close</li>
+                <li><i class="fas fa-check-circle"></i> Multiple trigger types: on chat start, keyword, page visit, idle</li>
+                <li><i class="fas fa-check-circle"></i> Unlimited flows — create different bots for different scenarios</li>
+                <li><i class="fas fa-check-circle"></i> Activate/deactivate flows instantly</li>
+            </ul>
+            <a href="{% url 'core:register' %}" class="btn btn-primary">Build Your First Flow <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="mega-visual" style="background: linear-gradient(135deg, #06b6d4, #3b82f6);">
+            <div class="mock" style="background: white;">
+                <div class="mock-bar" style="background: #ecfeff;">
+                    <div class="dot" style="background:#ef4444;"></div>
+                    <div class="dot" style="background:#f59e0b;"></div>
+                    <div class="dot" style="background:#10b981;"></div>
+                    <span style="margin-left:auto;font-size:11px;color:#6b7280;">Flow Editor</span>
+                </div>
+                <div class="mock-body" style="font-size:12px;display:flex;flex-direction:column;gap:8px;">
+                    <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:10px 12px;text-align:center;">
+                        <div style="font-size:10px;color:#166534;font-weight:700;text-transform:uppercase;">Start</div>
+                        <div style="color:#4b5563;">Welcome! How can I help?</div>
+                    </div>
+                    <div style="text-align:center;color:#d1d5db;"><i class="fas fa-arrow-down"></i></div>
+                    <div style="background:#eff6ff;border:2px solid #93c5fd;border-radius:10px;padding:10px 12px;text-align:center;">
+                        <div style="font-size:10px;color:#1e40af;font-weight:700;text-transform:uppercase;">Options</div>
+                        <div style="color:#4b5563;">Sales | Support | Billing</div>
+                    </div>
+                    <div style="display:flex;gap:6px;">
+                        <div style="flex:1;background:#fef3c7;border:2px solid #fcd34d;border-radius:10px;padding:8px;text-align:center;">
+                            <div style="font-size:10px;color:#92400e;font-weight:700;">Agent</div>
+                        </div>
+                        <div style="flex:1;background:#f5f3ff;border:2px solid #c4b5fd;border-radius:10px;padding:8px;text-align:center;">
+                            <div style="font-size:10px;color:#5b21b6;font-weight:700;">FAQ Bot</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- FEATURE 3: KNOWLEDGE BASE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="kb">
+<div class="section">
+    <div class="mega-card reveal">
+        <div class="mega-info">
+            <div class="mega-tag" style="background:rgba(16,185,129,0.08);color:#10b981;"><i class="fas fa-book"></i> NEW — SELF-SERVICE</div>
+            <h3>Knowledge Base / Help Center</h3>
+            <p>Let customers find answers themselves. Beautiful public help center with search, categories, and article feedback — reduces chat volume by up to 40%.</p>
+            <ul class="mega-features">
+                <li><i class="fas fa-check-circle"></i> Public help center at /kb/your-org/</li>
+                <li><i class="fas fa-check-circle"></i> Categories with custom icons & ordering</li>
+                <li><i class="fas fa-check-circle"></i> Rich text articles with view tracking</li>
+                <li><i class="fas fa-check-circle"></i> Helpful/Not helpful feedback on every article</li>
+                <li><i class="fas fa-check-circle"></i> Full-text search across all articles</li>
+                <li><i class="fas fa-check-circle"></i> Related articles for better discovery</li>
+            </ul>
+            <a href="{% url 'core:register' %}" class="btn btn-primary">Create Your Help Center <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="mega-visual" style="background: linear-gradient(135deg, #10b981, #06b6d4);">
+            <div class="mock" style="background: white;">
+                <div class="mock-bar" style="background: linear-gradient(135deg, #10b981, #06b6d4);">
+                    <div class="dot" style="background:rgba(255,255,255,0.4);"></div>
+                    <div class="dot" style="background:rgba(255,255,255,0.4);"></div>
+                    <div class="dot" style="background:rgba(255,255,255,0.4);"></div>
+                    <span style="margin-left:auto;font-size:11px;color:white;font-weight:600;">Help Center</span>
+                </div>
+                <div class="mock-body" style="background:#f0fdf4;">
+                    <div style="text-align:center;margin-bottom:12px;">
+                        <div style="font-size:16px;font-weight:800;color:#064e3b;">Help Center</div>
+                        <div style="background:white;border-radius:8px;padding:8px;margin-top:6px;border:1px solid #d1fae5;font-size:12px;color:#9ca3af;text-align:left;"><i class="fas fa-search" style="margin-right:4px;"></i> Search articles...</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <div style="background:white;border-radius:8px;padding:10px;border:1px solid #d1fae5;text-align:center;">
+                            <div style="font-size:16px;margin-bottom:4px;">🚀</div>
+                            <div style="font-size:11px;font-weight:700;color:#064e3b;">Getting Started</div>
+                            <div style="font-size:10px;color:#6b7280;">5 articles</div>
+                        </div>
+                        <div style="background:white;border-radius:8px;padding:10px;border:1px solid #d1fae5;text-align:center;">
+                            <div style="font-size:16px;margin-bottom:4px;">⚙️</div>
+                            <div style="font-size:11px;font-weight:700;color:#064e3b;">Configuration</div>
+                            <div style="font-size:10px;color:#6b7280;">8 articles</div>
+                        </div>
+                        <div style="background:white;border-radius:8px;padding:10px;border:1px solid #d1fae5;text-align:center;">
+                            <div style="font-size:16px;margin-bottom:4px;">💬</div>
+                            <div style="font-size:11px;font-weight:700;color:#064e3b;">Live Chat</div>
+                            <div style="font-size:10px;color:#6b7280;">12 articles</div>
+                        </div>
+                        <div style="background:white;border-radius:8px;padding:10px;border:1px solid #d1fae5;text-align:center;">
+                            <div style="font-size:16px;margin-bottom:4px;">📊</div>
+                            <div style="font-size:11px;font-weight:700;color:#064e3b;">Analytics</div>
+                            <div style="font-size:10px;color:#6b7280;">6 articles</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- FEATURE 4: WHATSAPP -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="whatsapp" class="section-alt">
+<div class="section">
+    <div class="mega-card reverse reveal">
+        <div class="mega-info">
+            <div class="mega-tag" style="background:rgba(37,211,102,0.08);color:#25d366;"><i class="fab fa-whatsapp"></i> NEW — OMNICHANNEL</div>
+            <h3>WhatsApp Integration</h3>
+            <p>Connect your WhatsApp Business account and manage all WhatsApp conversations from the same LiveTrack dashboard. India's #1 requested feature.</p>
+            <ul class="mega-features">
+                <li><i class="fas fa-check-circle"></i> WhatsApp Business API webhook integration</li>
+                <li><i class="fas fa-check-circle"></i> Receive & view inbound WhatsApp messages</li>
+                <li><i class="fas fa-check-circle"></i> Contact name & phone number tracking</li>
+                <li><i class="fas fa-check-circle"></i> Step-by-step Meta Business setup guide</li>
+                <li><i class="fas fa-check-circle"></i> Unified inbox — chat + WhatsApp in one place</li>
+            </ul>
+            <a href="{% url 'core:register' %}" class="btn btn-primary">Connect WhatsApp <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="mega-visual" style="background: linear-gradient(135deg, #25d366, #128c7e);">
+            <div class="mock" style="background: #ece5dd;">
+                <div class="mock-bar" style="background: #075e54;">
+                    <div style="width:28px;height:28px;background:#25d366;border-radius:50%;display:flex;align-items:center;justify-content:center;"><i class="fab fa-whatsapp" style="color:white;font-size:14px;"></i></div>
+                    <div style="margin-left:6px;"><div style="font-size:12px;font-weight:700;color:white;">LiveTrack Support</div><div style="font-size:10px;color:#82c8a0;">online</div></div>
+                </div>
+                <div class="mock-body" style="display:flex;flex-direction:column;gap:6px;padding:14px;">
+                    <div style="align-self:flex-start;background:white;padding:8px 12px;border-radius:0 10px 10px 10px;font-size:12px;max-width:80%;color:#303030;box-shadow:0 1px 1px rgba(0,0,0,0.08);">Hi! I need help with my order #4521</div>
+                    <div style="align-self:flex-end;background:#dcf8c6;padding:8px 12px;border-radius:10px 0 10px 10px;font-size:12px;max-width:80%;color:#303030;box-shadow:0 1px 1px rgba(0,0,0,0.08);">Hello! Let me check order #4521 for you. One moment please!</div>
+                    <div style="align-self:flex-end;background:#dcf8c6;padding:8px 12px;border-radius:10px 0 10px 10px;font-size:12px;max-width:80%;color:#303030;">Your order is on its way! Expected delivery: Tomorrow by 6 PM.</div>
+                    <div style="align-self:flex-start;background:white;padding:8px 12px;border-radius:0 10px 10px 10px;font-size:12px;max-width:80%;color:#303030;">Thank you so much! 🙏</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- FEATURES 5-10: GRID -->
+<!-- ═══════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════ -->
+<!-- GOOGLE ANALYTICS FEATURES -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="analytics-section">
+<div class="section">
+    <div class="mega-card reveal">
+        <div class="mega-info">
+            <div class="mega-tag" style="background:rgba(59,130,246,0.08);color:#3b82f6;"><i class="fas fa-chart-bar"></i> NEW — GOOGLE ANALYTICS ALTERNATIVE</div>
+            <h3>Advanced Analytics Dashboard</h3>
+            <p>A complete Google Analytics alternative built right into LiveTrack. Custom date ranges, period comparison, UTM campaign tracking, cohort analysis, and 15+ analytics features — all free.</p>
+            <ul class="mega-features">
+                <li><i class="fas fa-check-circle"></i> Custom date range picker (1d, 7d, 14d, 30d, 90d, custom)</li>
+                <li><i class="fas fa-check-circle"></i> Period comparison — this week vs last week with % change</li>
+                <li><i class="fas fa-check-circle"></i> UTM Campaign tracking (source, medium, campaign, term, content)</li>
+                <li><i class="fas fa-check-circle"></i> Bounce rate, session duration, pages per session</li>
+                <li><i class="fas fa-check-circle"></i> Channel grouping (Organic, Paid, Social, Email, Direct)</li>
+                <li><i class="fas fa-check-circle"></i> Goals & conversion tracking with monetary values</li>
+                <li><i class="fas fa-check-circle"></i> Cohort retention analysis (weekly cohorts)</li>
+            </ul>
+            <a href="{% url 'core:register' %}" class="btn btn-primary">Try Advanced Analytics <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="mega-visual" style="background: linear-gradient(135deg, #3b82f6, #6366f1);">
+            <div class="mock" style="background: white;">
+                <div class="mock-bar" style="background: #eef2ff;">
+                    <div class="dot" style="background:#ef4444;"></div><div class="dot" style="background:#f59e0b;"></div><div class="dot" style="background:#10b981;"></div>
+                    <span style="margin-left:auto;font-size:11px;color:#6b7280;">Advanced Analytics</span>
+                </div>
+                <div class="mock-body" style="font-size:11px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
+                        <div style="background:#eef2ff;padding:8px;border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:#3b82f6;">1.2K</div><div style="font-size:9px;color:#6b7280;">Visitors <span style="color:#10b981;">+12%</span></div></div>
+                        <div style="background:#f0fdf4;padding:8px;border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:#10b981;">32%</div><div style="font-size:9px;color:#6b7280;">Bounce Rate</div></div>
+                        <div style="background:#fef3c7;padding:8px;border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:#f59e0b;">2:45</div><div style="font-size:9px;color:#6b7280;">Avg Session</div></div>
+                    </div>
+                    <div style="display:flex;align-items:end;gap:2px;height:50px;margin-bottom:8px;">
+                        <div style="flex:1;background:#3b82f6;border-radius:2px 2px 0 0;height:30px;"></div>
+                        <div style="flex:1;background:#3b82f6;border-radius:2px 2px 0 0;height:45px;"></div>
+                        <div style="flex:1;background:#3b82f6;border-radius:2px 2px 0 0;height:35px;"></div>
+                        <div style="flex:1;background:#3b82f6;border-radius:2px 2px 0 0;height:50px;"></div>
+                        <div style="flex:1;background:#3b82f6;border-radius:2px 2px 0 0;height:40px;"></div>
+                        <div style="flex:1;background:#3b82f6;border-radius:2px 2px 0 0;height:25px;"></div>
+                        <div style="flex:1;background:#6366f1;border-radius:2px 2px 0 0;height:38px;"></div>
+                    </div>
+                    <div style="font-size:9px;color:#9ca3af;display:flex;justify-content:space-between;"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- GA Features Grid -->
+<div class="section-alt">
+<div class="section">
+    <div class="section-header reveal">
+        <div class="section-label"><i class="fas fa-chart-line"></i> Google Analytics Features</div>
+        <h2 class="section-title">15 Analytics Features.<br>Zero Cost.</h2>
+        <p class="section-desc">Everything Google Analytics offers — built into your dashboard. No external scripts needed.</p>
+    </div>
+    <div class="feature-grid">
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-blue"><i class="fas fa-bullhorn"></i></div>
+            <h3>UTM Campaign Tracking</h3>
+            <p>Track utm_source, utm_medium, utm_campaign, utm_term, utm_content — auto-captured from URLs. See which campaigns drive traffic.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-orange"><i class="fas fa-sign-out-alt"></i></div>
+            <h3>Bounce Rate</h3>
+            <p>Know what percentage of visitors leave after viewing just one page. Identify problematic pages instantly.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-green"><i class="fas fa-stopwatch"></i></div>
+            <h3>Session Duration & Pages/Session</h3>
+            <p>Average session length and pages per visit — core engagement metrics updated in real-time.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-purple"><i class="fas fa-file-alt"></i></div>
+            <h3>Top Pages Report</h3>
+            <p>See your most visited pages ranked by views with average time spent. Find your best content.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-cyan"><i class="fas fa-user-friends"></i></div>
+            <h3>New vs Returning Visitors</h3>
+            <p>Donut chart showing new vs returning visitor ratio. Understand your audience loyalty.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-pink"><i class="fas fa-calendar-alt"></i></div>
+            <h3>Custom Date Range Picker</h3>
+            <p>Today, 7d, 14d, 30d, 90d presets or custom date range. Every report respects the selected period.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-red"><i class="fas fa-bullseye"></i></div>
+            <h3>Goals & Conversion Tracking</h3>
+            <p>Set URL-based or event-based goals with monetary values. Track completion rates and total conversion value.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-blue"><i class="fas fa-sign-in-alt"></i></div>
+            <h3>Landing & Exit Pages</h3>
+            <p>Know where visitors enter and leave your site. Optimize entry points and reduce exit rates.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-green"><i class="fas fa-globe-americas"></i></div>
+            <h3>Country & Region Data</h3>
+            <p>See visitor distribution by country with visual cards. Top 30 countries ranked by traffic.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-orange"><i class="fas fa-mouse-pointer"></i></div>
+            <h3>Custom Event Tracking</h3>
+            <p>Track button clicks, form submits, video plays via API. Event name, category, label, and monetary value.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-purple"><i class="fas fa-route"></i></div>
+            <h3>User Flow Visualization</h3>
+            <p>See page-to-page navigation paths. Top 15 transitions ranked by frequency. Find your users' journey.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-cyan"><i class="fas fa-exchange-alt"></i></div>
+            <h3>Period Comparison</h3>
+            <p>Auto-compare current period with previous. See +/-% change for visitors and pageviews at a glance.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-pink"><i class="fas fa-envelope-open-text"></i></div>
+            <h3>Scheduled Email Reports</h3>
+            <p>Automated daily, weekly, or monthly analytics reports delivered to your inbox. One-click send now.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-blue"><i class="fas fa-tachometer-alt"></i></div>
+            <h3>Page Load Performance</h3>
+            <p>Track page load times via API. Color-coded slow pages. Average load time across your site.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-green"><i class="fas fa-language"></i></div>
+            <h3>Language Detection</h3>
+            <p>Auto-detect visitor language from browser Accept-Language header. See top languages in analytics.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- MICROSOFT CLARITY FEATURES -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="clarity-section">
+<div class="section">
+    <div class="mega-card reverse reveal">
+        <div class="mega-info">
+            <div class="mega-tag" style="background:rgba(16,185,129,0.08);color:#10b981;"><i class="fas fa-fire"></i> NEW — MICROSOFT CLARITY ALTERNATIVE</div>
+            <h3>Heatmaps & Session Recordings</h3>
+            <p>See exactly what users do on your site. Click heatmaps, scroll depth tracking, session replay with frustration detection — Microsoft Clarity features, built-in for free.</p>
+            <ul class="mega-features">
+                <li><i class="fas fa-check-circle"></i> Click heatmaps — see where users click on every page</li>
+                <li><i class="fas fa-check-circle"></i> Scroll depth tracking — know how far users scroll</li>
+                <li><i class="fas fa-check-circle"></i> Session recordings with full event replay</li>
+                <li><i class="fas fa-check-circle"></i> Rage click & dead click auto-detection</li>
+                <li><i class="fas fa-check-circle"></i> Frustration score per session (0-100)</li>
+                <li><i class="fas fa-check-circle"></i> JavaScript error tracking & grouping</li>
+                <li><i class="fas fa-check-circle"></i> Per-page engagement & frustration metrics</li>
+            </ul>
+            <a href="{% url 'core:register' %}" class="btn btn-primary">Try Heatmaps Free <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="mega-visual" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <div class="mock" style="background: white;">
+                <div class="mock-bar" style="background: #ecfdf5;">
+                    <div class="dot" style="background:#ef4444;"></div><div class="dot" style="background:#f59e0b;"></div><div class="dot" style="background:#10b981;"></div>
+                    <span style="margin-left:auto;font-size:11px;color:#6b7280;">Heatmap View</span>
+                </div>
+                <div class="mock-body" style="position:relative;min-height:180px;background:#f9fafb;">
+                    <!-- Fake heatmap dots -->
+                    <div style="width:8px;height:8px;border-radius:50%;background:rgba(239,68,68,0.7);position:absolute;top:20%;left:30%;"></div>
+                    <div style="width:14px;height:14px;border-radius:50%;background:rgba(239,68,68,0.5);position:absolute;top:22%;left:31%;"></div>
+                    <div style="width:10px;height:10px;border-radius:50%;background:rgba(124,58,237,0.6);position:absolute;top:40%;left:50%;"></div>
+                    <div style="width:12px;height:12px;border-radius:50%;background:rgba(124,58,237,0.4);position:absolute;top:38%;left:48%;"></div>
+                    <div style="width:8px;height:8px;border-radius:50%;background:rgba(245,158,11,0.6);position:absolute;top:60%;left:70%;"></div>
+                    <div style="width:16px;height:16px;border-radius:50%;background:rgba(239,68,68,0.3);position:absolute;top:25%;left:60%;"></div>
+                    <div style="width:6px;height:6px;border-radius:50%;background:rgba(124,58,237,0.5);position:absolute;top:75%;left:25%;"></div>
+                    <div style="width:10px;height:10px;border-radius:50%;background:rgba(16,185,129,0.5);position:absolute;top:50%;left:40%;"></div>
+                    <!-- Fake page skeleton -->
+                    <div style="width:50%;height:8px;background:#e5e7eb;border-radius:3px;margin:10px auto;"></div>
+                    <div style="width:70%;height:8px;background:#f3f4f6;border-radius:3px;margin:6px auto;"></div>
+                    <div style="width:30%;height:24px;background:#dbeafe;border-radius:6px;margin:12px auto;text-align:center;line-height:24px;font-size:8px;color:#3b82f6;font-weight:700;">Button</div>
+                    <div style="width:60%;height:8px;background:#f3f4f6;border-radius:3px;margin:10px auto;"></div>
+                    <!-- Scroll depth indicator -->
+                    <div style="position:absolute;right:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,#10b981 0%,#10b981 60%,#f59e0b 60%,#f59e0b 80%,#ef4444 80%,#ef4444 100%);border-radius:2px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Clarity Features Grid -->
+<div class="section-alt">
+<div class="section">
+    <div class="section-header reveal">
+        <div class="section-label"><i class="fas fa-fire"></i> Clarity Features</div>
+        <h2 class="section-title">See What Users<br>Actually Do.</h2>
+        <p class="section-desc">Heatmaps, recordings, and frustration detection — everything Microsoft Clarity offers, built-in.</p>
+    </div>
+    <div class="feature-grid">
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-red"><i class="fas fa-fire"></i></div>
+            <h3>Click Heatmaps</h3>
+            <p>Visual overlay showing exactly where users click on each page. Filter by device type and date range. Spot UX issues instantly.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-green"><i class="fas fa-arrows-alt-v"></i></div>
+            <h3>Scroll Depth Heatmaps</h3>
+            <p>See how far users scroll on every page. Average scroll depth percentage. Distribution chart shows drop-off points.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-purple"><i class="fas fa-video"></i></div>
+            <h3>Session Recordings</h3>
+            <p>Record and replay visitor sessions with mouse movements, clicks, and scrolling. Filter by device, duration, and frustration signals.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-orange"><i class="fas fa-bolt"></i></div>
+            <h3>Rage Click Detection</h3>
+            <p>Auto-detect when users rapidly click the same element — a clear sign of frustration. Find broken UI automatically.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-cyan"><i class="fas fa-ban"></i></div>
+            <h3>Dead Click Detection</h3>
+            <p>Find elements that look clickable but aren't. Clicks that produce no response — fix misleading UI elements.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-blue"><i class="fas fa-undo"></i></div>
+            <h3>Quick-Back Detection</h3>
+            <p>Visitors who navigate to a page and immediately return. Content didn't match expectations — find problem pages.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-red"><i class="fas fa-bug"></i></div>
+            <h3>JavaScript Error Tracking</h3>
+            <p>Catch frontend JS errors with source, line, column, and stack trace. Grouped by error message with occurrence counts.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-orange"><i class="fas fa-angry"></i></div>
+            <h3>Frustration Score</h3>
+            <p>AI-calculated 0-100 frustration score per session combining rage clicks, dead clicks, quick-backs, and JS errors.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-green"><i class="fas fa-chart-bar"></i></div>
+            <h3>Per-Page Engagement Metrics</h3>
+            <p>Bounce rate, avg time, scroll depth, click counts, rage clicks, and engagement score — for every individual page.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-purple"><i class="fas fa-hand-pointer"></i></div>
+            <h3>Most Clicked Elements</h3>
+            <p>See which buttons, links, and elements get the most clicks. Element tag, text content, and click count rankings.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- ORIGINAL 10 FEATURES (Segments, Dark Mode, etc) -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="segments">
+<div class="section">
+    <div class="section-header reveal">
+        <div class="section-label"><i class="fas fa-star"></i> More Powerful Features</div>
+        <h2 class="section-title">Enterprise Features.<br>Completely Free.</h2>
+        <p class="section-desc">Everything competitors charge $100+/month for — included in LiveTrack Pro at no cost.</p>
+    </div>
+
+    <div class="feature-grid">
+        <!-- Visitor Segmentation -->
+        <div class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-purple"><i class="fas fa-layer-group"></i></div>
+            <h3>Visitor Segmentation</h3>
+            <p>Create custom visitor segments based on 10+ conditions — visits, country, device, referrer, engagement score, chat history. Quick presets for VIP, returning, and mobile visitors.</p>
+        </div>
+
+        <!-- Dark Mode -->
+        <div id="dark-mode" class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-blue"><i class="fas fa-moon"></i></div>
+            <h3>Dark Mode</h3>
+            <p>Full dark theme across the entire dashboard. Toggle instantly with one click. Persists across sessions. Beautiful purple-tinted dark palette optimized for night work.</p>
+        </div>
+
+        <!-- Departments -->
+        <div id="departments" class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-green"><i class="fas fa-building"></i></div>
+            <h3>Agent Departments</h3>
+            <p>Organize agents into Sales, Support, Billing teams. Assign department leads. Track online agents per department. Route chats to the right team.</p>
+        </div>
+
+        <!-- SLA -->
+        <div id="sla" class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-red"><i class="fas fa-shield-alt"></i></div>
+            <h3>SLA Management</h3>
+            <p>Set response & resolution targets per priority level. Real-time at-risk chat detection. Breach tracking and alerts. No other free tool offers this.</p>
+        </div>
+
+        <!-- Surveys -->
+        <div id="surveys" class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-orange"><i class="fas fa-poll"></i></div>
+            <h3>Surveys & NPS</h3>
+            <p>Create NPS, CSAT, and custom surveys. Post-chat survey triggers. Dynamic question builder with 4 question types. NPS score with promoter/detractor breakdown.</p>
+        </div>
+
+        <!-- PWA -->
+        <div id="pwa" class="feature-card reveal">
+            <div class="badge-new">NEW</div>
+            <div class="feature-icon fi-cyan"><i class="fas fa-mobile-alt"></i></div>
+            <h3>Mobile PWA</h3>
+            <p>Install LiveTrack on your phone like a native app. Offline caching, push notifications, app shortcuts. Reply to chats on-the-go — no app store needed.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- CORE FEATURES GRID -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="core" class="section-alt">
+<div class="section">
+    <div class="section-header reveal">
+        <div class="section-label"><i class="fas fa-bolt"></i> Core Platform</div>
+        <h2 class="section-title">170+ Built-in Features</h2>
+        <p class="section-desc">The foundation that makes LiveTrack Pro the most complete support platform available.</p>
+    </div>
+
+    <div class="feature-grid">
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-purple"><i class="fas fa-comments"></i></div>
+            <h3>Real-Time Live Chat</h3>
+            <p>WebSocket-powered instant messaging. File sharing, image preview, typing indicators, read receipts — zero latency.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-cyan"><i class="fas fa-eye"></i></div>
+            <h3>Visitor Tracking</h3>
+            <p>IP, browser, OS, device, country/city, pages visited, referrer source, time on site — all in real-time.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-green"><i class="fas fa-palette"></i></div>
+            <h3>Customizable Widget</h3>
+            <p>Custom colors, title, position. One-line embed code works on any website. Proactive chat popups.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-orange"><i class="fas fa-users-cog"></i></div>
+            <h3>Multi-Agent Teams</h3>
+            <p>Unlimited agents. Auto-assign with least-busy or round-robin routing. Transfer & takeover chats.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-pink"><i class="fas fa-chart-line"></i></div>
+            <h3>Advanced Analytics</h3>
+            <p>Chat volume trends, CSAT analytics, agent leaderboards, browser/device breakdown, hourly activity.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-blue"><i class="fas fa-reply-all"></i></div>
+            <h3>Canned Responses</h3>
+            <p>Reusable replies with /shortcuts. Personal saved replies. Instant search and insert.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-green"><i class="fas fa-bell"></i></div>
+            <h3>Smart Notifications</h3>
+            <p>Desktop push, email alerts, unread badges, sound alerts — never miss a message.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-purple"><i class="fas fa-plug"></i></div>
+            <h3>Webhooks</h3>
+            <p>Connect to any system. Events for chat created, closed, new message. HMAC signatures.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-orange"><i class="fas fa-shield-alt"></i></div>
+            <h3>Multi-Tenant Security</h3>
+            <p>Full isolation per org. Token auth, CSRF, rate limiting, visitor banning, role-based access.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-cyan"><i class="fas fa-clock"></i></div>
+            <h3>Business Hours</h3>
+            <p>Set working hours. Widget auto-switches to offline mode. Offline lead capture form.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-pink"><i class="fas fa-file-export"></i></div>
+            <h3>Export & Transcripts</h3>
+            <p>CSV export for visitors & chats. Download or email chat transcripts. HTML export with styling.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon fi-blue"><i class="fas fa-history"></i></div>
+            <h3>Audit Trail</h3>
+            <p>Complete activity log. Who joined, transferred, closed chats. Full accountability.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- COMPARISON TABLE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section">
+    <div class="section-header reveal">
+        <div class="section-label"><i class="fas fa-trophy"></i> Comparison</div>
+        <h2 class="section-title">LiveTrack vs Others</h2>
+        <p class="section-desc">See why LiveTrack Pro is the best choice — more features, zero cost.</p>
+    </div>
+
+    <table class="compare-table reveal">
+        <thead>
+            <tr><th>Feature</th><th style="text-align:center;">LiveTrack Pro<br><span style="font-size:11px;color:var(--primary);font-weight:800;">FREE</span></th><th style="text-align:center;">Intercom<br><span style="font-size:11px;color:var(--text-muted);">$74/mo</span></th><th style="text-align:center;">Google Analytics<br><span style="font-size:11px;color:var(--text-muted);">Free</span></th><th style="text-align:center;">MS Clarity<br><span style="font-size:11px;color:var(--text-muted);">Free</span></th></tr>
+        </thead>
+        <tbody>
+            <tr style="background:rgba(59,130,246,0.03);"><td colspan="5" style="font-weight:700;color:#3b82f6;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:10px 20px;">Chat & Support</td></tr>
+            <tr><td><strong>AI Auto-Reply Bot</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>Chatbot Flow Builder</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td><strong>Knowledge Base</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>WhatsApp Integration</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td><strong>SLA Management</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>Surveys & NPS</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+
+            <tr style="background:rgba(59,130,246,0.03);"><td colspan="5" style="font-weight:700;color:#3b82f6;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:10px 20px;">Google Analytics Features</td></tr>
+            <tr><td><strong>UTM Campaign Tracking</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>Bounce Rate & Session Metrics</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td><strong>Goals & Conversions</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>Landing & Exit Pages</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td><strong>Custom Event Tracking</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>User Flow Visualization</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td><strong>Cohort Retention</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>Scheduled Email Reports</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+
+            <tr style="background:rgba(16,185,129,0.03);"><td colspan="5" style="font-weight:700;color:#10b981;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:10px 20px;">Microsoft Clarity Features</td></tr>
+            <tr><td><strong>Click Heatmaps</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>Scroll Depth Tracking</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+            <tr><td><strong>Session Recordings</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>Rage Click Detection</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+            <tr><td><strong>Dead Click Detection</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>JS Error Tracking</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+            <tr><td><strong>Frustration Score</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="yes"><i class="fas fa-check-circle"></i></td></tr>
+
+            <tr style="background:rgba(124,58,237,0.03);"><td colspan="5" style="font-weight:700;color:var(--primary);font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:10px 20px;">Unique to LiveTrack</td></tr>
+            <tr><td><strong>Live Chat + Analytics + Heatmaps (3-in-1)</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr class="highlight"><td><strong>Real-time Visitor Tracking</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+            <tr><td><strong>Unlimited Agents</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no">N/A</td><td class="no">N/A</td></tr>
+            <tr class="highlight"><td><strong>Self-Hosted / Open Source</strong></td><td class="yes"><i class="fas fa-check-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td><td class="no"><i class="fas fa-times-circle"></i></td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- CTA -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="cta-section">
+    <div class="orb orb-1"></div><div class="orb orb-2"></div>
+    <div class="cta-inner reveal">
+        <h2>Ready to Transform Your<br>Customer Support?</h2>
+        <p>200+ features. Google Analytics + Microsoft Clarity + Live Chat in one platform. Zero cost. No credit card.</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+            <a href="{% url 'core:register' %}" class="btn btn-primary btn-xl">Get Started Free <i class="fas fa-arrow-right"></i></a>
+            <a href="/" class="btn btn-outline-light btn-lg">See Live Demo</a>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="footer-grid">
+        <div class="footer-brand">
+            <h3><i class="fas fa-bolt"></i> LiveTrack Pro</h3>
+            <p>The most powerful visitor tracking and live chat platform — 100% free, forever.</p>
+            <div class="footer-social">
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                <a href="#"><i class="fab fa-github"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+            </div>
+        </div>
+        <div class="footer-col"><h4>Product</h4><a href="{% url 'pages:features' %}">Features</a><a href="/#pricing">Pricing</a><a href="/#how-it-works">How It Works</a></div>
+        <div class="footer-col"><h4>Company</h4><a href="{% url 'pages:about' %}">About Us</a><a href="{% url 'pages:contact' %}">Contact</a><a href="#">Careers</a></div>
+        <div class="footer-col"><h4>Resources</h4><a href="#">Documentation</a><a href="#">Help Center</a><a href="#">Blog</a></div>
+        <div class="footer-col"><h4>Legal</h4><a href="{% url 'pages:privacy' %}">Privacy Policy</a><a href="{% url 'pages:terms' %}">Terms of Service</a><a href="{% url 'pages:refund' %}">Refund Policy</a></div>
+    </div>
+    <div class="footer-bottom">
+        <span>&copy; 2026 LiveTrack Pro. All rights reserved.</span>
+    </div>
+</footer>
+
+<script>
+// Navbar scroll effect
+window.addEventListener('scroll', function() {
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 20);
+});
+
+// Reveal on scroll animation
+var reveals = document.querySelectorAll('.reveal');
+var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+        }
+    });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+reveals.forEach(function(el) { observer.observe(el); });
+
+// Filter tabs
+document.querySelectorAll('.filter-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
+        this.classList.add('active');
+    });
+});
+</script>
+
+</body>
+</html>

@@ -98,6 +98,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         'sender_name': sender_name,
                     }
                 )
+                # AI Auto-Reply Bot
+                if msg_type == 'text' and content:
+                    await self.handle_ai_bot_reply(content)
 
         elif message_type == 'typing':
             await self.channel_layer.group_send(
@@ -121,8 +124,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
-        # WebRTC signaling for screen share
-        elif message_type in ('screen_share_request', 'screen_share_offer', 'screen_share_answer', 'ice_candidate', 'screen_share_stop', 'cobrowse_update'):
+        # WebRTC signaling for calls, screen share, cobrowse
+        elif message_type in ('screen_share_request', 'screen_share_offer', 'screen_share_answer', 'ice_candidate', 'screen_share_stop', 'cobrowse_update', 'call_request', 'call_offer', 'call_answer', 'call_end', 'call_reject', 'call_toggle_video', 'call_toggle_audio'):
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -215,6 +218,128 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'sender_name': event['sender_name'],
             }))
 
+    async def handle_ai_bot_reply(self, visitor_message):
+        """Check if AI bot is enabled and generate a response."""
+        bot_response = await self.get_ai_bot_response(visitor_message)
+        if not bot_response:
+            return
+
+        content = bot_response['content']
+        bot_name = bot_response['bot_name']
+
+        # Save and broadcast the bot reply
+        await self.save_message(content, 'agent', bot_name)
+
+        import asyncio
+        delay = bot_response.get('delay', 2)
+        if delay > 0:
+            await asyncio.sleep(delay)
+
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat_message',
+                'message': content,
+                'sender_type': 'agent',
+                'sender_name': bot_name,
+                'msg_type': 'text',
+                'file_url': '',
+                'file_name': '',
+                'timestamp': timezone.now().isoformat(),
+            }
+        )
+
+    @database_sync_to_async
+    def get_ai_bot_response(self, visitor_message):
+        """Find an AI bot response for the visitor's message."""
+        from .models import ChatRoom, AIBotConfig, AIBotKnowledge, Message
+
+        try:
+            room = ChatRoom.objects.select_related('organization').get(room_id=self.room_id)
+        except ChatRoom.DoesNotExist:
+            return None
+
+        # Only respond if no human agent has joined yet
+        if room.agent_id:
+            return None
+
+        org = room.organization
+        if not org:
+            return None
+
+        try:
+            config = AIBotConfig.objects.get(organization=org, is_enabled=True)
+        except AIBotConfig.DoesNotExist:
+            return None
+
+        # Count bot's previous replies in this chat
+        bot_reply_count = Message.objects.filter(
+            room=room, sender_type='agent', sender_name=config.bot_name
+        ).count()
+
+        # Check if max auto-replies reached
+        if bot_reply_count >= config.max_auto_replies:
+            return {
+                'content': config.fallback_message,
+                'bot_name': config.bot_name,
+                'delay': config.response_delay_seconds,
+            }
+
+        # Check for handoff keywords
+        msg_lower = visitor_message.lower()
+        for keyword in config.handoff_keywords_list:
+            if keyword in msg_lower:
+                return {
+                    'content': config.fallback_message,
+                    'bot_name': config.bot_name,
+                    'delay': config.response_delay_seconds,
+                }
+
+        # Search knowledge base for matching answer
+        knowledge_entries = AIBotKnowledge.objects.filter(
+            organization=org, is_active=True
+        ).order_by('-priority')
+
+        best_match = None
+        best_score = 0
+
+        for entry in knowledge_entries:
+            score = 0
+            # Check keywords match
+            for kw in entry.keywords_list:
+                if kw in msg_lower:
+                    score += 2
+            # Check question text similarity (simple word overlap)
+            q_words = set(entry.question.lower().split())
+            m_words = set(msg_lower.split())
+            overlap = len(q_words & m_words)
+            score += overlap
+
+            if score > best_score:
+                best_score = score
+                best_match = entry
+
+        if best_match and best_score > 0:
+            return {
+                'content': best_match.answer,
+                'bot_name': config.bot_name,
+                'delay': config.response_delay_seconds,
+            }
+
+        # First message: send greeting, otherwise fallback
+        if bot_reply_count == 0:
+            return {
+                'content': config.greeting_message,
+                'bot_name': config.bot_name,
+                'delay': config.response_delay_seconds,
+            }
+
+        return {
+            'content': config.fallback_message,
+            'bot_name': config.bot_name,
+            'delay': config.response_delay_seconds,
+        }
+
     @database_sync_to_async
     def save_message(self, content, sender_type, sender_name):
         from .models import ChatRoom, Message
@@ -276,9 +401,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return {'is_agent': True, 'sender_name': sender_name, 'org_id': room.organization_id}
 
         if role == 'visitor':
-            if not session_key or principal != session_key:
-                return None
-            if room.visitor.session_key != session_key:
+            # Cross-origin: session cookie may not be available, trust token principal
+            # Verify principal matches visitor's session_key in the room
+            if room.visitor.session_key != principal:
                 return None
             return {'is_agent': False, 'sender_name': room.visitor_name or 'Visitor', 'org_id': room.organization_id}
 
@@ -327,6 +452,9 @@ class DashboardConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event))
 
     async def dashboard_update(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def visitor_activity(self, event):
         await self.send(text_data=json.dumps(event))
 
     @database_sync_to_async

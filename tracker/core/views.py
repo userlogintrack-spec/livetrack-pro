@@ -100,6 +100,23 @@ def get_user_org(user):
     return None
 
 
+def get_plan_limits(org):
+    """Return plan limits for an organization."""
+    if not org:
+        return {'max_visitors_per_month': 100, 'max_agents': 1, 'advanced_analytics': False, 'ai_bot': False}
+    from tracker.core.models import Subscription
+    sub = Subscription.objects.filter(organization=org).first()
+    if not sub:
+        sub = Subscription.objects.create(organization=org, plan='free', status='active')
+    return sub.plan_limits
+
+
+def check_plan_feature(org, feature):
+    """Check if org's plan allows a specific feature. Returns True/False."""
+    limits = get_plan_limits(org)
+    return limits.get(feature, False)
+
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard:home')
@@ -134,17 +151,20 @@ def register_view(request):
         last_name = request.POST.get('last_name', '').strip()
         org_name = request.POST.get('org_name', '').strip() or f"{username}'s Organization"
 
+        # Keep form data on error
+        form_data = {'username': username, 'email': email, 'first_name': first_name, 'last_name': last_name, 'org_name': org_name}
+
         if not username or not password:
             messages.error(request, 'Username and password are required.')
-            return render(request, 'core/register.html')
+            return render(request, 'core/register.html', form_data)
 
         if User.objects.filter(username=username).exists():
             messages.error(request, 'Username already taken.')
-            return render(request, 'core/register.html')
+            return render(request, 'core/register.html', form_data)
 
         if email and User.objects.filter(email=email).exists():
             messages.error(request, 'Email already registered.')
-            return render(request, 'core/register.html')
+            return render(request, 'core/register.html', form_data)
 
         user = User.objects.create_user(
             username=username,
@@ -170,7 +190,16 @@ def register_view(request):
 
         # Create agent profile with owner role
         AgentProfile.objects.create(user=user, organization=org, role='owner')
+        # Create subscription based on selected plan
+        from tracker.core.models import Subscription
+        selected_plan = request.POST.get('plan', 'free') or request.GET.get('plan', 'free')
+        if selected_plan not in ('free', 'pro', 'enterprise'):
+            selected_plan = 'free'
+        Subscription.objects.get_or_create(organization=org, defaults={'plan': selected_plan if selected_plan == 'free' else 'free', 'status': 'active'})
         login(request, user)
+        # If paid plan selected, redirect to billing to complete payment
+        if selected_plan in ('pro', 'enterprise'):
+            return redirect(f'/dashboard/billing/?upgrade={selected_plan}')
         return redirect('dashboard:onboarding')
     return render(request, 'core/register.html')
 
@@ -255,165 +284,41 @@ def widget_script(request):
   window.LiveTrackWidgetLoaded = true;
   var BASE = "__BASE__";
   var WIDGET_KEY = "__WIDGET_KEY__";
-  var roomId = null, wsToken = "", socket = null, visitorName = "Visitor";
-  var chatRestored = false;
+  var WC = "__WIDGET_COLOR__";
+  var isOpen = false;
 
   var style = document.createElement("style");
-  var WC = "__WIDGET_COLOR__";
-  style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:20px;font-weight:800;background:"+WC+";box-shadow:0 12px 30px rgba(0,0,0,.25)}.ltw-panel{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(380px,calc(100vw - 24px));max-height:min(560px,calc(100vh - 120px));background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.18);display:none;flex-direction:column;font-family:Inter,Arial,sans-serif}.ltw-head{padding:14px 16px;color:#fff;display:flex;justify-content:space-between;align-items:center;background:"+WC+"}.ltw-title{font-size:15px;font-weight:700}.ltw-close{border:0;background:rgba(255,255,255,.2);color:#fff;border-radius:8px;width:28px;height:28px;cursor:pointer}.ltw-body{padding:14px;overflow:auto;background:#fafbff;display:flex;flex-direction:column;gap:8px;min-height:200px}.ltw-msg{max-width:82%;font-size:13px;padding:9px 12px;border-radius:12px;line-height:1.45}.ltw-agent{align-self:flex-start;background:#eef2ff;color:#1f2937}.ltw-visitor{align-self:flex-end;background:"+WC+";color:#fff}.ltw-form{padding:12px;border-top:1px solid #e5e7eb;display:grid;gap:8px;background:#fff}.ltw-form input{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px;font-size:13px}.ltw-send-row{display:flex;gap:8px}.ltw-send-row input{flex:1}.ltw-send{border:0;border-radius:10px;padding:0 14px;cursor:pointer;color:#fff;background:"+WC+"}.ltw-newchat{border:0;border-radius:10px;padding:10px 16px;cursor:pointer;color:#fff;font-size:13px;font-weight:600;background:"+WC+";width:100%}.ltw-powered{padding:6px;text-align:center;font-size:10px;color:#9ca3af;background:#fafafa;border-top:1px solid #f0f0f0}.ltw-powered a{color:#6366f1;text-decoration:none;font-weight:600}";
+  style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:all .3s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}";
   document.head.appendChild(style);
 
   var btn = document.createElement("button");
   btn.className = "ltw-btn";
   btn.innerHTML = "💬";
 
-  var panel = document.createElement("div");
-  panel.className = "ltw-panel";
-  panel.innerHTML = '<div class="ltw-head"><div class="ltw-title">__WIDGET_TITLE__</div><button class="ltw-close" aria-label="Close">×</button></div><div class="ltw-body" id="ltwBody"></div><div class="ltw-form" id="ltwPrechat"><input id="ltwName" placeholder="Your name"/><input id="ltwEmail" placeholder="Your email (optional)"/><input id="ltwSubject" placeholder="Your query"/><button class="ltw-send" id="ltwStart">Start Chat</button></div><div class="ltw-form" id="ltwChat" style="display:none;"><div class="ltw-send-row"><input id="ltwInput" placeholder="Type your message..."/><button class="ltw-send" id="ltwSend">Send</button></div></div><div class="ltw-form" id="ltwClosed" style="display:none;"><button class="ltw-newchat" id="ltwNewChat">Start New Chat</button></div><div class="ltw-powered">Powered by <a href="__BASE__" target="_blank">LiveTrack</a></div>';
+  var frame = document.createElement("iframe");
+  frame.className = "ltw-frame";
+  frame.src = BASE + "/api/widget/embed/?key=" + WIDGET_KEY;
+  frame.allow = "microphone;camera;display-capture";
+
   document.body.appendChild(btn);
-  document.body.appendChild(panel);
+  document.body.appendChild(frame);
 
-  function addMessage(text, cls, timestamp) {
-    var body = panel.querySelector("#ltwBody");
-    var node = document.createElement("div");
-    node.className = "ltw-msg " + cls;
-    node.textContent = text || "";
-    if (timestamp) {
-      var t = new Date(timestamp);
-      var timeEl = document.createElement("div");
-      timeEl.style.cssText = "font-size:10px;opacity:0.6;margin-top:3px;";
-      timeEl.textContent = t.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
-      node.appendChild(timeEl);
-    }
-    body.appendChild(node);
-    body.scrollTop = body.scrollHeight;
-  }
-
-  function loadPreviousMessages(messages) {
-    var body = panel.querySelector("#ltwBody");
-    body.innerHTML = "";
-    for (var i = 0; i < messages.length; i++) {
-      var m = messages[i];
-      var cls = m.sender_type === "visitor" ? "ltw-visitor" : "ltw-agent";
-      if (m.msg_type === "file" || m.msg_type === "image") {
-        addMessage(m.file_name || "File", cls, m.timestamp);
-      } else {
-        addMessage(m.content, cls, m.timestamp);
-      }
-    }
-  }
-
-  function post(path, payload) {
-    var data = payload || {};
-    data.key = WIDGET_KEY;
-    return fetch(BASE + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(data)
-    }).then(function(r) { return r.json(); });
-  }
-
-  function openWs() {
-    if (!roomId || !wsToken) return;
-    var proto = location.protocol === "https:" ? "wss://" : "ws://";
-    var wsHost = BASE.replace(/^https?:\/\//, "");
-    socket = new WebSocket(proto + wsHost + "/ws/chat/" + roomId + "/?token=" + encodeURIComponent(wsToken));
-    socket.onmessage = function(e) {
-      var d = JSON.parse(e.data || "{}");
-      if (d.type === "chat_message" && d.sender_type !== "visitor") addMessage(d.message, "ltw-agent");
-      if (d.type === "chat_closed") {
-        addMessage("Chat closed by agent.", "ltw-agent");
-        panel.querySelector("#ltwChat").style.display = "none";
-        panel.querySelector("#ltwClosed").style.display = "grid";
-        if (socket) { socket.close(); socket = null; }
-        roomId = null; wsToken = "";
-      }
-    };
-  }
-
-  btn.onclick = function() { panel.style.display = panel.style.display === "flex" ? "none" : "flex"; };
-  panel.querySelector(".ltw-close").onclick = function() { panel.style.display = "none"; };
-
-  function startOrResumeChat(name, email, subject) {
-    visitorName = (name || "Visitor").trim() || "Visitor";
-    post("/api/widget/init/", {})
-      .then(function() { return post("/api/widget/start-chat/", { name: visitorName, email: email || "", subject: subject || "" }); })
-      .then(function(data) {
-        if (data.error) { addMessage(data.error, "ltw-agent"); return; }
-        roomId = data.room_id; wsToken = data.ws_token || "";
-        panel.querySelector("#ltwPrechat").style.display = "none";
-        panel.querySelector("#ltwChat").style.display = "block";
-        panel.querySelector("#ltwClosed").style.display = "none";
-        if (data.messages && data.messages.length > 0) {
-          loadPreviousMessages(data.messages);
-        }
-        openWs();
-      });
-  }
-
-  panel.querySelector("#ltwStart").onclick = function() {
-    var name = panel.querySelector("#ltwName").value;
-    var email = (panel.querySelector("#ltwEmail").value || "").trim();
-    var subject = (panel.querySelector("#ltwSubject").value || "").trim();
-    startOrResumeChat(name, email, subject);
+  btn.onclick = function() {
+    isOpen = !isOpen;
+    frame.style.display = isOpen ? "block" : "none";
+    btn.innerHTML = isOpen ? "✕" : "💬";
+    btn.style.fontSize = isOpen ? "18px" : "22px";
   };
-
-  function sendMsg() {
-    if (!socket) return;
-    var input = panel.querySelector("#ltwInput");
-    var text = (input.value || "").trim();
-    if (!text) return;
-    socket.send(JSON.stringify({ type: "chat_message", message: text, sender_type: "visitor", sender_name: visitorName, msg_type: "text" }));
-    addMessage(text, "ltw-visitor");
-    input.value = "";
-  }
-
-  panel.querySelector("#ltwSend").onclick = sendMsg;
-  panel.querySelector("#ltwInput").addEventListener("keydown", function(e) { if (e.key === "Enter") sendMsg(); });
-
-  panel.querySelector("#ltwNewChat").onclick = function() {
-    panel.querySelector("#ltwClosed").style.display = "none";
-    panel.querySelector("#ltwBody").innerHTML = "";
-    panel.querySelector("#ltwPrechat").style.display = "grid";
-    panel.querySelector("#ltwName").value = visitorName !== "Visitor" ? visitorName : "";
-  };
-
-  // Auto-restore existing chat on widget load
-  function tryRestoreChat() {
-    if (chatRestored) return;
-    chatRestored = true;
-    post("/api/widget/init/", {})
-      .then(function() { return post("/api/widget/start-chat/", { name: "", email: "", subject: "", restore_only: true }); })
-      .then(function(data) {
-        if (data.reused && data.messages && data.messages.length > 0) {
-          roomId = data.room_id; wsToken = data.ws_token || "";
-          visitorName = "Visitor";
-          for (var i = data.messages.length - 1; i >= 0; i--) {
-            if (data.messages[i].sender_type === "visitor" && data.messages[i].sender_name) {
-              visitorName = data.messages[i].sender_name;
-              break;
-            }
-          }
-          panel.querySelector("#ltwPrechat").style.display = "none";
-          panel.querySelector("#ltwChat").style.display = "block";
-          loadPreviousMessages(data.messages);
-          openWs();
-        }
-      })
-      .catch(function() {});
-  }
-  tryRestoreChat();
 
   // Proactive chat trigger
   if ("__PROACTIVE__" === "true") {
     setTimeout(function() {
-      if (!roomId && panel.style.display !== "flex") {
+      if (!isOpen) {
         btn.style.animation = "ltw-pulse 1.5s ease infinite";
         var notif = document.createElement("div");
-        notif.style.cssText = "position:fixed;__PANEL_POS_CSS__;bottom:90px;z-index:999999;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.12);font-family:Inter,Arial,sans-serif;max-width:260px;cursor:pointer;animation:ltw-fadein .3s;";
+        notif.style.cssText = "position:fixed;__PANEL_POS_CSS__;bottom:90px;z-index:999999;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.12);font-family:Inter,Arial,sans-serif;max-width:260px;cursor:pointer;";
         notif.innerHTML = '<div style="font-size:13px;font-weight:600;color:#1f2937;">__PROACTIVE_MSG__</div><div style="font-size:11px;color:#9ca3af;margin-top:4px;">Click to chat with us</div>';
-        notif.onclick = function() { notif.remove(); panel.style.display = "flex"; };
+        notif.onclick = function() { notif.remove(); btn.click(); };
         document.body.appendChild(notif);
         setTimeout(function() { if (notif.parentNode) notif.remove(); }, 10000);
       }
@@ -461,9 +366,15 @@ def widget_start_chat(request):
         if data is None:
             return JsonResponse({'error': 'Invalid JSON body'}, status=400)
 
+        # Get session — prefer cookie, fallback to session_key in body (cross-origin widget)
+        if not request.session.session_key:
+            request.session.create()
         session_key = request.session.session_key
-        if not session_key:
-            return JsonResponse({'error': 'No session'}, status=400)
+
+        # Cross-origin fallback: widget passes session_key from init response
+        body_session = data.get('session_key', '')
+        if body_session:
+            session_key = body_session
 
         # Resolve org from widget key
         org = _get_org_from_request(request)
@@ -475,7 +386,16 @@ def widget_start_chat(request):
         try:
             visitor = Visitor.objects.get(session_key=session_key, organization=org)
         except Visitor.DoesNotExist:
-            return JsonResponse({'error': 'Visitor not found'}, status=404)
+            # Fallback: create visitor on-the-fly for cross-origin
+            from tracker.visitors.middleware import get_client_ip, parse_user_agent
+            ip = get_client_ip(request)
+            ua = request.META.get('HTTP_USER_AGENT', '')
+            browser, os_name, device_type = parse_user_agent(ua)
+            visitor = Visitor.objects.create(
+                session_key=session_key, organization=org,
+                ip_address=ip, user_agent=ua, browser=browser,
+                os=os_name, device_type=device_type, is_online=True,
+            )
         if visitor.is_banned:
             return JsonResponse({'error': 'Chat disabled for this visitor. Please contact support.'}, status=403)
 
@@ -762,6 +682,23 @@ def submit_offline_message(request):
         return JsonResponse({'status': 'ok'})
 
     return JsonResponse({'error': 'POST required'}, status=405)
+
+
+from django.views.decorators.clickjacking import xframe_options_exempt
+
+@xframe_options_exempt
+def widget_embed_page(request):
+    """Standalone widget page — loaded inside iframe on external sites."""
+    widget_key = request.GET.get('key', '')
+    from tracker.core.models import Organization
+    org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else Organization.objects.first()
+    if not request.session.session_key:
+        request.session.create()
+    return render(request, 'core/widget_embed.html', {
+        'org': org,
+        'widget_key': widget_key,
+        'session_key': request.session.session_key,
+    })
 
 
 def landing_page(request):

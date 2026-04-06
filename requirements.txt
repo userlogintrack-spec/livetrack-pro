@@ -6,3 +6,6 @@ gunicorn>=21.2
 psycopg2-binary>=2.9
 whitenoise>=6.5
 dj-database-url>=2.1
+python-dotenv>=1.0
+stripe>=7.0
+django-cors-headers>=4.3

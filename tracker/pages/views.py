@@ -3,6 +3,18 @@ from django.shortcuts import render
 
 PUBLIC_PAGES = [
     {
+        'title': 'Compare',
+        'url': '/compare/',
+        'summary': 'Compare LiveTrack Pro with Google Analytics, Microsoft Clarity, Intercom, Hotjar, Tawk.to and more.',
+        'keywords': 'compare comparison vs alternative google analytics clarity intercom hotjar tawk',
+    },
+    {
+        'title': 'Features',
+        'url': '/features/',
+        'summary': 'Complete feature list — AI bot, chatbot builder, knowledge base, WhatsApp, segments, departments, SLA, surveys, PWA & more.',
+        'keywords': 'features ai bot chatbot knowledge base whatsapp segments departments sla surveys pwa dark mode',
+    },
+    {
         'title': 'About Us',
         'url': '/about/',
         'summary': 'Our story, mission, numbers, and team behind LiveTrack Pro.',
@@ -71,3 +83,11 @@ def refund(request):
 
 def contact(request):
     return render(request, 'pages/contact.html')
+
+
+def features(request):
+    return render(request, 'pages/features.html')
+
+
+def compare(request):
+    return render(request, 'pages/compare.html')

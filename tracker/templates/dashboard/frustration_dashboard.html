@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Frustration Signals{% endblock %}
+{% block page_title %}Frustration Signals{% endblock %}
+
+{% block content %}
+<!-- Signal Breakdown -->
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-angry"></i></div>
+        <div class="stat-value">{{ total_signals }}</div>
+        <div class="stat-label">Total Signals</div>
+    </div>
+    {% for label, count in signal_counts.items %}
+    <div class="stat-card {% if 'Rage' in label %}orange{% elif 'Dead' in label %}blue{% elif 'Quick' in label %}purple{% elif 'Scroll' in label %}green{% else %}blue{% endif %}">
+        <div class="stat-icon"><i class="fas fa-{% if 'Rage' in label %}bolt{% elif 'Dead' in label %}ban{% elif 'Quick' in label %}undo{% elif 'Scroll' in label %}arrows-alt-v{% else %}mouse-pointer{% endif %}"></i></div>
+        <div class="stat-value">{{ count }}</div>
+        <div class="stat-label">{{ label }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- Most Frustrated Pages -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-fire-alt"></i> Most Frustrated Pages</h3></div>
+        <div class="card-body"><div class="table-container"><table>
+            <thead><tr><th>Page</th><th>Signals</th><th>Rage</th><th>Dead</th></tr></thead>
+            <tbody>
+            {% for p in frustrated_pages %}
+            <tr>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;">{{ p.page_path }}</td>
+                <td><span style="font-weight:700;">{{ p.count }}</span></td>
+                <td style="color:var(--danger);">{{ p.rage }}</td>
+                <td style="color:var(--warning);">{{ p.dead }}</td>
+            </tr>
+            {% empty %}<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">No frustration signals detected yet</td></tr>{% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+
+    <!-- Frustrated Sessions -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-video"></i> Most Frustrated Sessions</h3></div>
+        <div class="card-body">
+            {% for rec in frustrated_recordings %}
+            <div style="padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:600;font-size:13px;">{{ rec.visitor.ip_address }} <span style="font-size:11px;color:var(--text-muted);">({{ rec.device_type }})</span></div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+                        Score: <span style="font-weight:700;color:{% if rec.frustration_score > 60 %}var(--danger){% elif rec.frustration_score > 30 %}var(--warning){% else %}var(--success){% endif %};">{{ rec.frustration_score }}/100</span>
+                        &middot; {{ rec.duration }}s &middot; {{ rec.pages_visited }} pages
+                        {% if rec.has_rage_clicks %}<i class="fas fa-bolt" style="color:var(--danger);margin-left:4px;" title="Rage clicks"></i>{% endif %}
+                        {% if rec.has_dead_clicks %}<i class="fas fa-ban" style="color:var(--warning);margin-left:4px;" title="Dead clicks"></i>{% endif %}
+                        {% if rec.has_errors %}<i class="fas fa-bug" style="color:var(--danger);margin-left:4px;" title="JS errors"></i>{% endif %}
+                    </div>
+                </div>
+                <a href="{% url 'dashboard:session_replay' rec.session_id %}" class="btn btn-sm btn-primary"><i class="fas fa-play"></i></a>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="padding:20px;"><p>No frustrated sessions found</p></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Per-Page Insights -->
+{% if page_insights %}
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-chart-bar"></i> Per-Page Engagement & Frustration</h3></div>
+    <div class="card-body"><div class="table-container"><table>
+        <thead><tr><th>Page</th><th>Views</th><th>Avg Time</th><th>Scroll Depth</th><th>Bounce Rate</th><th>Rage Clicks</th><th>Dead Clicks</th><th>Frustration</th><th>Engagement</th></tr></thead>
+        <tbody>
+        {% for pi in page_insights %}
+        <tr>
+            <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pi.page_path }}</td>
+            <td>{{ pi.total_views }}</td>
+            <td>{{ pi.avg_time_spent|floatformat:0 }}s</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <div style="width:40px;height:6px;background:var(--bg-hover);border-radius:3px;"><div style="height:100%;width:{{ pi.avg_scroll_depth }}%;background:var(--success);border-radius:3px;"></div></div>
+                    <span style="font-size:11px;">{{ pi.avg_scroll_depth|floatformat:0 }}%</span>
+                </div>
+            </td>
+            <td style="color:{% if pi.bounce_rate > 70 %}var(--danger){% elif pi.bounce_rate > 40 %}var(--warning){% else %}var(--success){% endif %};">{{ pi.bounce_rate|floatformat:0 }}%</td>
+            <td style="color:var(--danger);font-weight:600;">{{ pi.rage_clicks }}</td>
+            <td style="color:var(--warning);font-weight:600;">{{ pi.dead_clicks }}</td>
+            <td>
+                <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:{% if pi.frustration_score > 50 %}var(--danger-soft);color:var(--danger){% elif pi.frustration_score > 25 %}var(--warning-soft);color:var(--warning){% else %}var(--success-soft);color:var(--success){% endif %};">{{ pi.frustration_score|floatformat:0 }}</span>
+            </td>
+            <td>
+                <span style="padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:{% if pi.engagement_score > 70 %}var(--success-soft);color:var(--success){% elif pi.engagement_score > 40 %}var(--primary-soft);color:var(--primary){% else %}var(--bg-hover);color:var(--text-muted){% endif %};">{{ pi.engagement_score|floatformat:0 }}</span>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table></div></div>
+</div>
+{% endif %}
+
+<!-- How Signals Work -->
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><h3><i class="fas fa-info-circle"></i> What Are Frustration Signals?</h3></div>
+    <div class="card-body">
+        <div class="grid-2" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;">
+            <div style="padding:16px;background:var(--danger-soft);border-radius:12px;">
+                <div style="font-weight:700;color:var(--danger);margin-bottom:4px;"><i class="fas fa-bolt"></i> Rage Click</div>
+                <div style="font-size:13px;color:var(--text-secondary);">User rapidly clicks the same element multiple times — a sign of frustration with unresponsive UI.</div>
+            </div>
+            <div style="padding:16px;background:var(--warning-soft);border-radius:12px;">
+                <div style="font-weight:700;color:var(--warning);margin-bottom:4px;"><i class="fas fa-ban"></i> Dead Click</div>
+                <div style="font-size:13px;color:var(--text-secondary);">A click that produces no response — the element looks clickable but doesn't do anything.</div>
+            </div>
+            <div style="padding:16px;background:var(--info-soft);border-radius:12px;">
+                <div style="font-weight:700;color:var(--info);margin-bottom:4px;"><i class="fas fa-undo"></i> Quick Back</div>
+                <div style="font-size:13px;color:var(--text-secondary);">User navigates to a page and immediately returns — content didn't match expectations.</div>
+            </div>
+            <div style="padding:16px;background:var(--success-soft);border-radius:12px;">
+                <div style="font-weight:700;color:var(--success);margin-bottom:4px;"><i class="fas fa-arrows-alt-v"></i> Excessive Scroll</div>
+                <div style="font-size:13px;color:var(--text-secondary);">User scrolls up and down repeatedly — they can't find what they're looking for.</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,657 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Billing & Plan{% endblock %}
+{% block page_title %}Billing & Plan{% endblock %}
+
+{% block extra_css %}
+<style>
+    .plan-card {
+        background:var(--bg-card); border:2px solid var(--border); border-radius:20px;
+        padding:32px 24px; text-align:center; transition:all .3s; position:relative;
+    }
+    .plan-card:hover { transform:translateY(-6px); box-shadow:0 16px 40px rgba(0,0,0,0.08); }
+    .plan-card.current { border-color:var(--success); background:linear-gradient(180deg,rgba(16,185,129,0.03),transparent); }
+    .plan-card.featured {
+        border-color:var(--primary); background:linear-gradient(180deg,rgba(124,58,237,0.04),transparent);
+        box-shadow:0 8px 30px rgba(124,58,237,0.12); transform:scale(1.03);
+    }
+    .plan-card.featured:hover { transform:scale(1.03) translateY(-6px); box-shadow:0 16px 40px rgba(124,58,237,0.18); }
+    .plan-card .plan-icon {
+        width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center;
+        font-size:22px; margin:0 auto 14px;
+    }
+    .plan-card .plan-name { font-size:18px; font-weight:800; margin-bottom:2px; }
+    .plan-card .plan-price { font-size:48px; font-weight:900; color:var(--text-primary); margin:8px 0; line-height:1; letter-spacing:-2px; }
+    .plan-card .plan-price span { font-size:15px; color:var(--text-muted); font-weight:400; letter-spacing:0; }
+    .plan-card .plan-desc { font-size:13px; color:var(--text-muted); margin-bottom:18px; }
+    .plan-feature { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; color:var(--text-body); text-align:left; }
+    .plan-feature i { font-size:12px; width:18px; flex-shrink:0; text-align:center; }
+    .plan-feature i.fa-check { color:var(--success); }
+    .plan-feature.disabled { color:var(--text-muted); opacity:0.5; }
+    .plan-feature.disabled i { color:var(--text-muted); }
+    .plan-divider { height:1px; background:var(--border); margin:14px 0; }
+    .plan-badge {
+        position:absolute; top:-13px; left:50%; transform:translateX(-50%);
+        background:var(--gradient); color:white; padding:5px 18px; border-radius:20px;
+        font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1px; white-space:nowrap;
+        box-shadow:0 4px 12px rgba(124,58,237,0.3);
+    }
+    .usage-bar { height:8px; background:var(--bg-hover); border-radius:4px; overflow:hidden; margin-top:8px; }
+    .usage-fill { height:100%; border-radius:4px; transition:width .5s ease; }
+    .billing-info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:20px; }
+    .billing-info { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px; }
+    .billing-info .bi-label { font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+    .billing-info .bi-value { font-size:20px; font-weight:800; color:var(--text-primary); }
+    .billing-info .bi-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if upgrade_plan %}
+<!-- Auto-upgrade prompt after registration -->
+<div class="card" style="margin-bottom:16px;border:2px solid var(--primary);background:linear-gradient(135deg,rgba(124,58,237,0.04),rgba(168,85,247,0.02));">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+            <div style="font-size:16px;font-weight:800;color:var(--text-primary);"><i class="fas fa-rocket" style="color:var(--primary);margin-right:6px;"></i> Complete your upgrade to {{ upgrade_plan|title }}</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Your account is ready! Click below to activate your {{ upgrade_plan|title }} plan.</div>
+        </div>
+        <button onclick="upgradePlan('{{ upgrade_plan }}')" class="btn btn-primary btn-lg"><i class="fas fa-credit-card"></i> Pay & Activate {{ upgrade_plan|title }}</button>
+    </div>
+</div>
+{% endif %}
+
+<!-- ═══════ BILLING OVERVIEW ═══════ -->
+<div class="billing-info-grid">
+    <div class="billing-info">
+        <div class="bi-label">Current Plan</div>
+        <div class="bi-value" style="display:flex;align-items:center;gap:8px;">
+            <span style="color:{% if sub.plan == 'enterprise' %}var(--warning){% elif sub.plan == 'pro' %}var(--primary){% else %}var(--success){% endif %};">{{ sub.get_plan_display }}</span>
+            <span class="status {% if sub.is_active %}status-online{% else %}status-closed{% endif %}" style="font-size:10px;"><span class="dot"></span> {{ sub.get_status_display }}</span>
+        </div>
+        <div class="bi-sub">${{ plan_price }}/month{% if sub.cancel_at_period_end %} &middot; <span style="color:var(--warning);">Cancels at period end</span>{% endif %}</div>
+    </div>
+
+    <div class="billing-info">
+        <div class="bi-label">Next Payment</div>
+        <div class="bi-value">{% if next_payment %}{{ next_payment|date:"M d, Y" }}{% elif sub.plan == 'free' %}—{% else %}Pending{% endif %}</div>
+        <div class="bi-sub">{% if sub.plan != 'free' %}${{ plan_price }} will be charged{% else %}Free plan — no charges{% endif %}</div>
+    </div>
+
+    <div class="billing-info">
+        <div class="bi-label">Total Spent</div>
+        <div class="bi-value">${{ total_spent|floatformat:2 }}</div>
+        <div class="bi-sub">{{ payments.count }} payment{{ payments.count|pluralize }} made</div>
+    </div>
+
+    <div class="billing-info">
+        <div class="bi-label">Billing Email</div>
+        <div class="bi-value" style="font-size:14px;">{{ request.user.email|default:"Not set" }}</div>
+        <div class="bi-sub"><a href="{% url 'dashboard:profile' %}" style="color:var(--primary);text-decoration:none;font-size:11px;">Change email →</a></div>
+    </div>
+</div>
+
+<!-- ═══════ USAGE THIS MONTH ═══════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Usage This Month</h3>
+        <span style="font-size:11px;color:var(--text-muted);">Resets on 1st of every month</span>
+    </div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;">
+            <!-- Visitors -->
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:13px;font-weight:600;"><i class="fas fa-users" style="color:var(--primary);margin-right:4px;"></i> Visitors</span>
+                    <span style="font-size:12px;color:var(--text-muted);">{{ monthly_visitors }} / {% if limits.max_visitors_per_month >= 999999 %}Unlimited{% else %}{{ limits.max_visitors_per_month }}{% endif %}</span>
+                </div>
+                <div class="usage-bar">
+                    <div class="usage-fill" style="width:{% if limits.max_visitors_per_month >= 999999 %}5{% else %}{% widthratio monthly_visitors limits.max_visitors_per_month 100 %}{% endif %}%;background:{% if monthly_visitors >= limits.max_visitors_per_month and limits.max_visitors_per_month < 999999 %}var(--danger){% else %}var(--primary){% endif %};"></div>
+                </div>
+                {% if monthly_visitors >= limits.max_visitors_per_month and limits.max_visitors_per_month < 999999 %}
+                <div style="font-size:11px;color:var(--danger);margin-top:4px;font-weight:600;"><i class="fas fa-exclamation-circle"></i> Limit reached — new visitors won't be tracked</div>
+                {% endif %}
+            </div>
+
+            <!-- Agents -->
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:13px;font-weight:600;"><i class="fas fa-user-plus" style="color:var(--info);margin-right:4px;"></i> Agents</span>
+                    <span style="font-size:12px;color:var(--text-muted);">{{ agent_count }} / {% if limits.max_agents >= 999 %}Unlimited{% else %}{{ limits.max_agents }}{% endif %}</span>
+                </div>
+                <div class="usage-bar">
+                    <div class="usage-fill" style="width:{% if limits.max_agents >= 999 %}5{% else %}{% widthratio agent_count limits.max_agents 100 %}{% endif %}%;background:var(--info);"></div>
+                </div>
+            </div>
+
+            <!-- Chats -->
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:13px;font-weight:600;"><i class="fas fa-comments" style="color:var(--success);margin-right:4px;"></i> Chats This Month</span>
+                    <span style="font-size:12px;color:var(--text-muted);">{{ total_chats }}</span>
+                </div>
+                <div class="usage-bar">
+                    <div class="usage-fill" style="width:{% if total_chats > 0 %}30{% else %}0{% endif %}%;background:var(--success);"></div>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Unlimited on all plans</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ PLAN SELECTION ═══════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3><i class="fas fa-crown" style="color:var(--warning);"></i> Choose Your Plan</h3>
+        <!-- Monthly / Yearly Toggle -->
+        <div style="display:flex;background:var(--bg-hover);border-radius:10px;padding:3px;gap:2px;" id="intervalToggle">
+            <button onclick="setBillingInterval('month')" id="btnMonth" style="padding:6px 16px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;background:transparent;color:var(--text-muted);">Monthly</button>
+            <button onclick="setBillingInterval('year')" id="btnYear" style="padding:6px 16px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;background:var(--gradient);color:white;">Yearly <span style="font-size:10px;color:#a7f3d0;font-weight:800;">SAVE 17%</span></button>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Coupon Code -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;max-width:400px;">
+            <div style="flex:1;position:relative;">
+                <input type="text" id="couponInput" class="form-control" placeholder="Have a coupon code?" style="padding-right:36px;font-size:13px;">
+                <i class="fas fa-tag" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px;"></i>
+            </div>
+            <button onclick="applyCoupon()" id="couponBtn" class="btn btn-sm btn-secondary" style="white-space:nowrap;"><i class="fas fa-check"></i> Apply</button>
+        </div>
+        <div id="couponResult" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:10px;font-size:13px;"></div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:20px;align-items:start;">
+            <!-- ━━━ FREE ━━━ -->
+            <div class="plan-card {% if sub.plan == 'free' %}current{% endif %}">
+                <div class="plan-icon" style="background:rgba(100,116,139,0.08);color:#64748b;"><i class="fas fa-paper-plane"></i></div>
+                <div class="plan-name">Free</div>
+                <div class="plan-price">$0<span>/mo</span></div>
+                <div class="plan-desc">For small websites & startups</div>
+                <div class="plan-divider"></div>
+                <div style="padding:0 4px;">
+                    <div class="plan-feature"><i class="fas fa-check"></i> Up to 100 visitors/month</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> 1 Agent</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Live chat widget</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Visitor tracking</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Chat history (30 days)</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Basic analytics</div>
+                    <div class="plan-divider"></div>
+                    <div class="plan-feature disabled"><i class="fas fa-times"></i> Advanced analytics</div>
+                    <div class="plan-feature disabled"><i class="fas fa-times"></i> AI Bot</div>
+                    <div class="plan-feature disabled"><i class="fas fa-times"></i> Custom branding</div>
+                </div>
+                {% if sub.plan == 'free' %}
+                <div style="margin-top:18px;padding:12px;background:var(--success-soft);border-radius:12px;color:var(--success);font-weight:700;font-size:13px;"><i class="fas fa-check-circle"></i> Current Plan</div>
+                {% else %}
+                <button onclick="if(confirm('Downgrade to Free?')) cancelPlan()" class="btn btn-secondary" style="width:100%;margin-top:18px;justify-content:center;border-radius:12px;">Downgrade</button>
+                {% endif %}
+            </div>
+
+            <!-- ━━━ PRO ━━━ -->
+            <div class="plan-card {% if sub.plan == 'pro' %}current{% endif %} featured" style="overflow:visible;">
+                <div class="plan-badge">Most Popular</div>
+                <div class="plan-icon" style="background:var(--primary-soft);color:var(--primary);"><i class="fas fa-rocket"></i></div>
+                <div class="plan-name" style="color:var(--primary);">Pro</div>
+                <div class="plan-price price-monthly">$19<span>/mo</span></div>
+                <div class="plan-price price-yearly" style="display:none;">$15<span>.83/mo</span></div>
+                <div class="plan-desc price-monthly">For growing businesses</div>
+                <div class="plan-desc price-yearly" style="display:none;">
+                    <span style="color:var(--text-muted);text-decoration:line-through;margin-right:4px;">$228/yr</span>
+                    <span style="font-weight:800;">$190/yr</span>
+                    <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;background:var(--success-soft);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;color:var(--success);"><i class="fas fa-tag"></i> Save $38</div>
+                </div>
+                <div class="plan-divider"></div>
+                <div style="padding:0 4px;">
+                    <div class="plan-feature"><i class="fas fa-check"></i> <strong>Unlimited</strong> visitors</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> 5 Agents</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Priority chat queue</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> <strong>Advanced analytics</strong></div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Unlimited chat history</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Custom widget branding</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Email notifications</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Heatmaps & Goals</div>
+                    <div class="plan-divider"></div>
+                    <div class="plan-feature disabled"><i class="fas fa-times"></i> AI Bot & Chatflows</div>
+                </div>
+                {% if sub.plan == 'pro' %}
+                <div style="margin-top:18px;padding:12px;background:var(--primary-soft);border-radius:12px;color:var(--primary);font-weight:700;font-size:13px;"><i class="fas fa-check-circle"></i> Current Plan</div>
+                {% elif sub.plan == 'free' %}
+                <button onclick="upgradePlan('pro')" class="btn btn-primary" style="width:100%;margin-top:18px;justify-content:center;border-radius:12px;padding:12px;" id="proBuyBtn"><i class="fas fa-bolt" style="margin-right:4px;"></i> <span class="price-monthly" id="proMonthBtn">Upgrade — $19/mo</span><span class="price-yearly" style="display:none;" id="proYearBtn">Upgrade — $190/yr</span></button>
+                {% endif %}
+            </div>
+
+            <!-- ━━━ ENTERPRISE ━━━ -->
+            <div class="plan-card {% if sub.plan == 'enterprise' %}current{% endif %}">
+                <div class="plan-icon" style="background:var(--warning-soft);color:var(--warning);"><i class="fas fa-crown"></i></div>
+                <div class="plan-name" style="color:var(--warning);">Enterprise</div>
+                <div class="plan-price price-monthly">$79<span>/mo</span></div>
+                <div class="plan-price price-yearly" style="display:none;">$65<span>.83/mo</span></div>
+                <div class="plan-desc price-monthly">For large teams</div>
+                <div class="plan-desc price-yearly" style="display:none;">
+                    <span style="color:var(--text-muted);text-decoration:line-through;margin-right:4px;">$948/yr</span>
+                    <span style="font-weight:800;">$790/yr</span>
+                    <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;background:var(--success-soft);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;color:var(--success);"><i class="fas fa-tag"></i> Save $158</div>
+                </div>
+                <div class="plan-divider"></div>
+                <div style="padding:0 4px;">
+                    <div class="plan-feature"><i class="fas fa-check"></i> Everything in Pro</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> <strong>Unlimited</strong> Agents</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> <strong>AI chatbot</strong> & Flows</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Full API access</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> White-label widget</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Priority support</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> SLA guarantee</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Scheduled reports</div>
+                    <div class="plan-feature"><i class="fas fa-check"></i> Session recordings</div>
+                </div>
+                {% if sub.plan == 'enterprise' %}
+                <div style="margin-top:18px;padding:12px;background:var(--warning-soft);border-radius:12px;color:var(--warning);font-weight:700;font-size:13px;"><i class="fas fa-check-circle"></i> Current Plan</div>
+                {% elif sub.plan != 'enterprise' %}
+                <button onclick="upgradePlan('enterprise')" class="btn" style="width:100%;margin-top:18px;justify-content:center;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border-radius:12px;padding:12px;box-shadow:0 4px 14px rgba(245,158,11,0.3);" id="entBuyBtn"><i class="fas fa-crown" style="margin-right:4px;"></i> <span class="price-monthly" id="entMonthBtn">Upgrade — $79/mo</span><span class="price-yearly" style="display:none;" id="entYearBtn">Upgrade — $790/yr</span></button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ FEATURE COMPARISON TABLE ═══════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3><i class="fas fa-th-list"></i> Plan Comparison</h3></div>
+    <div class="card-body" style="padding:0;"><div class="table-container">
+        <table>
+            <thead><tr>
+                <th style="width:40%;">Feature</th>
+                <th style="text-align:center;{% if sub.plan == 'free' %}background:var(--primary-soft);{% endif %}">Free</th>
+                <th style="text-align:center;{% if sub.plan == 'pro' %}background:var(--primary-soft);{% endif %}">Pro <span style="font-size:10px;color:var(--primary);">$19</span></th>
+                <th style="text-align:center;{% if sub.plan == 'enterprise' %}background:var(--primary-soft);{% endif %}">Enterprise <span style="font-size:10px;color:var(--warning);">$79</span></th>
+            </tr></thead>
+            <tbody>
+                <tr><td>Monthly Visitors</td><td style="text-align:center;">100</td><td style="text-align:center;font-weight:700;">Unlimited</td><td style="text-align:center;font-weight:700;">Unlimited</td></tr>
+                <tr><td>Agents</td><td style="text-align:center;">1</td><td style="text-align:center;">5</td><td style="text-align:center;font-weight:700;">Unlimited</td></tr>
+                <tr><td>Chat History</td><td style="text-align:center;">30 days</td><td style="text-align:center;">Unlimited</td><td style="text-align:center;">Unlimited</td></tr>
+                <tr><td>Live Chat</td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>Visitor Tracking</td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>Advanced Analytics</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>Custom Widget Branding</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>Email Notifications</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>Heatmaps</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>AI Chatbot</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>API Access</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>White-Label Widget</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>Priority Support</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+                <tr><td>SLA Guarantee</td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--text-muted);"><i class="fas fa-times"></i></td><td style="text-align:center;color:var(--success);"><i class="fas fa-check"></i></td></tr>
+            </tbody>
+        </table>
+    </div></div>
+</div>
+
+<!-- ═══════ PAYMENT HISTORY ═══════ -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3><i class="fas fa-receipt" style="color:var(--success);"></i> Payment History</h3>
+        {% if payments %}<span style="font-size:11px;color:var(--text-muted);">{{ payments.count }} transaction{{ payments.count|pluralize }}</span>{% endif %}
+    </div>
+    <div class="card-body" style="padding:0;">
+        {% if payments %}
+        <div class="table-container"><table>
+            <thead><tr><th>Date</th><th>Description</th><th>Plan</th><th>Amount</th><th>Status</th><th>Invoice</th></tr></thead>
+            <tbody>
+            {% for p in payments %}
+            <tr>
+                <td style="font-size:12px;white-space:nowrap;">{{ p.created_at|date:"M d, Y" }}<br><span style="color:var(--text-muted);font-size:10px;">{{ p.created_at|time:"h:i A" }}</span></td>
+                <td style="font-size:13px;">{{ p.description|default:"Payment" }}</td>
+                <td><span style="background:{% if p.plan == 'enterprise' %}var(--warning-soft);color:var(--warning){% else %}var(--primary-soft);color:var(--primary){% endif %};padding:2px 10px;border-radius:6px;font-size:11px;font-weight:700;">{{ p.plan|title }}</span></td>
+                <td style="font-weight:800;font-size:15px;">${{ p.amount|floatformat:2 }}</td>
+                <td>
+                    {% if p.status == 'succeeded' %}
+                    <span class="status status-online" style="font-size:10px;"><span class="dot"></span> Paid</span>
+                    {% elif p.status == 'failed' %}
+                    <span class="status status-closed" style="font-size:10px;"><span class="dot"></span> Failed</span>
+                    {% else %}
+                    <span class="status status-waiting" style="font-size:10px;"><span class="dot"></span> {{ p.status|title }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if p.stripe_invoice_id %}
+                    <a href="#" onclick="downloadInvoice('{{ p.stripe_invoice_id }}');return false;" class="btn btn-sm btn-secondary" style="font-size:11px;padding:4px 10px;"><i class="fas fa-download" style="margin-right:3px;"></i> PDF</a>
+                    {% else %}
+                    <button onclick="generateLocalInvoice({{ p.id }})" class="btn btn-sm btn-secondary" style="font-size:11px;padding:4px 10px;"><i class="fas fa-file-alt" style="margin-right:3px;"></i> Receipt</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}
+        <div class="empty-state" style="padding:40px;">
+            <i class="fas fa-receipt" style="font-size:36px;opacity:0.2;margin-bottom:12px;"></i>
+            <p style="font-size:14px;color:var(--text-muted);">No payments yet</p>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Payment history will appear here when you upgrade to a paid plan.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ═══════ BILLING DETAILS ═══════ -->
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-info-circle" style="color:var(--info);"></i> Billing Details</h3></div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;">
+            <div>
+                <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Organization</div>
+                <div style="font-weight:600;">{{ request.user.agent_profile.organization.name }}</div>
+            </div>
+            <div>
+                <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Account Owner</div>
+                <div style="font-weight:600;">{{ request.user.get_full_name|default:request.user.username }}</div>
+            </div>
+            <div>
+                <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Billing Email</div>
+                <div style="font-weight:600;">{{ request.user.email|default:"Not set" }}</div>
+            </div>
+            <div>
+                <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Payment Method</div>
+                <div style="font-weight:600;">{% if sub.stripe_customer_id %}<i class="fab fa-cc-stripe" style="color:#635bff;margin-right:4px;"></i> Stripe{% elif sub.plan == 'free' %}None required{% else %}Not configured{% endif %}</div>
+            </div>
+            <div>
+                <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Customer ID</div>
+                <div style="font-weight:600;font-family:monospace;font-size:12px;">{% if sub.stripe_customer_id %}{{ sub.stripe_customer_id }}{% else %}—{% endif %}</div>
+            </div>
+            <div>
+                <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Member Since</div>
+                <div style="font-weight:600;">{{ sub.created_at|date:"M d, Y" }}</div>
+            </div>
+        </div>
+
+        {% if sub.plan != 'free' %}
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;">
+            <button onclick="cancelPlan()" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i> Cancel Subscription</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ═══════ PAYMENT GATEWAY STATUS ═══════ -->
+{% if not stripe_configured %}
+<div class="card" style="margin-top:20px;border:1px dashed var(--warning);">
+    <div class="card-body" style="display:flex;align-items:center;gap:12px;">
+        <i class="fas fa-exclamation-triangle" style="font-size:24px;color:var(--warning);"></i>
+        <div>
+            <div style="font-weight:700;font-size:14px;color:var(--text-primary);">Payment Gateway Not Configured</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Stripe keys are not set. Add <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_PUBLIC_KEY</code> to your <code>.env</code> file to enable payments.</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal Dialog -->
+<div id="billingModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border-radius:var(--radius);max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;animation:modalIn .25s ease;">
+        <div style="padding:24px 24px 0;text-align:center;">
+            <div id="modalIcon" style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;"></div>
+            <h3 id="modalTitle" style="font-size:18px;font-weight:800;color:var(--text-primary);margin-bottom:6px;"></h3>
+            <p id="modalMsg" style="font-size:13px;color:var(--text-muted);line-height:1.6;"></p>
+        </div>
+        <div id="modalActions" style="padding:20px 24px;display:flex;gap:8px;justify-content:center;"></div>
+    </div>
+</div>
+<style>
+@keyframes modalIn{from{opacity:0;transform:scale(0.95);}to{opacity:1;transform:scale(1);}}
+</style>
+
+<script>
+var selectedInterval = 'year';
+var appliedCoupon = '';
+
+// Init yearly as default on page load
+document.addEventListener('DOMContentLoaded', function() { setBillingInterval('year'); });
+
+function setBillingInterval(interval) {
+    selectedInterval = interval;
+    document.getElementById('btnMonth').style.background = interval === 'month' ? 'var(--gradient)' : 'transparent';
+    document.getElementById('btnMonth').style.color = interval === 'month' ? 'white' : 'var(--text-muted)';
+    document.getElementById('btnYear').style.background = interval === 'year' ? 'var(--gradient)' : 'transparent';
+    document.getElementById('btnYear').style.color = interval === 'year' ? 'white' : 'var(--text-muted)';
+    // Toggle price display
+    document.querySelectorAll('.price-monthly').forEach(function(el) { el.style.display = interval === 'month' ? '' : 'none'; });
+    document.querySelectorAll('.price-yearly').forEach(function(el) { el.style.display = interval === 'year' ? '' : 'none'; });
+    // Re-validate coupon if applied
+    if (appliedCoupon) applyCoupon();
+}
+
+function applyCoupon() {
+    var code = document.getElementById('couponInput').value.trim();
+    if (!code) return;
+    var btn = document.getElementById('couponBtn');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+
+    fetch('{% url "dashboard:validate_coupon" %}', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+        body: JSON.stringify({code: code, plan: 'pro', interval: selectedInterval})
+    }).then(r => r.json()).then(data => {
+        btn.innerHTML = '<i class="fas fa-check"></i> Apply';
+        btn.disabled = false;
+        var result = document.getElementById('couponResult');
+        result.style.display = 'block';
+        if (data.valid) {
+            appliedCoupon = code;
+            result.style.background = 'rgba(16,185,129,0.08)';
+            result.style.color = 'var(--success)';
+            result.style.border = '1px solid rgba(16,185,129,0.2)';
+            var discText = data.discount_type === 'percent' ? data.discount_value + '% off' : '$' + data.discount_value + ' off';
+            result.innerHTML = '<i class="fas fa-check-circle" style="margin-right:6px;"></i><strong>' + data.code + '</strong> applied — ' + discText + ' &middot; You pay <strong>$' + data.final_price + '</strong> <s style="color:var(--text-muted);font-size:11px;">$' + data.original_price + '</s> <button onclick="removeCoupon()" style="border:none;background:none;color:var(--danger);cursor:pointer;margin-left:8px;font-size:11px;"><i class="fas fa-times"></i> Remove</button>';
+            // Update plan card prices with discount
+            updatePlanPrices(data.discount_type, data.discount_value);
+        } else {
+            appliedCoupon = '';
+            result.style.background = 'rgba(239,68,68,0.06)';
+            result.style.color = 'var(--danger)';
+            result.style.border = '1px solid rgba(239,68,68,0.15)';
+            result.innerHTML = '<i class="fas fa-times-circle" style="margin-right:6px;"></i>' + data.error;
+        }
+    }).catch(function() {
+        btn.innerHTML = '<i class="fas fa-check"></i> Apply';
+        btn.disabled = false;
+    });
+}
+
+function removeCoupon() {
+    appliedCoupon = '';
+    document.getElementById('couponInput').value = '';
+    document.getElementById('couponResult').style.display = 'none';
+    resetPlanPrices();
+}
+
+function calcDisc(price, type, val) {
+    if (type === 'percent') return Math.round(price * (100 - val)) / 100;
+    return Math.max(price - val, 0);
+}
+
+function updatePlanPrices(discType, discVal) {
+    var prices = {pro:{month:19,year:190},enterprise:{month:79,year:790}};
+    // Pro prices
+    var proM = calcDisc(prices.pro.month, discType, discVal);
+    var proY = calcDisc(prices.pro.year, discType, discVal);
+    var entM = calcDisc(prices.enterprise.month, discType, discVal);
+    var entY = calcDisc(prices.enterprise.year, discType, discVal);
+
+    // Update Pro card
+    var proMonthEl = document.getElementById('proMonthBtn');
+    var proYearEl = document.getElementById('proYearBtn');
+    if (proMonthEl) proMonthEl.innerHTML = 'Upgrade — <s style="opacity:0.5;">$19</s> $' + proM + '/mo';
+    if (proYearEl) proYearEl.innerHTML = 'Upgrade — <s style="opacity:0.5;">$190</s> $' + proY + '/yr';
+
+    // Update Enterprise card
+    var entMonthEl = document.getElementById('entMonthBtn');
+    var entYearEl = document.getElementById('entYearBtn');
+    if (entMonthEl) entMonthEl.innerHTML = 'Upgrade — <s style="opacity:0.5;">$79</s> $' + entM + '/mo';
+    if (entYearEl) entYearEl.innerHTML = 'Upgrade — <s style="opacity:0.5;">$190</s> $' + entY + '/yr';
+}
+
+function resetPlanPrices() {
+    var proMonthEl = document.getElementById('proMonthBtn');
+    var proYearEl = document.getElementById('proYearBtn');
+    if (proMonthEl) proMonthEl.textContent = 'Upgrade — $19/mo';
+    if (proYearEl) proYearEl.textContent = 'Upgrade — $190/yr';
+    var entMonthEl = document.getElementById('entMonthBtn');
+    var entYearEl = document.getElementById('entYearBtn');
+    if (entMonthEl) entMonthEl.textContent = 'Upgrade — $79/mo';
+    if (entYearEl) entYearEl.textContent = 'Upgrade — $790/yr';
+}
+
+function showBillingModal(icon, iconBg, title, msg, actions) {
+    var m = document.getElementById('billingModal');
+    document.getElementById('modalIcon').innerHTML = '<i class="fas fa-'+icon+'"></i>';
+    document.getElementById('modalIcon').style.background = iconBg;
+    document.getElementById('modalIcon').style.color = 'white';
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalMsg').innerHTML = msg;
+    document.getElementById('modalActions').innerHTML = actions;
+    m.style.display = 'flex';
+}
+function closeModal() { document.getElementById('billingModal').style.display = 'none'; }
+
+function upgradePlan(plan) {
+    {% if stripe_configured %}
+    var btn = event.target.closest('button');
+    var prices = {pro:{month:'$19/mo',year:'$190/yr'},enterprise:{month:'$79/mo',year:'$790/yr'}};
+    var planName = plan.charAt(0).toUpperCase() + plan.slice(1) + ' (' + prices[plan][selectedInterval] + ')';
+    showBillingModal('credit-card', 'var(--primary)', 'Upgrade to ' + planName,
+        'You will be redirected to Stripe\'s secure checkout page to complete your payment.<br><br><span style="font-size:11px;color:var(--text-muted);"><i class="fas fa-lock" style="margin-right:4px;"></i>256-bit SSL encrypted payment</span>',
+        '<button onclick="closeModal()" class="btn btn-secondary">Cancel</button>' +
+        '<button onclick="closeModal();processUpgrade(\''+plan+'\')" class="btn btn-primary"><i class="fas fa-arrow-right"></i> Continue to Payment</button>'
+    );
+    {% else %}
+    showBillingModal('exclamation-triangle', 'var(--warning)', 'Payment Gateway Not Ready',
+        'Stripe keys are not configured yet.<br><br>Add <code>STRIPE_PUBLIC_KEY</code> and <code>STRIPE_SECRET_KEY</code> to your <code>.env</code> file to enable payments.',
+        '<button onclick="closeModal()" class="btn btn-primary">Got it</button>'
+    );
+    {% endif %}
+}
+
+function processUpgrade(plan) {
+    var btns = document.querySelectorAll('.plan-card button');
+    btns.forEach(function(b) { if (b.textContent.includes('Upgrade')) { b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; b.disabled = true; } });
+
+    fetch('{% url "dashboard:checkout" %}', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken':'{{ csrf_token }}'},
+        body: JSON.stringify({plan: plan, interval: selectedInterval, coupon: appliedCoupon})
+    }).then(r => r.json()).then(data => {
+        if (data.checkout_url) {
+            window.location.href = data.checkout_url;
+        } else {
+            showBillingModal('times-circle', 'var(--danger)', 'Payment Error',
+                data.error || 'Something went wrong. Please try again.',
+                '<button onclick="closeModal();location.reload();" class="btn btn-primary">Try Again</button>'
+            );
+        }
+    }).catch(function() {
+        showBillingModal('wifi', 'var(--danger)', 'Connection Error',
+            'Could not reach the payment server. Please check your internet connection and try again.',
+            '<button onclick="closeModal();location.reload();" class="btn btn-primary">Retry</button>'
+        );
+    });
+}
+
+function cancelPlan() {
+    showBillingModal('exclamation-circle', 'var(--warning)', 'Cancel Subscription?',
+        '<div style="text-align:left;font-size:13px;"><div style="padding:4px 0;"><i class="fas fa-check" style="color:var(--success);margin-right:6px;"></i>Access continues until billing period ends</div><div style="padding:4px 0;"><i class="fas fa-check" style="color:var(--success);margin-right:6px;"></i>Downgraded to Free plan after that</div><div style="padding:4px 0;"><i class="fas fa-check" style="color:var(--success);margin-right:6px;"></i>Your data will NOT be deleted</div></div>',
+        '<button onclick="closeModal()" class="btn btn-secondary">Keep Plan</button>' +
+        '<button onclick="closeModal();processCancelPlan();" class="btn" style="background:var(--danger);color:white;">Cancel Subscription</button>'
+    );
+}
+
+function processCancelPlan() {
+    fetch('{% url "dashboard:cancel_subscription" %}', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken':'{{ csrf_token }}'},
+    }).then(r => r.json()).then(data => {
+        if (data.status === 'ok') {
+            showBillingModal('check-circle', 'var(--success)', 'Subscription Cancelled',
+                'Your plan will be downgraded to Free at the end of the current billing period.',
+                '<button onclick="closeModal();location.reload();" class="btn btn-primary">OK</button>'
+            );
+        } else {
+            showBillingModal('times-circle', 'var(--danger)', 'Error', data.error || 'Could not cancel. Please try again.',
+                '<button onclick="closeModal()" class="btn btn-primary">OK</button>'
+            );
+        }
+    });
+}
+
+// ═══════ INVOICE DOWNLOAD ═══════
+function downloadInvoice(invoiceId) {
+    {% if stripe_configured %}
+    showBillingModal('spinner fa-spin', 'var(--primary)', 'Fetching Invoice...', 'Getting your invoice PDF from Stripe...', '');
+    fetch('{% url "dashboard:download_invoice" %}', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+        body: JSON.stringify({invoice_id: invoiceId})
+    }).then(r => r.json()).then(data => {
+        closeModal();
+        if (data.pdf_url) {
+            window.open(data.pdf_url, '_blank');
+        } else {
+            showBillingModal('exclamation-circle', 'var(--warning)', 'Invoice Not Available', data.error || 'Could not fetch invoice PDF.', '<button onclick="closeModal()" class="btn btn-primary">OK</button>');
+        }
+    }).catch(function() { closeModal(); });
+    {% else %}
+    generateLocalInvoice(0);
+    {% endif %}
+}
+
+function generateLocalInvoice(paymentId) {
+    // Generate a local HTML receipt
+    var rows = document.querySelectorAll('.table-container table tbody tr');
+    var row = null;
+    rows.forEach(function(r) { if (r.innerHTML.includes('generateLocalInvoice('+paymentId+')') || paymentId === 0) { if (!row) row = r; } });
+
+    var cells = row ? row.querySelectorAll('td') : [];
+    var date = cells[0] ? cells[0].textContent.trim() : '';
+    var desc = cells[1] ? cells[1].textContent.trim() : '';
+    var plan = cells[2] ? cells[2].textContent.trim() : '';
+    var amount = cells[3] ? cells[3].textContent.trim() : '';
+
+    var w = window.open('', '_blank');
+    w.document.write('<html><head><title>Invoice — LiveTrack Pro</title><style>');
+    w.document.write('body{font-family:Inter,Arial,sans-serif;max-width:600px;margin:40px auto;padding:20px;color:#1e1b4b;}');
+    w.document.write('h1{font-size:24px;margin-bottom:4px;} .meta{color:#6b7280;font-size:13px;margin-bottom:30px;}');
+    w.document.write('table{width:100%;border-collapse:collapse;margin:20px 0;} th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #e5e2ff;}');
+    w.document.write('th{font-size:11px;text-transform:uppercase;color:#6b7280;background:#f6f5ff;} .total{font-size:24px;font-weight:900;text-align:right;margin-top:20px;}');
+    w.document.write('.badge{background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;padding:3px 12px;border-radius:6px;font-size:11px;font-weight:700;}');
+    w.document.write('.footer{margin-top:40px;padding-top:20px;border-top:1px solid #e5e2ff;font-size:11px;color:#9ca3af;text-align:center;}');
+    w.document.write('@media print{body{margin:0;} button{display:none !important;}}');
+    w.document.write('</style></head><body>');
+    w.document.write('<div style="display:flex;justify-content:space-between;align-items:start;">');
+    w.document.write('<div><h1>Invoice</h1><div class="meta">LiveTrack Pro</div></div>');
+    w.document.write('<div style="text-align:right;"><span class="badge">PAID</span><div style="font-size:12px;color:#6b7280;margin-top:6px;">' + date + '</div></div></div>');
+    w.document.write('<table><tr><th>Description</th><th>Plan</th><th style="text-align:right;">Amount</th></tr>');
+    w.document.write('<tr><td>' + desc + '</td><td>' + plan + '</td><td style="text-align:right;font-weight:700;">' + amount + '</td></tr>');
+    if (desc.includes('Coupon')) {
+        w.document.write('<tr><td colspan="2" style="color:#10b981;font-size:12px;"><i>Discount applied — see description</i></td><td></td></tr>');
+    }
+    w.document.write('</table>');
+    w.document.write('<div class="total">Total Paid: ' + amount + '</div>');
+    w.document.write('<div style="margin-top:20px;padding:16px;background:#f6f5ff;border-radius:10px;font-size:12px;">');
+    w.document.write('<strong>Bill To:</strong> {{ request.user.agent_profile.organization.name }}<br>');
+    w.document.write('<strong>Email:</strong> {{ request.user.email }}<br>');
+    w.document.write('<strong>Plan:</strong> ' + plan + '</div>');
+    w.document.write('<div style="margin-top:20px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">Print / Save as PDF</button></div>');
+    w.document.write('<div class="footer">LiveTrack Pro &middot; Invoice generated automatically &middot; Questions? Contact support</div>');
+    w.document.write('</body></html>');
+    w.document.close();
+}
+
+// Close modal on backdrop click
+document.getElementById('billingModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+
+{% if upgrade_plan %}
+// Auto-trigger upgrade for users coming from pricing page
+setTimeout(function() { upgradePlan('{{ upgrade_plan }}'); }, 500);
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}Knowledge Base{% endblock %}
+{% block page_title %}Knowledge Base{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-folder"></i></div>
+        <div class="stat-value">{{ categories.count }}</div>
+        <div class="stat-label">Categories</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
+        <div class="stat-value">{{ articles.count }}</div>
+        <div class="stat-label">Articles</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-icon"><i class="fas fa-eye"></i></div>
+        <div class="stat-value">{% load humanize %}{% with total_views=0 %}{{ total_views }}{% endwith %}</div>
+        <div class="stat-label">Total Views</div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-link"></i></div>
+        <div class="stat-value"><a href="{% url 'kb_public' org_slug=request.user.agent_profile.organization.slug %}" style="color:inherit;font-size:14px;" target="_blank">View Public KB <i class="fas fa-external-link-alt" style="font-size:12px;"></i></a></div>
+        <div class="stat-label">Public Link</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Categories -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-folder-open"></i> Categories</h3></div>
+        <div class="card-body">
+            {% for cat in categories %}
+            <div style="padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <i class="{{ cat.icon }}" style="color:var(--primary);margin-right:6px;"></i>
+                    <strong>{{ cat.name }}</strong>
+                    <span style="font-size:12px;color:var(--text-muted);margin-left:4px;">({{ cat.article_count }} articles)</span>
+                    {% if cat.description %}<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">{{ cat.description|truncatewords:12 }}</div>{% endif %}
+                </div>
+                <button onclick="deleteCategory({{ cat.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="padding:20px;"><i class="fas fa-folder"></i><p>No categories yet.</p></div>
+            {% endfor %}
+
+            <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+                <div class="form-group"><label>New Category</label><input type="text" id="catName" class="form-control" placeholder="e.g. Getting Started"></div>
+                <div class="form-group"><label>Description</label><input type="text" id="catDesc" class="form-control" placeholder="Optional"></div>
+                <button onclick="createCategory()" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> Add Category</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Article -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-pen"></i> New Article</h3></div>
+        <div class="card-body">
+            <div class="form-group"><label>Category</label>
+                <select id="articleCat" class="form-control">
+                    {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group"><label>Title</label><input type="text" id="articleTitle" class="form-control" placeholder="e.g. How to install the widget"></div>
+            <div class="form-group"><label>Content (Markdown supported)</label><textarea id="articleContent" class="form-control" rows="8" placeholder="Write your article content here..."></textarea></div>
+            <button onclick="createArticle()" class="btn btn-primary"><i class="fas fa-plus"></i> Publish Article</button>
+        </div>
+    </div>
+</div>
+
+<!-- Articles List -->
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><h3><i class="fas fa-list"></i> All Articles</h3></div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Title</th><th>Category</th><th>Views</th><th>Helpful</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                {% for article in articles %}
+                <tr>
+                    <td style="font-weight:600;">{{ article.title }}</td>
+                    <td><span style="background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:6px;font-size:11px;">{{ article.category.name }}</span></td>
+                    <td>{{ article.views_count }}</td>
+                    <td><span style="color:var(--success);">{{ article.helpful_yes }} <i class="fas fa-thumbs-up"></i></span> / <span style="color:var(--danger);">{{ article.helpful_no }} <i class="fas fa-thumbs-down"></i></span></td>
+                    <td><span class="status {% if article.is_published %}status-online{% else %}status-offline{% endif %}"><span class="dot"></span> {% if article.is_published %}Published{% else %}Draft{% endif %}</span></td>
+                    <td>
+                        <button onclick="toggleArticle({{ article.id }}, {% if article.is_published %}false{% else %}true{% endif %})" class="btn btn-sm btn-secondary"><i class="fas fa-{% if article.is_published %}eye-slash{% else %}eye{% endif %}"></i></button>
+                        <button onclick="deleteArticle({{ article.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No articles yet</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function postJSON(url, data) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json());
+}
+function createCategory() { postJSON('', {action:'create_category', name:document.getElementById('catName').value, description:document.getElementById('catDesc').value}).then(()=>location.reload()); }
+function deleteCategory(id) { if(confirm('Delete category and all articles?')) postJSON('', {action:'delete_category', category_id:id}).then(()=>location.reload()); }
+function createArticle() {
+    postJSON('', {action:'create_article', category_id:parseInt(document.getElementById('articleCat').value), title:document.getElementById('articleTitle').value, content:document.getElementById('articleContent').value}).then(()=>location.reload());
+}
+function deleteArticle(id) { if(confirm('Delete this article?')) postJSON('', {action:'delete_article', article_id:id}).then(()=>location.reload()); }
+function toggleArticle(id, pub) { postJSON('', {action:'update_article', article_id:id, is_published:pub}).then(()=>location.reload()); }
+</script>
+{% endblock %}

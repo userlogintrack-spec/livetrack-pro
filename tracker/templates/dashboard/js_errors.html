@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}JavaScript Errors{% endblock %}
+{% block page_title %}JavaScript Error Tracking{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+    <div class="stat-card orange"><div class="stat-icon"><i class="fas fa-bug"></i></div><div class="stat-value">{{ total_errors }}</div><div class="stat-label">Total Errors</div></div>
+    <div class="stat-card purple"><div class="stat-icon"><i class="fas fa-fingerprint"></i></div><div class="stat-value">{{ unique_errors }}</div><div class="stat-label">Unique Errors</div></div>
+    <div class="stat-card blue"><div class="stat-icon"><i class="fas fa-users"></i></div><div class="stat-value">{{ affected_visitors }}</div><div class="stat-label">Affected Visitors</div></div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><h3><i class="fas fa-layer-group"></i> Error Groups</h3></div>
+    <div class="card-body"><div class="table-container"><table>
+        <thead><tr><th>Error Message</th><th>Occurrences</th><th>Browsers</th><th>Last Seen</th></tr></thead>
+        <tbody>
+        {% for eg in error_groups %}
+        <tr>
+            <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:12px;color:var(--danger);">{{ eg.error_message|truncatechars:80 }}</td>
+            <td><span style="font-weight:700;">{{ eg.count }}</span></td>
+            <td>{{ eg.browsers }}</td>
+            <td style="font-size:12px;color:var(--text-muted);">{{ eg.last_seen|timesince }} ago</td>
+        </tr>
+        {% empty %}<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:30px;"><i class="fas fa-check-circle" style="color:var(--success);font-size:24px;display:block;margin-bottom:8px;"></i>No JavaScript errors detected</td></tr>{% endfor %}
+        </tbody>
+    </table></div></div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-list"></i> Recent Errors</h3></div>
+    <div class="card-body"><div class="table-container"><table>
+        <thead><tr><th>Time</th><th>Error</th><th>Source</th><th>Line</th><th>Page</th><th>Browser</th></tr></thead>
+        <tbody>
+        {% for e in recent_errors %}
+        <tr>
+            <td style="font-size:12px;white-space:nowrap;">{{ e.timestamp|timesince }} ago</td>
+            <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:11px;color:var(--danger);">{{ e.error_message|truncatechars:60 }}</td>
+            <td style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ e.error_source|truncatechars:40 }}</td>
+            <td>{{ e.error_line }}:{{ e.error_col }}</td>
+            <td style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ e.page_url|truncatechars:40 }}</td>
+            <td>{{ e.browser }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table></div></div>
+</div>
+
+<!-- Tracking Code -->
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><h3><i class="fas fa-code"></i> Add Error Tracking to Your Site</h3></div>
+    <div class="card-body">
+        <pre style="background:var(--bg-hover);padding:16px;border-radius:var(--radius-sm);font-size:12px;overflow-x:auto;color:var(--text-primary);"><code>// Add this to catch all JS errors
+window.onerror = function(msg, source, line, col, error) {
+  fetch('/api/track/js-error/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    credentials: 'include',
+    body: JSON.stringify({
+      message: msg,
+      source: source,
+      line: line, col: col,
+      stack: error ? error.stack : '',
+      url: window.location.href
+    })
+  });
+};</code></pre>
+    </div>
+</div>
+{% endblock %}

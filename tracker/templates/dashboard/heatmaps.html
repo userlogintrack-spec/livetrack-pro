@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block title %}Heatmaps{% endblock %}
+{% block page_title %}Click & Scroll Heatmaps{% endblock %}
+{% block top_actions %}
+<form method="GET" style="display:flex;gap:6px;align-items:center;">
+    <select name="page" class="form-control" style="width:auto;padding:6px;font-size:12px;" onchange="this.form.submit()">
+        <option value="">All Pages</option>
+        {% for p in all_pages %}<option value="{{ p }}" {% if p == page_filter %}selected{% endif %}>{{ p }}</option>{% endfor %}
+    </select>
+    <select name="device" class="form-control" style="width:auto;padding:6px;font-size:12px;" onchange="this.form.submit()">
+        <option value="all">All Devices</option>
+        <option value="desktop" {% if device_filter == 'desktop' %}selected{% endif %}>Desktop</option>
+        <option value="mobile" {% if device_filter == 'mobile' %}selected{% endif %}>Mobile</option>
+        <option value="tablet" {% if device_filter == 'tablet' %}selected{% endif %}>Tablet</option>
+    </select>
+    <select name="period" class="form-control" style="width:auto;padding:6px;font-size:12px;" onchange="this.form.submit()">
+        <option value="7d" {% if period == '7d' %}selected{% endif %}>7 days</option>
+        <option value="30d" {% if period == '30d' %}selected{% endif %}>30 days</option>
+        <option value="90d" {% if period == '90d' %}selected{% endif %}>90 days</option>
+    </select>
+</form>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+    <div class="stat-card purple"><div class="stat-icon"><i class="fas fa-mouse-pointer"></i></div><div class="stat-value">{{ total_clicks }}</div><div class="stat-label">Total Clicks</div></div>
+    <div class="stat-card green"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-value">{{ normal_clicks }}</div><div class="stat-label">Normal Clicks</div></div>
+    <div class="stat-card orange"><div class="stat-icon"><i class="fas fa-bolt"></i></div><div class="stat-value">{{ rage_clicks }}</div><div class="stat-label">Rage Clicks</div></div>
+    <div class="stat-card blue"><div class="stat-icon"><i class="fas fa-ban"></i></div><div class="stat-value">{{ dead_clicks }}</div><div class="stat-label">Dead Clicks</div></div>
+    <div class="stat-card green"><div class="stat-icon"><i class="fas fa-arrows-alt-v"></i></div><div class="stat-value">{{ avg_scroll }}%</div><div class="stat-label">Avg Scroll Depth</div></div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px;">
+    <!-- Click Heatmap Canvas -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-fire"></i> Click Heatmap</h3></div>
+        <div class="card-body" style="position:relative;min-height:400px;background:#f8f9fa;border-radius:8px;overflow:hidden;" id="heatmapCanvas">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;" id="heatmapPlaceholder">
+                {% if total_clicks > 0 %}Loading heatmap...{% else %}No click data yet. Add the tracking script to your site.{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Scroll Depth -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-arrows-alt-v"></i> Scroll Depth Distribution</h3></div>
+        <div class="card-body">
+            {% for s in scroll_depths %}
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span style="font-size:12px;width:40px;text-align:right;color:var(--text-muted);">{{ s.max_scroll_percent }}%</span>
+                <div style="flex:1;height:18px;background:var(--bg-hover);border-radius:4px;overflow:hidden;">
+                    <div style="height:100%;background:linear-gradient(90deg,var(--success),var(--primary));border-radius:4px;width:{% widthratio s.count total_clicks 100 %}%;min-width:2px;"></div>
+                </div>
+                <span style="font-size:11px;font-weight:600;min-width:30px;">{{ s.count }}</span>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="padding:30px;"><i class="fas fa-arrows-alt-v"></i><p>No scroll data yet</p></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Top Clicked Pages -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-file-alt"></i> Top Clicked Pages</h3></div>
+        <div class="card-body"><div class="table-container"><table>
+            <thead><tr><th>Page</th><th>Clicks</th><th>Rage</th><th>Dead</th></tr></thead>
+            <tbody>
+            {% for p in top_click_pages %}
+            <tr>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="?page={{ p.page_path }}" style="color:var(--primary);">{{ p.page_path }}</a></td>
+                <td>{{ p.total }}</td>
+                <td style="color:var(--warning);font-weight:600;">{{ p.rage }}</td>
+                <td style="color:var(--danger);font-weight:600;">{{ p.dead }}</td>
+            </tr>
+            {% empty %}<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No data</td></tr>{% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+
+    <!-- Most Clicked Elements -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-hand-pointer"></i> Most Clicked Elements</h3></div>
+        <div class="card-body"><div class="table-container"><table>
+            <thead><tr><th>Element</th><th>Text</th><th>Clicks</th></tr></thead>
+            <tbody>
+            {% for e in top_elements %}
+            <tr>
+                <td><code style="background:var(--bg-hover);padding:2px 6px;border-radius:4px;font-size:11px;">&lt;{{ e.element_tag }}&gt;</code></td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ e.element_text|truncatewords:6 }}</td>
+                <td style="font-weight:600;">{{ e.count }}</td>
+            </tr>
+            {% empty %}<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">No element data</td></tr>{% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+</div>
+
+<script>
+// Render click heatmap
+var clickData = {{ click_points|safe }};
+if (clickData.length > 0) {
+    var canvas = document.getElementById('heatmapCanvas');
+    document.getElementById('heatmapPlaceholder').style.display = 'none';
+    clickData.forEach(function(pt) {
+        var dot = document.createElement('div');
+        var color = pt.click_type === 'rage' ? 'rgba(239,68,68,0.6)' : pt.click_type === 'dead' ? 'rgba(245,158,11,0.6)' : 'rgba(124,58,237,0.4)';
+        var size = pt.click_type === 'rage' ? 18 : pt.click_type === 'dead' ? 14 : 10;
+        dot.style.cssText = 'position:absolute;width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+color+';left:'+pt.x_percent+'%;top:'+pt.y_percent+'%;transform:translate(-50%,-50%);pointer-events:none;';
+        canvas.appendChild(dot);
+    });
+}
+</script>
+{% endblock %}

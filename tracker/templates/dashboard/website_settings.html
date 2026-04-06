@@ -192,40 +192,68 @@
 
 <!-- RIGHT: Live Preview -->
 <div>
-    <div class="card" style="position:sticky;top:20px;">
-        <div class="card-header"><h3><i class="fas fa-eye" style="color:var(--info);"></i> Live Preview</h3></div>
-        <div class="card-body" style="padding:20px;background:#f0f0f0;border-radius:0 0 12px 12px;min-height:420px;position:relative;">
-            <!-- Mini widget preview -->
-            <div id="previewWidget" style="position:absolute;bottom:16px;right:16px;width:100%;max-width:300px;">
-                <!-- Widget panel -->
-                <div id="previewPanel" style="background:white;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.12);overflow:hidden;margin-bottom:12px;">
-                    <div id="previewHeader" style="background:{{ org.widget_color }};padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
-                        <div style="display:flex;align-items:center;gap:10px;">
-                            <div style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:white;"><i class="fas fa-headset"></i></div>
-                            <div>
-                                <div id="previewTitle" style="font-size:13px;font-weight:700;color:white;">{{ org.widget_title }}</div>
-                                <div style="font-size:11px;color:rgba(255,255,255,0.8);"><span style="display:inline-block;width:6px;height:6px;background:#34d399;border-radius:50%;margin-right:4px;"></span>We're online</div>
-                            </div>
-                        </div>
-                        <div style="color:rgba(255,255,255,0.7);font-size:14px;">✕</div>
-                    </div>
-                    <div style="padding:16px;">
-                        <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">Please fill in this form.</p>
-                        <div style="display:flex;flex-direction:column;gap:8px;">
-                            <input disabled placeholder="Your name *" style="padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;color:#9ca3af;background:white;">
-                            <input disabled placeholder="Email (optional)" style="padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;color:#9ca3af;background:white;">
-                            <div id="previewBtn" style="padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;color:white;background:{{ org.widget_color }};cursor:default;">
-                                <i class="fas fa-paper-plane"></i> Start Chat
-                            </div>
-                        </div>
-                    </div>
-                    <div style="padding:8px 16px;background:#fafafa;border-top:1px solid #f0f0f0;font-size:11px;color:#9ca3af;text-align:center;">
-                        <span style="display:inline-block;width:7px;height:7px;background:#34d399;border-radius:50;margin-right:4px;"></span> Online
-                    </div>
+    <div class="card" style="position:sticky;top:80px;">
+        <div class="card-header"><h3><i class="fas fa-eye" style="color:var(--success);"></i> Live Preview</h3><span style="font-size:11px;color:var(--text-muted);">Changes update instantly</span></div>
+        <div class="card-body" style="padding:0;min-height:520px;position:relative;overflow:hidden;">
+            <!-- Fake website background -->
+            <div style="background:linear-gradient(135deg,#f0f4ff,#e8eeff);height:100%;min-height:520px;position:relative;padding:16px;">
+                <!-- Fake browser bar -->
+                <div style="background:white;border-radius:10px 10px 0 0;padding:8px 12px;display:flex;align-items:center;gap:6px;border:1px solid #e0e0e0;border-bottom:none;">
+                    <div style="display:flex;gap:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></div><div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;"></div><div style="width:8px;height:8px;border-radius:50%;background:#10b981;"></div></div>
+                    <div style="flex:1;background:#f5f5f5;border-radius:6px;padding:4px 10px;font-size:9px;color:#9ca3af;font-family:monospace;">yourwebsite.com</div>
                 </div>
-                <!-- Widget button -->
-                <div id="previewButton" style="width:50px;height:50px;border-radius:50%;background:{{ org.widget_color }};display:flex;align-items:center;justify-content:center;color:white;font-size:20px;box-shadow:0 4px 16px rgba(0,0,0,0.2);margin-left:auto;">
-                    💬
+                <!-- Fake page content -->
+                <div style="background:white;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 10px 10px;padding:20px;min-height:420px;position:relative;">
+                    <div style="width:60%;height:10px;background:#e5e7eb;border-radius:4px;margin-bottom:8px;"></div>
+                    <div style="width:80%;height:10px;background:#f3f4f6;border-radius:4px;margin-bottom:8px;"></div>
+                    <div style="width:40%;height:10px;background:#f3f4f6;border-radius:4px;margin-bottom:16px;"></div>
+                    <div style="width:100%;height:60px;background:#f9fafb;border-radius:8px;margin-bottom:12px;"></div>
+                    <div style="width:70%;height:10px;background:#f3f4f6;border-radius:4px;margin-bottom:8px;"></div>
+                    <div style="width:50%;height:10px;background:#e5e7eb;border-radius:4px;"></div>
+
+                    <!-- Widget Preview — matches actual landing page widget exactly -->
+                    <div id="previewWidget" style="position:absolute;bottom:12px;right:12px;width:280px;transition:all .3s;font-family:Inter,Arial,sans-serif;">
+                        <!-- Widget panel -->
+                        <div id="previewPanel" style="background:white;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.15),0 0 0 1px rgba(0,0,0,0.04);overflow:hidden;transition:all .3s;">
+                            <!-- Header -->
+                            <div id="previewHeader" style="background:{{ org.widget_color }};padding:14px 16px;display:flex;align-items:center;justify-content:space-between;transition:background .3s;border-radius:16px 16px 0 0;">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <div style="width:34px;height:34px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:white;"><i class="fas fa-headset"></i></div>
+                                    <div>
+                                        <div id="previewTitle" style="font-size:14px;font-weight:700;color:white;letter-spacing:-0.2px;">{{ org.widget_title }}</div>
+                                        <div style="font-size:11px;color:rgba(255,255,255,0.85);display:flex;align-items:center;gap:4px;">
+                                            <span style="width:6px;height:6px;background:#34d399;border-radius:50%;box-shadow:0 0 6px #34d399;"></span> We're online
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="display:flex;gap:4px;">
+                                    <div style="width:26px;height:26px;background:rgba(255,255,255,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.8);font-size:10px;">⋮</div>
+                                    <div style="width:26px;height:26px;background:rgba(255,255,255,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.8);font-size:11px;">✕</div>
+                                </div>
+                            </div>
+                            <!-- Pre-chat form -->
+                            <div style="padding:16px;">
+                                <p style="font-size:11px;color:#6b7280;margin-bottom:10px;line-height:1.5;" id="previewWelcome">{{ org.welcome_message }}</p>
+                                <div style="display:flex;flex-direction:column;gap:8px;">
+                                    <input disabled placeholder="Your name *" style="padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;color:#a1a1aa;background:#fafafa;width:100%;box-sizing:border-box;font-family:inherit;">
+                                    <input disabled placeholder="Email (optional)" id="previewEmailField" style="padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;color:#a1a1aa;background:#fafafa;width:100%;box-sizing:border-box;font-family:inherit;">
+                                    <input disabled placeholder="Phone number (optional)" style="padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;color:#a1a1aa;background:#fafafa;width:100%;box-sizing:border-box;font-family:inherit;">
+                                    <textarea disabled placeholder="How can we help you?" style="padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;color:#a1a1aa;background:#fafafa;width:100%;box-sizing:border-box;font-family:inherit;resize:none;min-height:50px;"></textarea>
+                                    <div id="previewBtn" style="padding:11px;text-align:center;border-radius:12px;font-size:13px;font-weight:700;color:white;background:{{ org.widget_color }};cursor:default;transition:background .3s;box-shadow:0 4px 14px rgba(0,0,0,0.15);">
+                                        <i class="fas fa-paper-plane" style="margin-right:6px;"></i> Start Chat
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Status bar -->
+                            <div id="previewFooter" style="padding:8px 16px;background:#fafafa;border-top:1px solid #f0f0f0;font-size:10px;color:#9ca3af;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;">
+                                <span id="previewStatusDot" style="width:7px;height:7px;background:#34d399;border-radius:50%;display:inline-block;box-shadow:0 0 6px #34d399;"></span> Online
+                            </div>
+                        </div>
+                        <!-- Widget FAB button -->
+                        <div id="previewButton" style="width:50px;height:50px;border-radius:50%;background:{{ org.widget_color }};display:flex;align-items:center;justify-content:center;color:white;font-size:18px;box-shadow:0 6px 24px rgba(0,0,0,0.25);margin-left:auto;margin-top:10px;transition:background .3s;cursor:default;">
+                            💬
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -244,17 +272,92 @@ function copyEmbed() {
     });
 }
 
-// Live preview updates
-document.getElementById('colorPicker').addEventListener('input', function() {
-    const c = this.value;
-    document.getElementById('colorText').value = c;
+// ═══════ LIVE PREVIEW — All fields update preview in real-time ═══════
+
+function updateColor(c) {
     document.getElementById('previewHeader').style.background = c;
     document.getElementById('previewBtn').style.background = c;
     document.getElementById('previewButton').style.background = c;
+}
+
+// Color picker
+document.getElementById('colorPicker').addEventListener('input', function() {
+    document.getElementById('colorText').value = this.value;
+    updateColor(this.value);
+});
+document.getElementById('colorText').addEventListener('input', function() {
+    if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+        document.getElementById('colorPicker').value = this.value;
+        updateColor(this.value);
+    }
 });
 
+// Widget title
 document.querySelector('[name="widget_title"]').addEventListener('input', function() {
     document.getElementById('previewTitle').textContent = this.value || 'LiveTrack Support';
+});
+
+// Welcome message
+document.querySelector('[name="welcome_message"]').addEventListener('input', function() {
+    document.getElementById('previewWelcome').textContent = this.value || 'Hi! How can we help you today?';
+});
+
+// Widget position
+document.querySelector('[name="widget_position"]').addEventListener('change', function() {
+    var widget = document.getElementById('previewWidget');
+    if (this.value === 'bottom-left') {
+        widget.style.right = 'auto';
+        widget.style.left = '12px';
+        document.getElementById('previewButton').style.marginLeft = '0';
+        document.getElementById('previewButton').style.marginRight = 'auto';
+    } else {
+        widget.style.left = 'auto';
+        widget.style.right = '12px';
+        document.getElementById('previewButton').style.marginLeft = 'auto';
+        document.getElementById('previewButton').style.marginRight = '0';
+    }
+});
+
+// Business hours — toggle online/offline in preview
+document.querySelector('[name="business_hours_enabled"]').addEventListener('change', function() {
+    var dot = document.getElementById('previewStatusDot');
+    var footer = document.getElementById('previewFooter');
+    if (this.checked) {
+        // Check if current time is within business hours
+        var start = document.querySelector('[name="business_hours_start"]').value;
+        var end = document.querySelector('[name="business_hours_end"]').value;
+        var now = new Date();
+        var hm = now.getHours() * 60 + now.getMinutes();
+        var startMin = start ? parseInt(start.split(':')[0]) * 60 + parseInt(start.split(':')[1]) : 0;
+        var endMin = end ? parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]) : 1440;
+        if (hm >= startMin && hm <= endMin) {
+            dot.style.background = '#34d399';
+            footer.innerHTML = '<span style="width:6px;height:6px;background:#34d399;border-radius:50%;display:inline-block;"></span> Online';
+        } else {
+            dot.style.background = '#f87171';
+            footer.innerHTML = '<span style="width:6px;height:6px;background:#f87171;border-radius:50%;display:inline-block;"></span> Offline';
+        }
+    } else {
+        dot.style.background = '#34d399';
+        footer.innerHTML = '<span style="width:6px;height:6px;background:#34d399;border-radius:50%;display:inline-block;"></span> Online';
+    }
+});
+
+// Offline message preview
+document.querySelector('[name="offline_message"]').addEventListener('input', function() {
+    // Show offline message in welcome area when business hours are off
+    var bhEnabled = document.querySelector('[name="business_hours_enabled"]').checked;
+    if (bhEnabled) {
+        document.getElementById('previewWelcome').textContent = this.value || 'We are currently offline.';
+    }
+});
+
+// Require email — toggle email field required indicator
+document.querySelector('[name="require_email"]').addEventListener('change', function() {
+    var emailField = document.querySelectorAll('#previewPanel input[placeholder*="Email"]')[0];
+    if (emailField) {
+        emailField.placeholder = this.checked ? 'Email *' : 'Email (optional)';
+    }
 });
 </script>
 {% endblock %}

@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#7c3aed">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LiveTrack">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/icon-192.svg">
     <title>{% block title %}LiveTrack{% endblock %} | LiveTrack Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -101,30 +107,52 @@
             z-index: 100;
             display: flex;
             flex-direction: column;
-            transition: background 0.3s;
-            box-shadow: var(--shadow-md);
+            transition: width 0.3s, background 0.3s;
         }
+        /* Collapsed state */
+        .sidebar.collapsed { width: 68px; }
+        .sidebar.collapsed .sidebar-brand h2,
+        .sidebar.collapsed .sidebar-brand small,
+        .sidebar.collapsed .nav-link span,
+        .sidebar.collapsed .nav-link .badge,
+        .sidebar.collapsed .nav-toggle-text,
+        .sidebar.collapsed .nav-search input,
+        .sidebar.collapsed .user-details,
+        .sidebar.collapsed .avail-text { display: none !important; }
+        .sidebar.collapsed .sidebar-brand { justify-content: center; padding: 18px 12px; }
+        .sidebar.collapsed .nav-link { justify-content: center; padding: 10px; }
+        .sidebar.collapsed .nav-link i { margin: 0; }
+        .sidebar.collapsed .nav-toggle { justify-content: center; padding: 10px; }
+        .sidebar.collapsed .nav-submenu .nav-link { padding-left: 10px; margin-left: 0; border-left: none; }
+        .sidebar.collapsed .sidebar-footer { padding: 8px; }
+        .sidebar.collapsed .user-info { justify-content: center; }
+        .sidebar.collapsed .nav-search { padding: 0 8px; }
+        .sidebar.collapsed .nav-search input { width: 0; padding: 0; }
+        .sidebar.collapsed .nav-search { justify-content: center; width: 44px; margin: 0 auto; border-radius: 10px; }
 
         .sidebar-brand {
-            padding: 20px 24px;
+            padding: 16px 16px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            border-bottom: 1px solid var(--border);
+            gap: 10px;
+            position: relative;
         }
 
         .sidebar-brand .logo {
-            width: 40px; height: 40px;
+            width: 36px; height: 36px;
             background: var(--gradient);
-            border-radius: 12px;
+            border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 18px; color: white;
+            font-size: 15px; color: white;
             box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+            flex-shrink: 0;
         }
 
         .sidebar-brand h2 {
-            font-size: 18px; font-weight: 700;
+            font-size: 16px; font-weight: 800;
             color: var(--text-primary);
+            letter-spacing: -0.3px;
+            white-space: nowrap;
         }
 
         .sidebar-brand h2 em {
@@ -136,38 +164,60 @@
 
         .sidebar-brand small {
             display: block;
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-muted);
             font-weight: 400;
         }
 
+        .collapse-btn {
+            position: absolute; right: -12px; top: 50%; transform: translateY(-50%);
+            width: 24px; height: 24px; border-radius: 50%;
+            background: var(--bg-card); border: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 10px; color: var(--text-muted);
+            transition: all 0.2s; z-index: 101; box-shadow: var(--shadow);
+        }
+        .collapse-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+        .sidebar.collapsed .collapse-btn { right: -12px; }
+        .sidebar.collapsed .collapse-btn i { transform: rotate(180deg); }
+
+        /* Search */
+        .nav-search {
+            display: flex; align-items: center; gap: 6px;
+            margin: 8px 12px 4px; padding: 8px 10px;
+            background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 10px; transition: all 0.2s;
+        }
+        .nav-search:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+        .nav-search i { color: var(--text-muted); font-size: 12px; flex-shrink: 0; }
+        .nav-search input {
+            border: none; background: transparent; outline: none;
+            font-size: 12px; color: var(--text-primary); width: 100%;
+            font-family: inherit;
+        }
+        .nav-search input::placeholder { color: var(--text-muted); }
+
         .sidebar-nav {
             flex: 1;
-            padding: 16px 12px;
+            padding: 6px 8px;
             overflow-y: auto;
         }
-
-        .nav-label {
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: var(--text-muted);
-            padding: 14px 12px 6px;
-        }
+        .sidebar-nav::-webkit-scrollbar { width: 3px; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
         .nav-link {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
+            gap: 10px;
+            padding: 8px 12px;
             color: var(--text-secondary);
             text-decoration: none;
-            border-radius: var(--radius-sm);
-            font-size: 14px;
+            border-radius: 10px;
+            font-size: 13px;
             font-weight: 500;
-            transition: all 0.2s;
-            margin-bottom: 2px;
+            transition: all 0.15s;
+            margin-bottom: 1px;
+            position: relative;
         }
 
         .nav-link:hover {
@@ -178,42 +228,110 @@
         .nav-link.active {
             background: var(--gradient);
             color: white;
-            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
         }
 
-        .nav-link i { width: 20px; text-align: center; font-size: 15px; }
+        .nav-link i { width: 18px; text-align: center; font-size: 14px; opacity: 0.7; flex-shrink: 0; }
+        .nav-link.active i { opacity: 1; }
 
         .nav-link .badge {
             margin-left: auto;
-            background: var(--danger);
+            background: #ef4444;
             color: white;
-            font-size: 11px;
-            padding: 2px 8px;
+            font-size: 10px;
+            padding: 2px 7px;
             border-radius: 10px;
+            font-weight: 700;
+            min-width: 20px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            padding: 12px 12px 6px;
+        }
+
+        /* Collapsible toggles */
+        .nav-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            margin: 2px 0;
+            border-radius: 10px;
+            font-size: 13px;
             font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.15s;
+        }
+        .nav-toggle:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        .nav-toggle .nav-chevron {
+            font-size: 10px;
+            transition: transform 0.25s;
+            opacity: 0.4;
+            margin-left: auto;
+        }
+        .nav-toggle .nav-chevron.rotated {
+            transform: rotate(90deg);
+            opacity: 0.8;
+        }
+        .nav-toggle i:first-child { width: 18px; text-align: center; font-size: 14px; opacity: 0.6; flex-shrink: 0; }
+
+        .nav-submenu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .nav-submenu.open {
+            max-height: 500px;
+        }
+        .nav-submenu .nav-link {
+            font-size: 12.5px;
+            padding: 7px 12px 7px 40px;
+            margin: 0;
+        }
+
+        .nav-sep {
+            height: 1px;
+            background: var(--border);
+            margin: 6px 12px;
+            opacity: 0.6;
         }
 
         .sidebar-footer {
-            padding: 16px;
+            padding: 10px 12px;
             border-top: 1px solid var(--border);
         }
 
-        .user-info { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-sm); }
+        .user-info { display: flex; align-items: center; gap: 10px; padding: 6px 6px; border-radius: 10px; transition: background 0.15s; }
+        .user-info:hover { background: var(--bg-hover); }
 
         .user-avatar {
-            width: 36px; height: 36px;
+            width: 32px; height: 32px;
             background: var(--gradient);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: 600; font-size: 14px;
+            color: white; font-weight: 700; font-size: 12px;
+            flex-shrink: 0;
         }
 
-        .user-details { flex: 1; }
-        .user-details .name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-        .user-details .role { font-size: 11px; color: var(--text-muted); }
+        .user-details { flex: 1; min-width: 0; }
+        .user-details .name { font-size: 12px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-details .role { font-size: 10px; color: var(--text-muted); }
 
         /* ===== MAIN CONTENT ===== */
-        .main-content { margin-left: 260px; min-height: 100vh; }
+        .main-content { margin-left: 260px; min-height: 100vh; transition: margin-left 0.3s; }
+        .sidebar.collapsed ~ .main-content { margin-left: 68px; }
 
         .top-bar {
             position: sticky; top: 0; z-index: 50;
@@ -424,105 +542,149 @@
     </script>
 
     {% block sidebar %}
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <div class="logo"><i class="fas fa-bolt"></i></div>
             <div>
                 <h2>Live<em>Track</em></h2>
                 <small>Visitor Tracker & Chat</small>
             </div>
+            <button class="collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar"><i class="fas fa-chevron-left"></i></button>
         </div>
-        <nav class="sidebar-nav">
-            <div class="nav-label">Main</div>
-            <a href="{% url 'dashboard:home' %}" class="nav-link {% block nav_dashboard %}{% endblock %}">
-                <i class="fas fa-th-large"></i> Dashboard
-            </a>
-            <a href="{% url 'dashboard:visitor_list' %}" class="nav-link {% block nav_visitors %}{% endblock %}">
-                <i class="fas fa-users"></i> Visitors
-            </a>
 
-            <div class="nav-label">Communication</div>
+        <!-- Search -->
+        <div class="nav-search">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search..." id="sidebarSearch" oninput="filterSidebarLinks(this.value)">
+        </div>
+
+        <nav class="sidebar-nav">
+            {% if request.user.is_superuser %}
+            <a href="{% url 'dashboard:super_admin' %}" class="nav-link" style="background:linear-gradient(135deg,rgba(239,68,68,0.06),rgba(245,158,11,0.04));border:1px solid rgba(239,68,68,0.1);">
+                <i class="fas fa-shield-alt" style="color:var(--danger);"></i> <span>Super Admin</span>
+            </a>
+            {% endif %}
+
+            <!-- Primary — always visible -->
+            <a href="{% url 'dashboard:home' %}" class="nav-link {% block nav_dashboard %}{% endblock %}">
+                <i class="fas fa-th-large"></i> <span>Dashboard</span>
+            </a>
             <a href="{% url 'dashboard:chat_list' %}?status=waiting" class="nav-link {% if request.path == '/dashboard/chats/' and request.GET.status == 'waiting' %}active{% endif %} {% block nav_waiting %}{% endblock %}">
-                <i class="fas fa-clock"></i> Waiting Chats
+                <i class="fas fa-clock"></i> <span>Waiting</span>
                 <span class="badge" id="waitingBadge" style="display:none;">0</span>
             </a>
             <a href="{% url 'dashboard:chat_list' %}?status=active" class="nav-link {% if request.path == '/dashboard/chats/' and request.GET.status == 'active' %}active{% endif %} {% block nav_active_chats %}{% endblock %}">
-                <i class="fas fa-comments"></i> Active Chats
+                <i class="fas fa-comments"></i> <span>Active Chats</span>
                 <span class="badge" id="activeBadge" style="display:none;background:var(--primary-light);">0</span>
             </a>
             <a href="{% url 'dashboard:chat_list' %}" class="nav-link {% if request.path == '/dashboard/chats/' and request.GET.status != 'active' and request.GET.status != 'waiting' %}active{% endif %} {% block nav_all_chats %}{% endblock %}">
-                <i class="fas fa-inbox"></i> All Chats
+                <i class="fas fa-inbox"></i> <span>All Chats</span>
                 <span class="badge" id="unreadBadge" style="display:none;">0</span>
             </a>
-
-            <div class="nav-label">Tools</div>
-            <a href="{% url 'dashboard:offline_messages' %}" class="nav-link {% block nav_offline %}{% endblock %}">
-                <i class="fas fa-envelope"></i> Offline Messages
-            </a>
-            <a href="{% url 'dashboard:canned_responses' %}" class="nav-link {% block nav_canned %}{% endblock %}">
-                <i class="fas fa-reply-all"></i> Canned Responses
-            </a>
-            <a href="{% url 'dashboard:agent_stats' %}" class="nav-link {% block nav_stats %}{% endblock %}">
-                <i class="fas fa-chart-pie"></i> Agent Stats
-            </a>
-            <a href="{% url 'dashboard:chat_search' %}" class="nav-link">
-                <i class="fas fa-search"></i> Search Chats
-            </a>
-            <a href="{% url 'dashboard:analytics' %}" class="nav-link">
-                <i class="fas fa-chart-area"></i> Analytics
-            </a>
-            <a href="{% url 'dashboard:activity_log' %}" class="nav-link">
-                <i class="fas fa-history"></i> Activity Log
-            </a>
-            <a href="{% url 'dashboard:notification_center' %}" class="nav-link">
-                <i class="fas fa-bell"></i> Notifications
+            <a href="{% url 'dashboard:visitor_list' %}" class="nav-link {% block nav_visitors %}{% endblock %}">
+                <i class="fas fa-users"></i> <span>Visitors</span>
             </a>
 
-            <div class="nav-label">Settings</div>
-            <a href="{% url 'dashboard:website_settings' %}" class="nav-link">
-                <i class="fas fa-palette"></i> Widget Settings
-            </a>
-            <a href="{% url 'dashboard:add_agent' %}" class="nav-link">
-                <i class="fas fa-user-plus"></i> Manage Agents
-            </a>
-            <a href="{% url 'dashboard:chat_labels' %}" class="nav-link">
-                <i class="fas fa-tags"></i> Chat Labels
-            </a>
-            <a href="{% url 'dashboard:saved_replies' %}" class="nav-link">
-                <i class="fas fa-bookmark"></i> My Saved Replies
-            </a>
-            <a href="{% url 'dashboard:webhooks' %}" class="nav-link">
-                <i class="fas fa-plug"></i> Webhooks
-            </a>
-            <a href="{% url 'dashboard:ban_list' %}" class="nav-link">
-                <i class="fas fa-ban"></i> Banned Visitors
-            </a>
+            <div class="nav-sep"></div>
+
             {% if request.user.is_superuser %}
-            <a href="{% url 'admin:index' %}" class="nav-link" target="_blank">
-                <i class="fas fa-cog"></i> Admin Panel
-            </a>
-            {% endif %}
-        </nav>
-        <!-- Availability toggle -->
-        <div style="padding:8px 16px;border-top:1px solid var(--border);">
-            <button onclick="toggleMyAvailability()" id="availToggle" style="width:100%;padding:8px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;{% if request.user.agent_profile and request.user.agent_profile.is_available %}background:rgba(16,185,129,0.1);color:#10b981;{% else %}background:rgba(239,68,68,0.1);color:#ef4444;{% endif %}">
-                <i class="fas fa-circle" style="font-size:8px;" id="availDot"></i>
-                <span id="availText">{% if request.user.agent_profile and request.user.agent_profile.is_available %}Available{% else %}Away{% endif %}</span>
-            </button>
-        </div>
-        <div class="sidebar-footer">
-            <div class="user-info">
-                <a href="{% url 'dashboard:profile' %}" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:10px;flex:1;">
-                    <div class="user-avatar">{{ request.user.first_name|default:request.user.username|first|upper }}</div>
-                    <div class="user-details">
-                        <div class="name">{{ request.user.get_full_name|default:request.user.username }}</div>
-                        <div class="role">{% if request.user.agent_profile and request.user.agent_profile.role == 'owner' %}Owner{% else %}Agent{% endif %}</div>
-                    </div>
-                </a>
-                <a href="{% url 'core:logout' %}" title="Logout" style="color: var(--text-muted); font-size: 14px;">
-                    <i class="fas fa-sign-out-alt"></i>
-                </a>
+            <!-- ═══ SUPERUSER SIDEBAR — all tools, no billing ═══ -->
+
+            <!-- Analytics — all unlocked -->
+            <div class="nav-toggle" onclick="toggleMenu('menuAnalytics')"><i class="fas fa-chart-bar"></i><span class="nav-toggle-text">Analytics</span><i class="fas fa-chevron-right nav-chevron"></i></div>
+            <div id="menuAnalytics" class="nav-submenu">
+                <a href="{% url 'dashboard:advanced_analytics' %}" class="nav-link"><i class="fas fa-chart-line"></i> <span>Overview</span></a>
+                <a href="{% url 'dashboard:heatmaps' %}" class="nav-link"><i class="fas fa-fire"></i> <span>Heatmaps</span></a>
+                <a href="{% url 'dashboard:goals' %}" class="nav-link"><i class="fas fa-bullseye"></i> <span>Goals</span></a>
+                <a href="{% url 'dashboard:agent_stats' %}" class="nav-link {% block nav_stats %}{% endblock %}"><i class="fas fa-chart-pie"></i> <span>Agent Stats</span></a>
             </div>
+
+            <!-- Automation — all unlocked -->
+            <div class="nav-toggle" onclick="toggleMenu('menuAI')"><i class="fas fa-robot"></i><span class="nav-toggle-text">Automation</span><i class="fas fa-chevron-right nav-chevron"></i></div>
+            <div id="menuAI" class="nav-submenu">
+                <a href="{% url 'dashboard:ai_bot_config' %}" class="nav-link"><i class="fas fa-robot"></i> <span>AI Bot</span></a>
+                <a href="{% url 'dashboard:chatbot_flows' %}" class="nav-link"><i class="fas fa-project-diagram"></i> <span>Chatbot Flows</span></a>
+                <a href="{% url 'dashboard:kb_manage' %}" class="nav-link"><i class="fas fa-book"></i> <span>Knowledge Base</span></a>
+                <a href="{% url 'dashboard:canned_responses' %}" class="nav-link"><i class="fas fa-reply-all"></i> <span>Quick Replies</span></a>
+            </div>
+
+            <!-- Admin Tools -->
+            <div class="nav-toggle" onclick="toggleMenu('menuAdmin')"><i class="fas fa-tools"></i><span class="nav-toggle-text">Admin</span><i class="fas fa-chevron-right nav-chevron"></i></div>
+            <div id="menuAdmin" class="nav-submenu">
+                <a href="{% url 'dashboard:manage_coupons' %}" class="nav-link"><i class="fas fa-tags"></i> <span>Coupons</span></a>
+                <a href="{% url 'dashboard:website_settings' %}" class="nav-link"><i class="fas fa-palette"></i> <span>Widget</span></a>
+                <a href="{% url 'dashboard:add_agent' %}" class="nav-link"><i class="fas fa-user-plus"></i> <span>Agents</span></a>
+                <a href="{% url 'dashboard:offline_messages' %}" class="nav-link"><i class="fas fa-envelope"></i> <span>Offline Msgs</span></a>
+                <a href="{% url 'admin:index' %}" class="nav-link" target="_blank"><i class="fas fa-cog"></i> <span>Django Admin</span></a>
+            </div>
+
+            {% else %}
+            <!-- ═══ NORMAL USER SIDEBAR — plan-based ═══ -->
+            {% with user_plan=request.user.agent_profile.organization.subscription.plan|default:"free" %}
+
+            {% if user_plan == 'pro' or user_plan == 'enterprise' %}
+            <div class="nav-toggle" onclick="toggleMenu('menuAnalytics')"><i class="fas fa-chart-bar"></i><span class="nav-toggle-text">Analytics</span><i class="fas fa-chevron-right nav-chevron"></i></div>
+            <div id="menuAnalytics" class="nav-submenu">
+                <a href="{% url 'dashboard:advanced_analytics' %}" class="nav-link"><i class="fas fa-chart-line"></i> <span>Overview</span></a>
+                <a href="{% url 'dashboard:heatmaps' %}" class="nav-link"><i class="fas fa-fire"></i> <span>Heatmaps</span></a>
+                <a href="{% url 'dashboard:goals' %}" class="nav-link"><i class="fas fa-bullseye"></i> <span>Goals</span></a>
+                <a href="{% url 'dashboard:agent_stats' %}" class="nav-link"><i class="fas fa-chart-pie"></i> <span>Agent Stats</span></a>
+            </div>
+            {% else %}
+            <a href="{% url 'dashboard:agent_stats' %}" class="nav-link {% block nav_stats_free %}{% endblock %}"><i class="fas fa-chart-pie"></i> <span>Agent Stats</span></a>
+            {% endif %}
+
+            <div class="nav-toggle" onclick="toggleMenu('menuAI')"><i class="fas fa-robot"></i><span class="nav-toggle-text">Automation</span><i class="fas fa-chevron-right nav-chevron"></i></div>
+            <div id="menuAI" class="nav-submenu">
+                {% if user_plan == 'enterprise' %}
+                <a href="{% url 'dashboard:ai_bot_config' %}" class="nav-link"><i class="fas fa-robot"></i> <span>AI Bot</span></a>
+                <a href="{% url 'dashboard:chatbot_flows' %}" class="nav-link"><i class="fas fa-project-diagram"></i> <span>Chatbot Flows</span></a>
+                {% endif %}
+                <a href="{% url 'dashboard:kb_manage' %}" class="nav-link"><i class="fas fa-book"></i> <span>Knowledge Base</span></a>
+                <a href="{% url 'dashboard:canned_responses' %}" class="nav-link {% block nav_canned %}{% endblock %}"><i class="fas fa-reply-all"></i> <span>Quick Replies</span></a>
+            </div>
+
+            <div class="nav-toggle" onclick="toggleMenu('menuSettings')"><i class="fas fa-cog"></i><span class="nav-toggle-text">Settings</span><i class="fas fa-chevron-right nav-chevron"></i></div>
+            <div id="menuSettings" class="nav-submenu">
+                <a href="{% url 'dashboard:billing' %}" class="nav-link"><i class="fas fa-credit-card"></i> <span>Billing & Plan</span></a>
+                <a href="{% url 'dashboard:website_settings' %}" class="nav-link"><i class="fas fa-palette"></i> <span>Widget</span></a>
+                <a href="{% url 'dashboard:add_agent' %}" class="nav-link"><i class="fas fa-user-plus"></i> <span>Agents</span></a>
+                <a href="{% url 'dashboard:offline_messages' %}" class="nav-link {% block nav_offline %}{% endblock %}"><i class="fas fa-envelope"></i> <span>Offline Msgs</span></a>
+            </div>
+
+            {% endwith %}
+            {% endif %}
+
+            <!-- Help — bottom -->
+            <div class="nav-sep"></div>
+            <a href="{% url 'dashboard:tour_guide' %}" class="nav-link" style="font-size:12px;color:var(--text-muted);">
+                <i class="fas fa-question-circle" style="opacity:0.4;"></i> Help & Tour
+            </a>
+        </nav>
+
+        <!-- Bottom area: availability + user -->
+        <div style="border-top:1px solid var(--border);">
+            <!-- Availability -->
+            <div style="padding:6px 10px;">
+                <button onclick="toggleMyAvailability()" id="availToggle" style="width:100%;padding:6px;border:none;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .2s;{% if request.user.agent_profile and request.user.agent_profile.is_available %}background:rgba(16,185,129,0.08);color:#10b981;{% else %}background:rgba(239,68,68,0.08);color:#ef4444;{% endif %}">
+                    <i class="fas fa-circle" style="font-size:6px;" id="availDot"></i>
+                    <span id="availText" class="avail-text">{% if request.user.agent_profile and request.user.agent_profile.is_available %}Available{% else %}Away{% endif %}</span>
+                </button>
+            </div>
+            <!-- User -->
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <a href="{% url 'dashboard:profile' %}" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+                        <div class="user-avatar">{{ request.user.first_name|default:request.user.username|first|upper }}</div>
+                        <div class="user-details">
+                            <div class="name">{{ request.user.get_full_name|default:request.user.username }}</div>
+                            <div class="role">{% if request.user.agent_profile and request.user.agent_profile.role == 'owner' %}Owner{% else %}Agent{% endif %}</div>
+                        </div>
+                    </a>
+                    <a href="{% url 'core:logout' %}" title="Logout" style="color:var(--text-muted);font-size:13px;padding:4px;">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                </div>
         </div>
     </aside>
     {% endblock %}
@@ -551,6 +713,79 @@
     </main>
 
     <script>
+        // ===== SIDEBAR COLLAPSE =====
+        function toggleSidebar() {
+            var sb = document.getElementById('sidebar');
+            sb.classList.toggle('collapsed');
+            localStorage.setItem('sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
+        }
+        // Restore collapse state
+        if (localStorage.getItem('sidebar_collapsed') === '1') {
+            document.getElementById('sidebar').classList.add('collapsed');
+        }
+
+        // ===== SIDEBAR SEARCH =====
+        function filterSidebarLinks(q) {
+            q = q.toLowerCase().trim();
+            document.querySelectorAll('.sidebar-nav .nav-link, .sidebar-nav .nav-toggle').forEach(function(el) {
+                var text = el.textContent.toLowerCase();
+                if (!q || text.includes(q)) {
+                    el.style.display = '';
+                } else {
+                    el.style.display = 'none';
+                }
+            });
+            // Auto-open submenus that have matching items
+            if (q) {
+                document.querySelectorAll('.nav-submenu').forEach(function(menu) {
+                    var hasVisible = false;
+                    menu.querySelectorAll('.nav-link').forEach(function(link) {
+                        if (link.style.display !== 'none') hasVisible = true;
+                    });
+                    if (hasVisible) menu.classList.add('open');
+                });
+            }
+        }
+
+        // ===== SIDEBAR MENUS =====
+        function toggleMenu(id) {
+            var menu = document.getElementById(id);
+            var label = menu.previousElementSibling;
+            var chevron = label.querySelector('.nav-chevron');
+            menu.classList.toggle('open');
+            chevron.classList.toggle('rotated');
+            // Save state
+            localStorage.setItem('menu_' + id, menu.classList.contains('open') ? '1' : '0');
+        }
+        // Restore saved menu states
+        ['menuAnalytics','menuAI','menuManage','menuSettings'].forEach(function(id) {
+            var state = localStorage.getItem('menu_' + id);
+            if (state === '1') {
+                var menu = document.getElementById(id);
+                if (menu) {
+                    menu.classList.add('open');
+                    var chevron = menu.previousElementSibling.querySelector('.nav-chevron');
+                    if (chevron) chevron.classList.add('rotated');
+                }
+            }
+        });
+        // Auto-open menu that contains current active page
+        document.querySelectorAll('.nav-submenu').forEach(function(menu) {
+            var hasActive = menu.querySelector('.nav-link.active') || false;
+            // Check if current path matches any link in this submenu
+            var links = menu.querySelectorAll('.nav-link');
+            links.forEach(function(link) {
+                if (link.href && window.location.pathname === new URL(link.href).pathname) {
+                    hasActive = true;
+                }
+            });
+            if (hasActive) {
+                menu.classList.add('open');
+                var chevron = menu.previousElementSibling.querySelector('.nav-chevron');
+                if (chevron) chevron.classList.add('rotated');
+            }
+        });
+
         // ===== THEME =====
         function toggleDashTheme() {
             var html = document.documentElement;
@@ -631,8 +866,11 @@
             dashboardSocket.onmessage = function(e) {
                 var data = JSON.parse(e.data);
                 if (data.type === 'new_message_notify' || data.type === 'dashboard_update') {
-                    // Fetch fresh stats immediately on any notification
                     refreshStats();
+                }
+                if (data.type === 'visitor_activity') {
+                    // Dispatch custom event for dashboard home to listen
+                    window.dispatchEvent(new CustomEvent('livetrack:visitor', { detail: data }));
                 }
             };
 
@@ -678,6 +916,12 @@
                 }
             });
         }
+    </script>
+    <!-- PWA Service Worker -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js', {scope: '/'}).catch(function() {});
+    }
     </script>
     {% block extra_js %}{% endblock %}
 </body>

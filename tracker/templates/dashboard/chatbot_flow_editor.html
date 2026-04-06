@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block title %}Edit Flow: {{ flow.name }}{% endblock %}
+{% block page_title %}{{ flow.name }}{% endblock %}
+{% block top_actions %}
+<button onclick="saveFlow()" class="btn btn-primary"><i class="fas fa-save"></i> Save Flow</button>
+<a href="{% url 'dashboard:chatbot_flows' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.flow-canvas { background: var(--bg-body); border: 2px dashed var(--border); border-radius: var(--radius); min-height: 500px; padding: 20px; position: relative; overflow: auto; }
+.flow-node { background: var(--bg-card); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 14px; width: 260px; position: absolute; cursor: move; box-shadow: var(--shadow-md); transition: border-color 0.2s; }
+.flow-node:hover { border-color: var(--primary); }
+.flow-node.selected { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.node-type { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:6px; }
+.node-content { font-size:13px; }
+.node-actions { margin-top:8px; display:flex; gap:4px; }
+.flow-toolbar { display:flex; gap:8px; margin-bottom:16px; padding:12px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="gap:12px;margin-bottom:16px;">
+    <div class="form-group" style="margin:0;"><label>Flow Name</label><input type="text" id="flowName" class="form-control" value="{{ flow.name }}"></div>
+    <div class="form-group" style="margin:0;">
+        <label>Trigger</label>
+        <div style="display:flex;gap:6px;">
+            <select id="flowTrigger" class="form-control" style="width:auto;">
+                <option value="greeting" {% if flow.trigger_type == 'greeting' %}selected{% endif %}>On Chat Start</option>
+                <option value="keyword" {% if flow.trigger_type == 'keyword' %}selected{% endif %}>On Keyword</option>
+                <option value="page" {% if flow.trigger_type == 'page' %}selected{% endif %}>On Page Visit</option>
+                <option value="idle" {% if flow.trigger_type == 'idle' %}selected{% endif %}>On Idle</option>
+            </select>
+            <input type="text" id="flowTriggerVal" class="form-control" placeholder="Trigger value (keyword/URL)" value="{{ flow.trigger_value }}">
+        </div>
+    </div>
+</div>
+
+<div class="flow-toolbar">
+    <button onclick="addNode('message')" class="btn btn-sm btn-primary"><i class="fas fa-comment"></i> Message</button>
+    <button onclick="addNode('question')" class="btn btn-sm btn-secondary"><i class="fas fa-question-circle"></i> Question</button>
+    <button onclick="addNode('options')" class="btn btn-sm btn-secondary"><i class="fas fa-list"></i> Options Menu</button>
+    <button onclick="addNode('condition')" class="btn btn-sm btn-secondary"><i class="fas fa-code-branch"></i> Condition</button>
+    <button onclick="addNode('handoff')" class="btn btn-sm btn-warning"><i class="fas fa-user"></i> Agent Handoff</button>
+    <button onclick="addNode('delay')" class="btn btn-sm btn-secondary"><i class="fas fa-clock"></i> Delay</button>
+    <button onclick="addNode('close')" class="btn btn-sm btn-danger"><i class="fas fa-times-circle"></i> Close Chat</button>
+</div>
+
+<div class="flow-canvas" id="canvas">
+    <!-- Nodes rendered here by JS -->
+</div>
+
+<script>
+var flowData = {{ flow.flow_data|safe }};
+if (!flowData || !flowData.nodes) flowData = {nodes: [{id:'start', type:'message', text:'Hello! How can I help you?', x:50, y:50, next:[]}]};
+
+var canvas = document.getElementById('canvas');
+var selectedNode = null;
+var nodeIdCounter = flowData.nodes.length;
+
+function renderNodes() {
+    canvas.innerHTML = '';
+    flowData.nodes.forEach(function(node, i) {
+        var div = document.createElement('div');
+        div.className = 'flow-node';
+        div.id = 'node-' + node.id;
+        div.style.left = (node.x || 50 + i*30) + 'px';
+        div.style.top = (node.y || 50 + i*80) + 'px';
+
+        var typeLabel = node.type.charAt(0).toUpperCase() + node.type.slice(1);
+        var typeColor = {'message':'var(--primary)','question':'var(--info)','options':'var(--success)','condition':'var(--warning)','handoff':'var(--danger)','delay':'var(--text-muted)','close':'var(--danger)'}[node.type] || 'var(--primary)';
+
+        div.innerHTML = '<div class="node-type" style="color:'+typeColor+'"><i class="fas fa-'+(
+            {'message':'comment','question':'question-circle','options':'list','condition':'code-branch','handoff':'user','delay':'clock','close':'times-circle'}[node.type] || 'circle'
+        )+'"></i> '+typeLabel+'</div>' +
+        '<div class="node-content"><textarea style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px;font-size:12px;background:var(--bg-input);color:var(--text-primary);resize:vertical;font-family:inherit;" rows="2" onchange="updateNodeText(\''+node.id+'\', this.value)">'+
+        (node.text||'')+'</textarea></div>' +
+        '<div class="node-actions"><button onclick="deleteNode(\''+node.id+'\')" class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px;"><i class="fas fa-trash"></i></button></div>';
+
+        // Make draggable
+        div.onmousedown = function(e) {
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || e.target.tagName === 'I') return;
+            var startX = e.clientX, startY = e.clientY;
+            var origX = parseInt(div.style.left), origY = parseInt(div.style.top);
+            function onMove(ev) {
+                div.style.left = (origX + ev.clientX - startX) + 'px';
+                div.style.top = (origY + ev.clientY - startY) + 'px';
+                node.x = parseInt(div.style.left); node.y = parseInt(div.style.top);
+            }
+            function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+
+        canvas.appendChild(div);
+    });
+}
+
+function addNode(type) {
+    var id = 'node_' + (++nodeIdCounter);
+    var defaultTexts = {
+        message: 'Type your message here...',
+        question: 'What would you like to know?',
+        options: 'Option 1, Option 2, Option 3',
+        condition: 'if keyword contains "pricing"',
+        handoff: 'Connecting you with a human agent...',
+        delay: '3 seconds',
+        close: 'Thank you! Chat closed.',
+    };
+    flowData.nodes.push({id: id, type: type, text: defaultTexts[type] || '', x: 100 + Math.random()*200, y: 100 + Math.random()*200, next: []});
+    renderNodes();
+}
+
+function deleteNode(id) {
+    flowData.nodes = flowData.nodes.filter(function(n) { return n.id !== id; });
+    renderNodes();
+}
+
+function updateNodeText(id, text) {
+    var node = flowData.nodes.find(function(n) { return n.id === id; });
+    if (node) node.text = text;
+}
+
+function saveFlow() {
+    fetch('{% url "dashboard:chatbot_flows" %}', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken':'{{ csrf_token }}'},
+        body: JSON.stringify({
+            action: 'save',
+            flow_id: {{ flow.id }},
+            name: document.getElementById('flowName').value,
+            trigger_type: document.getElementById('flowTrigger').value,
+            trigger_value: document.getElementById('flowTriggerVal').value,
+            flow_data: flowData,
+        })
+    }).then(r=>r.json()).then(d => {
+        if (d.status === 'ok') alert('Flow saved successfully!');
+    });
+}
+
+renderNodes();
+</script>
+{% endblock %}

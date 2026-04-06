@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block title %}Session Replay{% endblock %}
+{% block page_title %}Replay: {{ recording.session_id|truncatechars:12 }}{% endblock %}
+{% block top_actions %}
+<a href="{% url 'dashboard:session_recordings' %}" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+    <div class="stat-card purple"><div class="stat-icon"><i class="fas fa-user"></i></div><div class="stat-value" style="font-size:16px;">{{ recording.visitor.ip_address }}</div><div class="stat-label">Visitor</div></div>
+    <div class="stat-card blue"><div class="stat-icon"><i class="fas fa-clock"></i></div><div class="stat-value">{{ recording.duration }}s</div><div class="stat-label">Duration</div></div>
+    <div class="stat-card green"><div class="stat-icon"><i class="fas fa-file"></i></div><div class="stat-value">{{ recording.pages_visited }}</div><div class="stat-label">Pages</div></div>
+    <div class="stat-card orange"><div class="stat-icon"><i class="fas fa-angry"></i></div><div class="stat-value">{{ recording.frustration_score }}</div><div class="stat-label">Frustration</div></div>
+    <div class="stat-card {% if recording.has_rage_clicks %}orange{% else %}green{% endif %}"><div class="stat-icon"><i class="fas fa-{% if recording.has_rage_clicks %}bolt{% else %}check{% endif %}"></i></div><div class="stat-value">{% if recording.has_rage_clicks %}Yes{% else %}No{% endif %}</div><div class="stat-label">Rage Clicks</div></div>
+</div>
+
+<div class="grid-2" style="grid-template-columns:2fr 1fr;">
+    <!-- Replay Area -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-play-circle"></i> Session Replay</h3>
+            <div style="display:flex;gap:6px;">
+                <button onclick="playReplay()" class="btn btn-sm btn-primary" id="playBtn"><i class="fas fa-play"></i> Play</button>
+                <button onclick="pauseReplay()" class="btn btn-sm btn-secondary" id="pauseBtn" style="display:none;"><i class="fas fa-pause"></i> Pause</button>
+                <span style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;" id="replayTime">0:00</span>
+            </div>
+        </div>
+        <div class="card-body" style="position:relative;min-height:400px;background:#f0f0f0;border-radius:8px;overflow:hidden;border:2px solid var(--border);" id="replayCanvas">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);">
+                <div style="text-align:center;">
+                    <i class="fas fa-play-circle" style="font-size:48px;opacity:0.3;margin-bottom:8px;"></i>
+                    <p>{{ recording.events_data|length }} events recorded</p>
+                    <p style="font-size:12px;">Start URL: {{ recording.start_url|truncatechars:60 }}</p>
+                </div>
+            </div>
+            <!-- Cursor indicator -->
+            <div id="replayCursor" style="display:none;position:absolute;width:20px;height:20px;border-radius:50%;background:rgba(124,58,237,0.5);border:2px solid #7c3aed;transform:translate(-50%,-50%);pointer-events:none;transition:all 0.1s;z-index:10;"></div>
+        </div>
+        <!-- Timeline -->
+        <div style="padding:12px;background:var(--bg-hover);border-radius:0 0 var(--radius) var(--radius);">
+            <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;cursor:pointer;" id="timeline">
+                <div style="height:100%;background:var(--gradient);width:0%;transition:width 0.1s;" id="timelineProgress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-list"></i> Event Log</h3></div>
+        <div class="card-body" style="max-height:500px;overflow-y:auto;">
+            {% if errors %}
+            <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:8px;"><i class="fas fa-bug"></i> JS Errors</div>
+            {% for e in errors %}
+            <div style="padding:6px 8px;background:var(--danger-soft);border-radius:6px;margin-bottom:4px;font-size:11px;">
+                <div style="font-weight:600;color:var(--danger);">{{ e.error_message|truncatewords:12 }}</div>
+                <div style="color:var(--text-muted);">Line {{ e.error_line }} &middot; {{ e.page_url|truncatechars:40 }}</div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if frustrations %}
+            <div style="font-weight:600;font-size:12px;color:var(--warning);margin-top:12px;margin-bottom:8px;"><i class="fas fa-angry"></i> Frustration Signals</div>
+            {% for f in frustrations %}
+            <div style="padding:6px 8px;background:var(--warning-soft);border-radius:6px;margin-bottom:4px;font-size:11px;">
+                <div style="font-weight:600;color:var(--warning);">{{ f.get_signal_type_display }}</div>
+                <div style="color:var(--text-muted);">{{ f.page_path }} {% if f.element_text %}&middot; "{{ f.element_text|truncatewords:5 }}"{% endif %}</div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if clicks %}
+            <div style="font-weight:600;font-size:12px;color:var(--primary);margin-top:12px;margin-bottom:8px;"><i class="fas fa-mouse-pointer"></i> Clicks ({{ clicks.count }})</div>
+            {% for c in clicks|slice:":20" %}
+            <div style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:11px;display:flex;justify-content:space-between;">
+                <span>{{ c.element_tag }} {% if c.element_text %}"{{ c.element_text|truncatewords:3 }}"{% endif %}</span>
+                <span style="color:{% if c.click_type == 'rage' %}var(--danger){% elif c.click_type == 'dead' %}var(--warning){% else %}var(--text-muted){% endif %};">{{ c.click_type }}</span>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+var events = {{ events_json|safe }};
+var cursor = document.getElementById('replayCursor');
+var progress = document.getElementById('timelineProgress');
+var timeDisplay = document.getElementById('replayTime');
+var playing = false, eventIdx = 0, timer = null;
+
+function playReplay() {
+    if (!events || events.length === 0) return;
+    playing = true;
+    cursor.style.display = 'block';
+    document.getElementById('playBtn').style.display = 'none';
+    document.getElementById('pauseBtn').style.display = 'inline-flex';
+    timer = setInterval(function() {
+        if (eventIdx >= events.length) { pauseReplay(); return; }
+        var ev = events[eventIdx];
+        if (ev.x !== undefined && ev.y !== undefined) {
+            cursor.style.left = ev.x + '%';
+            cursor.style.top = ev.y + '%';
+            if (ev.type === 'click') {
+                cursor.style.background = 'rgba(239,68,68,0.6)';
+                setTimeout(function() { cursor.style.background = 'rgba(124,58,237,0.5)'; }, 200);
+            }
+        }
+        progress.style.width = ((eventIdx / events.length) * 100) + '%';
+        var secs = Math.floor(eventIdx * 0.1);
+        timeDisplay.textContent = Math.floor(secs/60) + ':' + ('0'+secs%60).slice(-2);
+        eventIdx++;
+    }, 100);
+}
+function pauseReplay() {
+    playing = false;
+    clearInterval(timer);
+    document.getElementById('playBtn').style.display = 'inline-flex';
+    document.getElementById('pauseBtn').style.display = 'none';
+}
+</script>
+{% endblock %}

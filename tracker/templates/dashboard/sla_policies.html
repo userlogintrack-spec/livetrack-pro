@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}SLA Management{% endblock %}
+{% block page_title %}SLA Management{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card purple">
+        <div class="stat-icon"><i class="fas fa-shield-alt"></i></div>
+        <div class="stat-value">{{ policies.count }}</div>
+        <div class="stat-label">Active Policies</div>
+    </div>
+    <div class="stat-card orange">
+        <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="stat-value">{{ at_risk|length }}</div>
+        <div class="stat-label">At-Risk Chats</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        <div class="stat-value">{{ sla_minutes }}m</div>
+        <div class="stat-label">Default Response Target</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-icon"><i class="fas fa-bell"></i></div>
+        <div class="stat-value">{{ breaches_today.count }}</div>
+        <div class="stat-label">Breaches Today</div>
+    </div>
+</div>
+
+{% if at_risk %}
+<div class="card" style="margin-bottom:20px;border-color:var(--danger);">
+    <div class="card-header" style="background:var(--danger-soft);"><h3 style="color:var(--danger);"><i class="fas fa-exclamation-circle"></i> At-Risk Chats (SLA Breach)</h3></div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Chat</th><th>Visitor</th><th>Elapsed</th><th>Target</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for item in at_risk %}
+                <tr>
+                    <td><a href="{% url 'dashboard:chat_room' item.chat.room_id %}" style="color:var(--primary);font-weight:600;">#{{ item.chat.room_id }}</a></td>
+                    <td>{{ item.chat.visitor_name }}</td>
+                    <td style="color:var(--danger);font-weight:600;">{{ item.elapsed_minutes }}m</td>
+                    <td>{{ item.target_minutes }}m</td>
+                    <td><span class="status status-{{ item.chat.status }}"><span class="dot"></span> {{ item.chat.status }}</span></td>
+                    <td><a href="{% url 'dashboard:chat_room' item.chat.room_id %}" class="btn btn-sm btn-primary">Respond Now</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-list"></i> SLA Policies</h3></div>
+        <div class="card-body">
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Name</th><th>Priority</th><th>First Response</th><th>Resolution</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody>
+                    {% for policy in policies %}
+                    <tr>
+                        <td style="font-weight:600;">{{ policy.name }}</td>
+                        <td><span class="status" style="background:{% if policy.priority == 'urgent' %}var(--danger-soft){% elif policy.priority == 'high' %}var(--warning-soft){% else %}var(--primary-soft){% endif %};color:{% if policy.priority == 'urgent' %}var(--danger){% elif policy.priority == 'high' %}var(--warning){% else %}var(--primary){% endif %};">{{ policy.priority }}</span></td>
+                        <td>{{ policy.first_response_minutes }}m</td>
+                        <td>{{ policy.resolution_minutes }}m</td>
+                        <td><span class="status {% if policy.is_active %}status-online{% else %}status-offline{% endif %}"><span class="dot"></span> {% if policy.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+                        <td>
+                            <button onclick="togglePolicy({{ policy.id }})" class="btn btn-sm btn-secondary"><i class="fas fa-{% if policy.is_active %}pause{% else %}play{% endif %}"></i></button>
+                            <button onclick="deletePolicy({{ policy.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No SLA policies configured</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-plus-circle"></i> Create SLA Policy</h3></div>
+        <div class="card-body">
+            <div class="form-group"><label>Policy Name</label><input type="text" id="slaName" class="form-control" placeholder="e.g. Premium Support"></div>
+            <div class="form-group"><label>Priority</label>
+                <select id="slaPriority" class="form-control">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                </select>
+            </div>
+            <div class="form-group"><label>First Response Target (minutes)</label><input type="number" id="slaResponse" class="form-control" value="5" min="1"></div>
+            <div class="form-group"><label>Resolution Target (minutes)</label><input type="number" id="slaResolution" class="form-control" value="60" min="1"></div>
+            <button onclick="createPolicy()" class="btn btn-primary"><i class="fas fa-plus"></i> Create Policy</button>
+        </div>
+    </div>
+</div>
+
+{% if breaches_today.count > 0 %}
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><h3><i class="fas fa-history"></i> Today's Breaches</h3></div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Time</th><th>Chat</th><th>Type</th><th>Target</th><th>Actual</th><th>Policy</th></tr></thead>
+                <tbody>
+                {% for breach in breaches_today %}
+                <tr>
+                    <td>{{ breach.breached_at|timesince }} ago</td>
+                    <td><a href="{% url 'dashboard:chat_room' breach.chat.room_id %}" style="color:var(--primary);">#{{ breach.chat.room_id }}</a></td>
+                    <td>{{ breach.breach_type }}</td>
+                    <td>{{ breach.target_minutes }}m</td>
+                    <td style="color:var(--danger);">{{ breach.actual_minutes }}m</td>
+                    <td>{{ breach.policy.name }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function postJSON(url, data) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json());
+}
+function createPolicy() {
+    postJSON('', {action:'create', name:document.getElementById('slaName').value, priority:document.getElementById('slaPriority').value, first_response_minutes:document.getElementById('slaResponse').value, resolution_minutes:document.getElementById('slaResolution').value}).then(()=>location.reload());
+}
+function deletePolicy(id) { if(confirm('Delete this policy?')) postJSON('', {action:'delete', policy_id:id}).then(()=>location.reload()); }
+function togglePolicy(id) { postJSON('', {action:'toggle', policy_id:id}).then(()=>location.reload()); }
+</script>
+{% endblock %}

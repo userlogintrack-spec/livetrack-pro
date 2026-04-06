@@ -10,4 +10,6 @@ urlpatterns = [
     path('terms/', views.terms, name='terms'),
     path('refund/', views.refund, name='refund'),
     path('contact/', views.contact, name='contact'),
+    path('features/', views.features, name='features'),
+    path('compare/', views.compare, name='compare'),
 ]

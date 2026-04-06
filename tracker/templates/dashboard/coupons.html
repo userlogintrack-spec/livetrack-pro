@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Manage Coupons{% endblock %}
+{% block page_title %}Manage Coupons{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-tags" style="color:var(--primary);"></i> Active Coupons</h3><span style="font-size:11px;color:var(--text-muted);">{{ coupons.count }} total</span></div>
+        <div class="card-body" style="padding:0;"><div class="table-container"><table>
+            <thead><tr><th>Code</th><th>Discount</th><th>Plans</th><th>Used</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for c in coupons %}
+            <tr>
+                <td><code style="background:var(--bg-hover);padding:3px 10px;border-radius:6px;font-weight:700;font-size:13px;">{{ c.code }}</code>{% if c.name %}<br><span style="font-size:11px;color:var(--text-muted);">{{ c.name }}</span>{% endif %}</td>
+                <td style="font-weight:700;color:var(--primary);">{% if c.discount_type == 'percent' %}{{ c.discount_value }}%{% else %}${{ c.discount_value }}{% endif %}</td>
+                <td style="font-size:11px;">{{ c.applicable_plans }}<br>{{ c.applicable_intervals }}</td>
+                <td>{{ c.times_used }}{% if c.max_uses > 0 %}/{{ c.max_uses }}{% else %}/∞{% endif %}</td>
+                <td>
+                    {% if c.is_valid %}<span class="status status-online" style="font-size:10px;"><span class="dot"></span> Active</span>
+                    {% else %}<span class="status status-closed" style="font-size:10px;"><span class="dot"></span> Expired</span>{% endif %}
+                </td>
+                <td style="display:flex;gap:4px;">
+                    <button onclick="toggleCoupon({{ c.id }})" class="btn btn-sm btn-secondary"><i class="fas fa-{% if c.is_active %}pause{% else %}play{% endif %}"></i></button>
+                    <button onclick="deleteCoupon({{ c.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6"><div class="empty-state" style="padding:30px;"><i class="fas fa-tags"></i><p>No coupons yet</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table></div></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-plus-circle" style="color:var(--success);"></i> Create Coupon</h3></div>
+        <div class="card-body">
+            <div class="form-group"><label>Coupon Code</label><input type="text" id="cCode" class="form-control" placeholder="e.g. WELCOME20" style="text-transform:uppercase;"></div>
+            <div class="form-group"><label>Display Name (optional)</label><input type="text" id="cName" class="form-control" placeholder="e.g. Welcome Discount"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label>Discount Type</label>
+                    <select id="cType" class="form-control">
+                        <option value="percent">Percentage Off (%)</option>
+                        <option value="fixed">Fixed Amount Off ($)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Discount Value</label><input type="number" id="cValue" class="form-control" value="20" min="1" step="0.01"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label>Applicable Plans</label>
+                    <select id="cPlans" class="form-control">
+                        <option value="pro,enterprise">Pro & Enterprise</option>
+                        <option value="pro">Pro Only</option>
+                        <option value="enterprise">Enterprise Only</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Billing Intervals</label>
+                    <select id="cIntervals" class="form-control">
+                        <option value="month,year">Monthly & Yearly</option>
+                        <option value="month">Monthly Only</option>
+                        <option value="year">Yearly Only</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label>Max Uses (0 = unlimited)</label><input type="number" id="cMax" class="form-control" value="0" min="0"></div>
+                <div class="form-group"><label>Valid Until (optional)</label><input type="date" id="cUntil" class="form-control"></div>
+            </div>
+            <button onclick="createCoupon()" class="btn btn-primary" style="width:100%;margin-top:8px;justify-content:center;"><i class="fas fa-plus"></i> Create Coupon</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function postJSON(url, data) { return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json()); }
+function createCoupon() {
+    postJSON('', {
+        action:'create', code:document.getElementById('cCode').value,
+        name:document.getElementById('cName').value,
+        discount_type:document.getElementById('cType').value,
+        discount_value:document.getElementById('cValue').value,
+        applicable_plans:document.getElementById('cPlans').value,
+        applicable_intervals:document.getElementById('cIntervals').value,
+        max_uses:document.getElementById('cMax').value,
+        valid_until:document.getElementById('cUntil').value,
+    }).then(d => { if(d.status==='ok') location.reload(); else alert(d.error); });
+}
+function deleteCoupon(id) { if(confirm('Delete this coupon?')) postJSON('', {action:'delete', coupon_id:id}).then(()=>location.reload()); }
+function toggleCoupon(id) { postJSON('', {action:'toggle', coupon_id:id}).then(()=>location.reload()); }
+</script>
+{% endblock %}

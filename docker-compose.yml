@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production-use-long-random-value}
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - DATABASE_URL=postgresql://livetrack:livetrack@db:5432/livetrack
+      - REDIS_URL=redis://redis:6379/0
+      - CSRF_TRUSTED_ORIGINS=http://localhost:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_data:/app/media
+      - log_data:/app/logs
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             daphne -b 0.0.0.0 -p 8000 tracker.asgi:application"
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: livetrack
+      POSTGRES_USER: livetrack
+      POSTGRES_PASSWORD: livetrack
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U livetrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  media_data:
+  log_data:
