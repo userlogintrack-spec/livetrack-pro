@@ -30,12 +30,11 @@ services:
       - key: DATABASE_URL
         sync: false                # marks it as a secret you set manually in the dashboard
 
-      # Redis — managed by Render below
-      - key: REDIS_URL
-        fromService:
-          name: livetrack-redis
-          type: redis
-          property: connectionString
+      # Redis — OPTIONAL. Leave unset for single-instance deployments (free tier).
+      # When unset, Django falls back to InMemoryChannelLayer + LocMemCache automatically.
+      # Add REDIS_URL only if you scale to multiple instances/workers.
+      # - key: REDIS_URL
+      #   sync: false
 
       # Stripe (set in dashboard, sync:false keeps them out of git)
       - key: STRIPE_PUBLIC_KEY
@@ -48,11 +47,3 @@ services:
       # Behind Render's proxy
       - key: TRUST_X_FORWARDED_FOR
         value: "True"
-
-  # Redis — needed for WebSocket channels + cache
-  - type: redis
-    name: livetrack-redis
-    plan: free
-    region: oregon
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList: []                # only accessible from your services
