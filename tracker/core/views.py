@@ -79,6 +79,45 @@ def _rate_limit(request, scope, limit, window_seconds):
     return False
 
 
+def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
+    """Centralised dedup: returns the canonical Visitor row for this device.
+
+    Match priority (within last 24h):
+        1. existing row with same session_key + org → exact match
+        2. existing row with same ip + user_agent + org → adopt session_key
+        3. brand new row with the given session_key
+
+    This prevents duplicate visitor rows when the parent script and iframe race
+    each other to create sessions before localStorage syncs.
+    """
+    from tracker.visitors.models import Visitor
+    cutoff = timezone.now() - timedelta(hours=24)
+
+    # 1. Exact session match
+    if session_key:
+        v = Visitor.objects.filter(organization=org, session_key=session_key).first()
+        if v:
+            return v, False
+
+    # 2. IP + UA match (excluding localhost/internal IPs)
+    if ip and ua and ip not in ('127.0.0.1', '0.0.0.0', '::1'):
+        v = (Visitor.objects
+             .filter(organization=org, ip_address=ip, user_agent=ua, last_seen__gte=cutoff)
+             .order_by('-last_seen').first())
+        if v:
+            if session_key and v.session_key != session_key:
+                v.session_key = session_key
+                v.save(update_fields=['session_key'])
+            return v, False
+
+    # 3. Create new
+    create_kwargs = {'organization': org, 'session_key': session_key, 'ip_address': ip, 'user_agent': ua}
+    if defaults:
+        create_kwargs.update(defaults)
+    v = Visitor.objects.create(**create_kwargs)
+    return v, True
+
+
 def _resolve_room_actor(request, room):
     """Determine who is acting on a chat room (agent / collaborator / visitor).
 
@@ -260,27 +299,23 @@ def widget_init(request):
         org = _get_org_from_request(request)
 
         from tracker.visitors.middleware import get_client_ip, parse_user_agent
-        from tracker.visitors.models import Visitor
 
-        session_key = request.session.session_key
+        body_data = _parse_json_body(request) or {}
+        body_session = (body_data.get('session_key') or '').strip()
+        session_key = body_session or request.session.session_key
         ip = get_client_ip(request)
         ua = request.META.get('HTTP_USER_AGENT', '')
         browser, os_name, device_type = parse_user_agent(ua)
 
-        visitor, _ = Visitor.objects.get_or_create(
-            session_key=session_key,
-            organization=org,
+        visitor, _ = _resolve_or_create_visitor(
+            org=org, ip=ip, ua=ua, session_key=session_key,
             defaults={
-                'ip_address': ip,
-                'user_agent': ua,
-                'browser': browser,
-                'os': os_name,
-                'device_type': device_type,
+                'browser': browser, 'os': os_name, 'device_type': device_type,
             },
         )
 
         return JsonResponse({
-            'session_key': session_key,
+            'session_key': visitor.session_key or session_key,
             'visitor_id': visitor.id,
             'welcome_message': org.welcome_message if org else 'Hi! How can we help you?',
             'widget_color': org.widget_color if org else '#7c3aed',
@@ -315,28 +350,20 @@ def widget_track_pageview(request):
     )
     from tracker.visitors.models import Visitor, PageView
 
-    # Resolve session: cookie first, fallback to body session_key (cross-origin)
     if not request.session.session_key:
         request.session.create()
-    session_key = body_session or request.session.session_key
+    session_key = (body_session or request.session.session_key or '').strip()
 
     ip = get_client_ip(request)
     ua = request.META.get('HTTP_USER_AGENT', '')
     browser, os_name, device_type = parse_user_agent(ua)
 
-    visitor, created = Visitor.objects.get_or_create(
-        session_key=session_key,
-        organization=org,
+    visitor, created = _resolve_or_create_visitor(
+        org=org, ip=ip, ua=ua, session_key=session_key,
         defaults={
-            'ip_address': ip,
-            'user_agent': ua,
-            'browser': browser,
-            'os': os_name,
-            'device_type': device_type,
-            'referrer': referrer,
-            'referrer_source': get_referrer_source(referrer),
-            'is_online': True,
-            'landing_page': url,
+            'browser': browser, 'os': os_name, 'device_type': device_type,
+            'referrer': referrer, 'referrer_source': get_referrer_source(referrer),
+            'is_online': True, 'landing_page': url,
         },
     )
 
@@ -599,19 +626,21 @@ def widget_start_chat(request):
         from tracker.chat.models import ChatRoom
         from django.db.models import Max
 
-        try:
-            visitor = Visitor.objects.get(session_key=session_key, organization=org)
-        except Visitor.DoesNotExist:
-            # Fallback: create visitor on-the-fly for cross-origin
-            from tracker.visitors.middleware import get_client_ip, parse_user_agent
-            ip = get_client_ip(request)
-            ua = request.META.get('HTTP_USER_AGENT', '')
-            browser, os_name, device_type = parse_user_agent(ua)
-            visitor = Visitor.objects.create(
-                session_key=session_key, organization=org,
-                ip_address=ip, user_agent=ua, browser=browser,
-                os=os_name, device_type=device_type, is_online=True,
-            )
+        # Find or create visitor (with smart dedup by IP+UA so we don't create duplicates)
+        from tracker.visitors.middleware import get_client_ip, parse_user_agent
+        ip = get_client_ip(request)
+        ua = request.META.get('HTTP_USER_AGENT', '')
+        browser, os_name, device_type = parse_user_agent(ua)
+        visitor, _ = _resolve_or_create_visitor(
+            org=org, ip=ip, ua=ua, session_key=session_key,
+            defaults={
+                'browser': browser, 'os': os_name, 'device_type': device_type,
+                'is_online': True,
+            },
+        )
+        # Use the canonical session_key going forward (the one stored on the visitor)
+        if visitor.session_key:
+            session_key = visitor.session_key
         if visitor.is_banned:
             return JsonResponse({'error': 'Chat disabled for this visitor. Please contact support.'}, status=403)
 
