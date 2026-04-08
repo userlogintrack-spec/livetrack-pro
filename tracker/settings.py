@@ -209,6 +209,12 @@ STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_PRICE_PRO = os.getenv('STRIPE_PRICE_PRO', '')  # Stripe Price ID for Pro plan
 STRIPE_PRICE_ENTERPRISE = os.getenv('STRIPE_PRICE_ENTERPRISE', '')  # Stripe Price ID for Enterprise plan
 
+# Always honor X-Forwarded-Proto when running behind a reverse proxy (Render, Heroku, Nginx).
+# Without this, request.is_secure() returns False and absolute URLs are http:// even on HTTPS
+# deployments — which breaks the widget script (mixed content blocked).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
 # Production security
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
@@ -216,7 +222,6 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'SAMEORIGIN'
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True

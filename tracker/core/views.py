@@ -377,6 +377,12 @@ def widget_script(request):
     <script src="https://your-domain/api/widget/script.js?key=YOUR_KEY"></script>
     """
     base_url = request.build_absolute_uri('/').rstrip('/')
+    # Force HTTPS for any deployment whose host is NOT localhost — prevents mixed-content
+    # blocks when the customer's site is on HTTPS but our absolute URL ended up http://
+    # (happens behind some proxies even with SECURE_PROXY_SSL_HEADER set).
+    host = request.get_host().split(':')[0]
+    if host not in ('localhost', '127.0.0.1', '0.0.0.0') and base_url.startswith('http://'):
+        base_url = 'https://' + base_url[len('http://'):]
     widget_key = request.GET.get('key', '')
 
     # Load org customization
