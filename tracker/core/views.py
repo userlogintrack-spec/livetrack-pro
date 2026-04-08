@@ -912,6 +912,31 @@ def widget_embed_page(request):
     widget_key = request.GET.get('key', '')
     from tracker.core.models import Organization
     org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else Organization.objects.first()
+
+    # Show a clear setup error when the key is invalid (instead of a blank panel).
+    if widget_key and not org:
+        html = f"""<!DOCTYPE html>
+<html><head><meta charset='UTF-8'><title>Widget setup needed</title>
+<style>
+  body{{margin:0;font-family:-apple-system,Inter,Arial,sans-serif;background:#fff;color:#1f2937;height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;}}
+  .box{{max-width:320px}}
+  h2{{font-size:16px;margin:0 0 8px;color:#dc2626}}
+  p{{font-size:13px;line-height:1.5;color:#6b7280;margin:0 0 12px}}
+  code{{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:11px;word-break:break-all}}
+  .icon{{font-size:36px;margin-bottom:8px}}
+</style></head>
+<body>
+  <div class='box'>
+    <div class='icon'>⚠️</div>
+    <h2>Widget not configured</h2>
+    <p>The widget key in your embed script does not match any organization on this server.</p>
+    <p>Provided key:<br><code>{widget_key[:64]}</code></p>
+    <p style='font-size:11px;margin-top:14px'>Log in to your dashboard → <b>Settings → Widget</b> to copy the correct key.</p>
+  </div>
+</body></html>"""
+        from django.http import HttpResponse
+        return HttpResponse(html, content_type='text/html; charset=utf-8')
+
     # Prefer session_key passed by parent script (for cross-origin where cookies are blocked).
     # Fall back to Django session cookie, then create one as a last resort.
     parent_sk = (request.GET.get('sk') or '').strip()[:64]
