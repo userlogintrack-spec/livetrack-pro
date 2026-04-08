@@ -46,7 +46,7 @@
 
         /* Pre-chat */
         .prechat { padding:24px 20px; display:flex; flex-direction:column; gap:14px; flex:1; overflow-y:auto; background:white; }
-        .prechat p { font-size:13px; color:#6b7280; line-height:1.6; }
+        .prechat p { font-size:13px; color:#6b7280; line-height:1.6; margin:0 0 10px; }
         .prechat input, .prechat textarea {
             padding:13px 16px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:12px;
             font-size:14px; font-family:inherit; color:#1f2937; outline:none; transition:all .2s; width:100%; box-sizing:border-box;
@@ -94,6 +94,42 @@
         .emoji-popup button:hover { background:#f5f3ff; transform:scale(1.2); }
 
         .hidden { display:none !important; }
+
+        /* 3-dot dropdown menu */
+        .ltw-menu {
+            display: none;
+            position: absolute;
+            top: 60px; right: 14px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+            min-width: 200px;
+            z-index: 1000;
+            overflow: hidden;
+            animation: ltwMenuIn .15s ease;
+        }
+        .ltw-menu.show { display: block; }
+        @keyframes ltwMenuIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+        .ltw-menu-item {
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            text-align: left;
+            font-size: 13px;
+            color: #1f2937;
+            cursor: pointer;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background .15s;
+        }
+        .ltw-menu-item:hover { background: #f9fafb; }
+        .ltw-menu-item.ltw-menu-danger { color: #ef4444; }
+        .ltw-menu-item.ltw-menu-bordered { border-top: 1px solid #f3f4f6; }
+        .ltw-menu-item.ltw-hide { display: none; }
     </style>
 </head>
 <body>
@@ -102,14 +138,27 @@
         <div class="header-info">
             <div class="avatar"><i class="fas fa-headset"></i></div>
             <div>
-                <div class="title">{{ org.widget_title|default:"LiveTrack Support" }}</div>
-                <div class="status"><span class="status-dot"></span> We're online</div>
+                <div class="title" id="ltwTitle">{{ org.widget_title|default:"LiveTrack Support" }}</div>
+                <div class="status" id="ltwStatus"><span class="status-dot"></span> <span id="ltwStatusText">We're online</span></div>
             </div>
         </div>
         <div class="header-actions">
-            <button class="header-btn" onclick="toggleMenu()" title="Menu"><i class="fas fa-ellipsis-v"></i></button>
-            <button class="header-btn" onclick="parent.postMessage('ltw-close','*')" title="Close"><i class="fas fa-times"></i></button>
+            <button class="header-btn" onclick="toggleMenu(event)" title="Menu"><i class="fas fa-ellipsis-v"></i></button>
+            <button class="header-btn" onclick="closeWidget()" title="Close"><i class="fas fa-times"></i></button>
         </div>
+    </div>
+
+    <!-- Dropdown menu (rendered OUTSIDE header so .header overflow:hidden doesn't clip it) -->
+    <div id="ltwMenu" class="ltw-menu">
+        <button onclick="downloadTranscript()" id="menuDownload" class="ltw-menu-item">
+            <i class="fas fa-download" style="color:#6b7280;width:16px;"></i> Download Transcript
+        </button>
+        <button onclick="endChatFromMenu()" id="menuEnd" class="ltw-menu-item ltw-menu-danger">
+            <i class="fas fa-phone-slash" style="width:16px;"></i> End Chat
+        </button>
+        <button onclick="closeWidget()" class="ltw-menu-item ltw-menu-bordered">
+            <i class="fas fa-window-minimize" style="color:#6b7280;width:16px;"></i> Minimize
+        </button>
     </div>
 
     <!-- Messages -->
@@ -188,6 +237,7 @@
     <!-- End chat / New chat -->
     <div class="end-chat-area" id="endArea">
         <p style="font-size:13px;color:#6b7280;margin-bottom:12px;">Chat has ended.</p>
+        <button class="newchat-btn" onclick="downloadTranscript()" style="background:#fff;color:var(--wc);border:1.5px solid var(--wc);margin-bottom:10px;"><i class="fas fa-download" style="margin-right:6px;"></i> Download Transcript</button>
         <button class="newchat-btn" onclick="newChat()"><i class="fas fa-plus" style="margin-right:6px;"></i> Start New Chat</button>
     </div>
 
@@ -197,9 +247,49 @@
 <script>
 var BASE = window.location.origin;
 var KEY = '{{ widget_key }}';
-var SESSION = '{{ session_key }}';
+var SK_STORAGE = 'ltw_sk_' + KEY;
+var ROOM_STORAGE = 'ltw_room_' + KEY;
+var NAME_STORAGE = 'ltw_name_' + KEY;
+// Stable session_key: localStorage (per backend origin) > server-rendered (from parent URL) > generated
+function _loadSk() { try { return localStorage.getItem(SK_STORAGE) || ''; } catch(e) { return ''; } }
+function _saveSk(v) { try { if (v) localStorage.setItem(SK_STORAGE, v); } catch(e) {} }
+var SESSION = _loadSk() || '{{ session_key }}';
+_saveSk(SESSION);
+// Tell parent script to use the same session_key for pageview tracking (unify visitor)
+try { parent.postMessage({type:'ltw-session', sessionKey: SESSION}, '*'); } catch(e) {}
+
 var roomId = null, wsToken = '', socket = null, visitorName = 'Visitor';
 var WC = '{{ org.widget_color|default:"#7c3aed" }}';
+var wsRetry = 0, wsClosedByUser = false, wsReconnectTimer = null;
+
+function closeWidget() { try { parent.postMessage({type:'ltw-close'}, '*'); } catch(e) {} }
+
+// ── Agent presence in header ──
+var activeAgents = []; // list of agent names currently in the room
+function updateActiveAgent(name) {
+    if (!name || name === 'System' || name === 'Visitor' || name === visitorName) return;
+    if (activeAgents.indexOf(name) === -1) activeAgents.push(name);
+    renderAgentHeader();
+}
+function removeActiveAgent(name) {
+    var i = activeAgents.indexOf(name);
+    if (i !== -1) activeAgents.splice(i, 1);
+    renderAgentHeader();
+}
+function renderAgentHeader() {
+    var titleEl = document.getElementById('ltwTitle');
+    var statusEl = document.getElementById('ltwStatusText');
+    if (!titleEl || !statusEl) return;
+    if (activeAgents.length === 0) {
+        statusEl.textContent = "We're online";
+        return;
+    }
+    if (activeAgents.length === 1) {
+        statusEl.textContent = activeAgents[0] + ' is helping you';
+    } else {
+        statusEl.textContent = activeAgents[0] + ' +' + (activeAgents.length - 1) + ' helping you';
+    }
+}
 
 // Emojis
 var EMOJIS = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉','😊','😇','🥰','😍','🤩','😘','😋','😛','😜','🤪','😝','🤗','🤭','🤔','😐','😏','😒','🙄','😬','😌','😔','😪','😴','😷','🤒','🤕','🤢','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','😕','😟','🙁','😮','😲','😳','🥺','😢','😭','😱','😤','😡','👍','👎','👋','🤝','🙏','✅','❌','❤️','🔥','⭐','🎉','💯','👏','🚀','💡','📎'];
@@ -214,7 +304,17 @@ function insertEmoji(e) { document.getElementById('msgInput').value += e; docume
 
 function post(path, data) {
     data = data || {}; data.key = KEY; data.session_key = SESSION;
-    return fetch(BASE + path, {method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(data)}).then(function(r){return r.json();});
+    return fetch(BASE + path, {method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(data)})
+        .then(function(r){return r.json();})
+        .then(function(j){
+            // Persist any session_key the server sends back so we stay the same visitor
+            if (j && j.session_key) {
+                SESSION = j.session_key;
+                _saveSk(SESSION);
+                try { parent.postMessage({type:'ltw-session', sessionKey: SESSION}, '*'); } catch(e) {}
+            }
+            return j;
+        });
 }
 
 function addMsg(text, type, timestamp, msgType, fileUrl, fileName) {
@@ -246,26 +346,81 @@ function addMsg(text, type, timestamp, msgType, fileUrl, fileName) {
 
 function connectWs() {
     if (!roomId || !wsToken) return;
+    if (socket && (socket.readyState === 0 || socket.readyState === 1)) return;
+    wsClosedByUser = false;
     var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
-    socket = new WebSocket(proto + location.host + '/ws/chat/' + roomId + '/?token=' + encodeURIComponent(wsToken));
+    try { socket = new WebSocket(proto + location.host + '/ws/chat/' + roomId + '/?token=' + encodeURIComponent(wsToken)); }
+    catch(e) { scheduleReconnect(); return; }
+
+    socket.onopen = function() { wsRetry = 0; };
     socket.onmessage = function(e) {
-        var d = JSON.parse(e.data);
+        var d;
+        try { d = JSON.parse(e.data); } catch(_) { return; }
         if (d.type === 'chat_message' && d.sender_type !== 'visitor') {
             addMsg(d.message, d.sender_type === 'system' ? 'system' : 'agent', d.timestamp, d.msg_type, d.file_url, d.file_name);
+            // Update header to show the agent's name on the first agent message
+            if (d.sender_type === 'agent' && d.sender_name) {
+                updateActiveAgent(d.sender_name);
+            }
+            // Parse system "X joined / X joined as collaborator / X left"
+            if (d.sender_type === 'system' && d.message) {
+                var m = d.message.match(/^(.+?) joined (?:the chat|as collaborator)\.?$/);
+                if (m) updateActiveAgent(m[1]);
+                var m2 = d.message.match(/^(.+?) left the chat\.?$/);
+                if (m2) removeActiveAgent(m2[1]);
+            }
         }
         if (d.type === 'typing' && d.sender_type === 'agent') {
             document.getElementById('typing').style.display = d.is_typing ? 'block' : 'none';
+            if (d.sender_name) updateActiveAgent(d.sender_name);
         }
         if (d.type === 'chat_closed') {
             handleChatClosed('Agent ended the chat.');
         }
     };
+    socket.onclose = function() {
+        if (wsClosedByUser || !roomId) return;
+        scheduleReconnect();
+    };
+    socket.onerror = function() { try { socket.close(); } catch(_){} };
 }
+
+function scheduleReconnect() {
+    if (wsClosedByUser || !roomId) return;
+    if (wsReconnectTimer) return;
+    var delay = Math.min(1000 * Math.pow(2, wsRetry), 15000);
+    wsRetry++;
+    wsReconnectTimer = setTimeout(function() {
+        wsReconnectTimer = null;
+        // Re-fetch a fresh ws_token via restore (token may have expired)
+        post('/api/widget/start-chat/', {name:'',email:'',subject:'',restore_only:true})
+            .then(function(data) {
+                if (data && data.reused && data.room_id) {
+                    roomId = data.room_id;
+                    wsToken = data.ws_token || wsToken;
+                    connectWs();
+                } else {
+                    // Server says chat is gone — show end state once
+                    if (roomId) handleChatClosed('Chat session expired.');
+                }
+            })
+            .catch(function() { scheduleReconnect(); });
+    }, delay);
+}
+
+// Reconnect proactively when tab becomes visible / network comes back
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && roomId && (!socket || socket.readyState > 1)) scheduleReconnect();
+});
+window.addEventListener('online', function() {
+    if (roomId && (!socket || socket.readyState > 1)) scheduleReconnect();
+});
 
 function startChat() {
     var name = document.getElementById('nameInput').value.trim();
     if (!name) { document.getElementById('nameInput').style.borderColor='#ef4444'; return; }
     visitorName = name;
+    try { localStorage.setItem(NAME_STORAGE, name); } catch(_){}
     var email = document.getElementById('emailInput').value.trim();
     var subject = document.getElementById('subjectInput').value.trim();
 
@@ -273,6 +428,7 @@ function startChat() {
     .then(function(data) {
         if (data.error) { addMsg(data.error, 'system'); return; }
         roomId = data.room_id; wsToken = data.ws_token || '';
+        try { localStorage.setItem(ROOM_STORAGE, roomId); } catch(_){}
         document.getElementById('prechat').classList.add('hidden');
         document.getElementById('messages').classList.remove('hidden');
         document.getElementById('chatInput').classList.remove('hidden');
@@ -280,6 +436,11 @@ function startChat() {
             data.messages.forEach(function(m) {
                 var cls = m.sender_type === 'visitor' ? 'visitor' : m.sender_type === 'system' ? 'system' : 'agent';
                 addMsg(m.content, cls, m.timestamp, m.msg_type, m.file_url, m.file_name);
+                if (m.sender_type === 'agent' && m.sender_name) updateActiveAgent(m.sender_name);
+                if (m.sender_type === 'system' && m.content) {
+                    var jm = m.content.match(/^(.+?) joined (?:the chat|as collaborator)\.?$/);
+                    if (jm) updateActiveAgent(jm[1]);
+                }
             });
         }
         connectWs();
@@ -326,8 +487,12 @@ function handleChatClosed(msg) {
     document.getElementById('chatInput').classList.add('hidden');
     document.getElementById('typing').style.display = 'none';
     document.getElementById('endArea').style.display = 'block';
-    if (socket) { socket.close(); socket = null; }
-    roomId = null; wsToken = '';
+    wsClosedByUser = true;
+    if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+    if (socket) { try { socket.close(); } catch(_){} socket = null; }
+    if (roomId) lastRoomId = roomId;
+    roomId = null; wsToken = ''; wsRetry = 0;
+    try { localStorage.removeItem(ROOM_STORAGE); } catch(_){}
 }
 
 function newChat() {
@@ -337,23 +502,84 @@ function newChat() {
     document.getElementById('messages').innerHTML = '';
     document.getElementById('prechat').classList.remove('hidden');
     roomId = null; wsToken = '';
+    wsClosedByUser = false; wsRetry = 0;
+    // Pre-fill saved name so user doesn't retype
+    try {
+        var savedName = localStorage.getItem(NAME_STORAGE) || '';
+        if (savedName) document.getElementById('nameInput').value = savedName;
+    } catch(_){}
 }
 
-function toggleMenu() {}
+function toggleMenu(ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    var m = document.getElementById('ltwMenu');
+    if (!m) return;
+    var hasActive = !!(roomId && socket && socket.readyState === 1);
+    var hasAnyRoom = !!(roomId || lastRoomId);
+    var endBtn = document.getElementById('menuEnd');
+    var dlBtn  = document.getElementById('menuDownload');
+    if (endBtn) endBtn.classList.toggle('ltw-hide', !hasActive);
+    if (dlBtn)  dlBtn.classList.toggle('ltw-hide', !hasAnyRoom);
+    m.classList.toggle('show');
+}
+document.addEventListener('click', function(e) {
+    var m = document.getElementById('ltwMenu');
+    if (!m || !m.classList.contains('show')) return;
+    if (!m.contains(e.target) && !e.target.closest('.header-actions')) m.classList.remove('show');
+});
 
-// Auto-restore chat on load
+function endChatFromMenu() {
+    document.getElementById('ltwMenu').classList.remove('show');
+    endChat();
+}
+
+function downloadTranscript() {
+    document.getElementById('ltwMenu').classList.remove('show');
+    var rid = roomId || lastRoomId;
+    if (!rid) { alert('No chat to download yet.'); return; }
+    var url = BASE + '/api/chat/transcript/' + encodeURIComponent(rid) + '/?sk=' + encodeURIComponent(SESSION);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'transcript_' + rid + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ a.remove(); }, 100);
+}
+
+// Remember last room id even after chat ends so the user can still download
+var lastRoomId = null;
+
+// Pre-fill saved name in prechat form
+try {
+    var _savedName = localStorage.getItem(NAME_STORAGE) || '';
+    if (_savedName) document.getElementById('nameInput').value = _savedName;
+} catch(_){}
+
+// Auto-restore chat on load — keep user inside the same room until they end it
 post('/api/widget/start-chat/', {name:'',email:'',subject:'',restore_only:true})
 .then(function(data) {
-    if (data.reused && data.messages && data.messages.length > 0) {
+    if (data && data.reused && data.room_id) {
         roomId = data.room_id; wsToken = data.ws_token || '';
+        try { localStorage.setItem(ROOM_STORAGE, roomId); } catch(_){}
         document.getElementById('prechat').classList.add('hidden');
         document.getElementById('messages').classList.remove('hidden');
+        document.getElementById('messages').innerHTML = '';
         document.getElementById('chatInput').classList.remove('hidden');
-        data.messages.forEach(function(m) {
-            var cls = m.sender_type === 'visitor' ? 'visitor' : m.sender_type === 'system' ? 'system' : 'agent';
-            addMsg(m.content, cls, m.timestamp, m.msg_type, m.file_url, m.file_name);
-            if (m.sender_type === 'visitor' && m.sender_name) visitorName = m.sender_name;
-        });
+        if (data.messages) {
+            data.messages.forEach(function(m) {
+                var cls = m.sender_type === 'visitor' ? 'visitor' : m.sender_type === 'system' ? 'system' : 'agent';
+                addMsg(m.content, cls, m.timestamp, m.msg_type, m.file_url, m.file_name);
+                if (m.sender_type === 'visitor' && m.sender_name) visitorName = m.sender_name;
+                // Reconstruct agent presence from history
+                if (m.sender_type === 'agent' && m.sender_name) updateActiveAgent(m.sender_name);
+                if (m.sender_type === 'system' && m.content) {
+                    var jm = m.content.match(/^(.+?) joined (?:the chat|as collaborator)\.?$/);
+                    if (jm) updateActiveAgent(jm[1]);
+                    var lm = m.content.match(/^(.+?) left the chat\.?$/);
+                    if (lm) removeActiveAgent(lm[1]);
+                }
+            });
+        }
         connectWs();
     }
 }).catch(function(){});
@@ -378,27 +604,60 @@ async function startVisitorCall(type) {
     addMsg('Calling agent...','system',new Date().toISOString());
 }
 
+var screenPC = null;
 async function startVisitorScreenShare() {
-    if (!socket || socket.readyState !== 1) { alert('Start chat first'); return; }
-    try { screenStr = await navigator.mediaDevices.getDisplayMedia({video:true}); } catch(e) { return; }
+    if (!socket || socket.readyState !== 1) { alert('Please start a chat first'); return; }
+    if (screenPC || screenStr) { stopScreenShare(); return; }
+    try {
+        screenStr = await navigator.mediaDevices.getDisplayMedia({video:true, audio:false});
+    } catch(e) {
+        addMsg('Screen share cancelled or blocked','system',new Date().toISOString());
+        return;
+    }
     document.getElementById('btnScreenShare').style.color = '#10b981';
     addMsg('Screen sharing started','system',new Date().toISOString());
-    // Create peer connection for screen
-    if (!callPC) {
-        callPC = new RTCPeerConnection(rtcCfg);
-        callPC.onicecandidate = function(e) { if(e.candidate) socket.send(JSON.stringify({type:'ice_candidate',data:{candidate:e.candidate.toJSON()}})); };
+
+    screenPC = new RTCPeerConnection(rtcCfg);
+    screenPC.onicecandidate = function(e) {
+        if (e.candidate && socket && socket.readyState === 1) {
+            socket.send(JSON.stringify({type:'ice_candidate',data:{candidate:e.candidate.toJSON(),context:'screen'}}));
+        }
+    };
+    screenPC.oniceconnectionstatechange = function() {
+        if (screenPC && ['failed','closed','disconnected'].indexOf(screenPC.iceConnectionState) !== -1) {
+            stopScreenShare();
+        }
+    };
+    screenStr.getTracks().forEach(function(t){ screenPC.addTrack(t, screenStr); });
+
+    try {
+        var offer = await screenPC.createOffer();
+        await screenPC.setLocalDescription(offer);
+        socket.send(JSON.stringify({type:'screen_share_offer',data:{sdp:screenPC.localDescription.toJSON()}}));
+    } catch(err) {
+        addMsg('Could not start screen share: ' + (err && err.message ? err.message : 'unknown'),'system',new Date().toISOString());
+        stopScreenShare();
+        return;
     }
-    screenStr.getTracks().forEach(function(t){callPC.addTrack(t,screenStr);});
-    var offer = await callPC.createOffer();
-    await callPC.setLocalDescription(offer);
-    socket.send(JSON.stringify({type:'screen_share_offer',data:{sdp:callPC.localDescription.toJSON()}}));
+
+    // Stop when user clicks the browser's "Stop sharing" button
     screenStr.getVideoTracks()[0].onended = function() { stopScreenShare(); };
 }
 
-function stopScreenShare() {
-    if(screenStr){screenStr.getTracks().forEach(function(t){t.stop();}); screenStr=null;}
-    document.getElementById('btnScreenShare').style.color = '';
-    socket.send(JSON.stringify({type:'screen_share_stop',data:{}}));
+function stopScreenShare(opts) {
+    // Idempotent: do nothing if there's no active share
+    var hadAnything = !!(screenStr || screenPC);
+    if (!hadAnything) return;
+
+    if (screenStr) { try { screenStr.getTracks().forEach(function(t){t.stop();}); } catch(_){} screenStr = null; }
+    if (screenPC)  { try { screenPC.close(); } catch(_){} screenPC = null; }
+    var b = document.getElementById('btnScreenShare'); if (b) b.style.color = '';
+
+    // Only broadcast if WE are the one stopping (not echoing an inbound stop)
+    var silent = opts && opts.silent;
+    if (!silent && socket && socket.readyState === 1) {
+        try { socket.send(JSON.stringify({type:'screen_share_stop',data:{}})); } catch(_){}
+    }
     addMsg('Screen sharing stopped','system',new Date().toISOString());
 }
 
@@ -483,13 +742,36 @@ function patchCallHandler() {
     if(!socket) return;
     _origWsMsg = socket.onmessage;
     socket.onmessage = function(e) {
-        var d = JSON.parse(e.data);
+        var d;
+        try { d = JSON.parse(e.data); } catch(_) { return; }
         if(d.type==='call_offer' && d.sender_type!=='visitor') { handleIncomingCall(d.data||d); return; }
         if(d.type==='call_answer' && callPC) { callPC.setRemoteDescription(new RTCSessionDescription((d.data||d).sdp)); startCallTimer(); document.getElementById('callTitle').textContent='Connected'; return; }
         if(d.type==='call_end') { endCallVisitor(); return; }
         if(d.type==='call_reject') { endCallVisitor(); addMsg('Call rejected','system',new Date().toISOString()); return; }
-        if(d.type==='ice_candidate' && d.data && d.data.context==='call' && callPC) { callPC.addIceCandidate(new RTCIceCandidate(d.data.candidate)).catch(function(){}); return; }
-        if(d.type==='screen_share_answer' && callPC) { callPC.setRemoteDescription(new RTCSessionDescription((d.data||d).sdp)).catch(function(){}); return; }
+        if(d.type==='ice_candidate' && d.data) {
+            var ctx = d.data.context;
+            // Explicit context wins
+            if (ctx === 'screen' && screenPC) { screenPC.addIceCandidate(new RTCIceCandidate(d.data.candidate)).catch(function(){}); return; }
+            if (ctx === 'call' && callPC)     { callPC.addIceCandidate(new RTCIceCandidate(d.data.candidate)).catch(function(){}); return; }
+            // No context — route to whichever PC exists. If both exist, prefer screen
+            // (agent dashboard sends screen-share ICE without context).
+            if (!ctx) {
+                if (screenPC) { screenPC.addIceCandidate(new RTCIceCandidate(d.data.candidate)).catch(function(){}); return; }
+                if (callPC)   { callPC.addIceCandidate(new RTCIceCandidate(d.data.candidate)).catch(function(){}); return; }
+            }
+            return;
+        }
+        if(d.type==='screen_share_answer' && screenPC) {
+            screenPC.setRemoteDescription(new RTCSessionDescription((d.data||d).sdp)).catch(function(err){
+                addMsg('Screen share failed to connect','system',new Date().toISOString());
+            });
+            return;
+        }
+        if(d.type==='screen_share_stop') {
+            // Only react when the OTHER party stopped — never echo our own stop
+            if (d.sender_type !== 'visitor') stopScreenShare({silent: true});
+            return;
+        }
         if(_origWsMsg) _origWsMsg.call(socket,e);
     };
 }

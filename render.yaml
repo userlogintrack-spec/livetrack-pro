@@ -1,35 +1,58 @@
 services:
+  # Web service — Daphne (ASGI for WebSockets + HTTP)
   - type: web
-    name: livetrack
+    name: livetrack-pro
     runtime: python
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: |
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate --noinput
     startCommand: daphne -b 0.0.0.0 -p $PORT tracker.asgi:application
+    healthCheckPath: /
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+
+      # Django core
+      - key: SECRET_KEY
+        generateValue: true        # Render auto-generates a strong key
       - key: DEBUG
         value: "False"
-      - key: SECRET_KEY
-        generateValue: true
       - key: ALLOWED_HOSTS
-        value: ".onrender.com"
+        value: ".onrender.com"     # add your custom domain later: ".onrender.com,yourdomain.com"
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://*.onrender.com"
+
+      # Database — external Neon Postgres (set this in Render dashboard, NOT here)
       - key: DATABASE_URL
-        fromDatabase:
-          name: livetrack-db
-          property: connectionString
+        sync: false                # marks it as a secret you set manually in the dashboard
+
+      # Redis — managed by Render below
       - key: REDIS_URL
         fromService:
           name: livetrack-redis
           type: redis
           property: connectionString
-      - key: PYTHON_VERSION
-        value: "3.10.7"
 
+      # Stripe (set in dashboard, sync:false keeps them out of git)
+      - key: STRIPE_PUBLIC_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+
+      # Behind Render's proxy
+      - key: TRUST_X_FORWARDED_FOR
+        value: "True"
+
+  # Redis — needed for WebSocket channels + cache
   - type: redis
     name: livetrack-redis
     plan: free
+    region: oregon
     maxmemoryPolicy: allkeys-lru
-
-databases:
-  - name: livetrack-db
-    plan: free
+    ipAllowList: []                # only accessible from your services

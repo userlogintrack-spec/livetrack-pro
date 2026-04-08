@@ -260,6 +260,116 @@ def widget_init(request):
     return JsonResponse({'error': 'POST required'}, status=405)
 
 
+@csrf_exempt
+def widget_track_pageview(request):
+    """Record a page view from the embedded widget on a customer's website."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    if _rate_limit(request, 'widget_track', limit=120, window_seconds=60):
+        return JsonResponse({'error': 'Too many requests'}, status=429)
+
+    data = _parse_json_body(request) or {}
+    url = (data.get('url') or '')[:500]
+    title = (data.get('title') or '')[:300]
+    referrer = (data.get('referrer') or '')[:500]
+    body_session = data.get('session_key', '')
+
+    if not url:
+        return JsonResponse({'error': 'url required'}, status=400)
+
+    org = _get_org_from_request(request)
+    if not org:
+        return JsonResponse({'error': 'org not found'}, status=404)
+
+    from tracker.visitors.middleware import (
+        get_client_ip, parse_user_agent, get_referrer_source,
+    )
+    from tracker.visitors.models import Visitor, PageView
+
+    # Resolve session: cookie first, fallback to body session_key (cross-origin)
+    if not request.session.session_key:
+        request.session.create()
+    session_key = body_session or request.session.session_key
+
+    ip = get_client_ip(request)
+    ua = request.META.get('HTTP_USER_AGENT', '')
+    browser, os_name, device_type = parse_user_agent(ua)
+
+    visitor, created = Visitor.objects.get_or_create(
+        session_key=session_key,
+        organization=org,
+        defaults={
+            'ip_address': ip,
+            'user_agent': ua,
+            'browser': browser,
+            'os': os_name,
+            'device_type': device_type,
+            'referrer': referrer,
+            'referrer_source': get_referrer_source(referrer),
+            'is_online': True,
+            'landing_page': url,
+        },
+    )
+
+    now = timezone.now()
+    page_count = (visitor.total_visits or 0) + (1 if not created else 1)
+    Visitor.objects.filter(pk=visitor.pk).update(
+        last_seen=now,
+        total_visits=page_count,
+        is_online=True,
+        score=min(100, page_count * 5),
+        exit_page=url,
+        pages_per_session=page_count,
+        is_bounced=page_count <= 1,
+    )
+
+    # Mark previous pageview as not-exit
+    PageView.objects.filter(visitor=visitor, is_exit=True).update(is_exit=False)
+
+    PageView.objects.create(
+        visitor=visitor,
+        url=url,
+        page_title=title or url,
+        is_entry=created,
+        is_exit=True,
+    )
+
+    # Real-time broadcast to dashboard (throttled)
+    cache_key = f'ws_broadcast_{visitor.id}'
+    if visitor.organization_id and not cache.get(cache_key):
+        cache.set(cache_key, True, 2)
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'dashboard_updates_{visitor.organization_id}',
+                {
+                    'type': 'visitor_activity',
+                    'visitor_id': visitor.id,
+                    'ip': visitor.ip_address,
+                    'browser': visitor.browser,
+                    'os': visitor.os,
+                    'device': visitor.device_type,
+                    'country': visitor.country or '',
+                    'score': min(100, page_count * 5),
+                    'score_label': visitor.score_label,
+                    'current_page': url,
+                    'page_title': title or url,
+                    'total_pages': page_count,
+                    'is_chatting': False,
+                }
+            )
+        except Exception:
+            pass
+
+    return JsonResponse({
+        'ok': True,
+        'session_key': session_key,
+        'visitor_id': visitor.id,
+        'page_count': page_count,
+    })
+
+
 def widget_script(request):
     """
     Public embeddable widget script.
@@ -287,6 +397,52 @@ def widget_script(request):
   var WC = "__WIDGET_COLOR__";
   var isOpen = false;
 
+  // ===== Visitor session persistence (cross-page) =====
+  var SK_KEY = "ltw_session_key_" + WIDGET_KEY;
+  function getSessionKey() {
+    try { return localStorage.getItem(SK_KEY) || ""; } catch(e) { return ""; }
+  }
+  function setSessionKey(k) {
+    try { localStorage.setItem(SK_KEY, k); } catch(e) {}
+  }
+
+  // ===== Page view tracking =====
+  var lastTrackedUrl = "";
+  function trackPageView() {
+    var url = location.href;
+    if (url === lastTrackedUrl) return;
+    lastTrackedUrl = url;
+    var payload = {
+      key: WIDGET_KEY,
+      session_key: getSessionKey(),
+      url: url,
+      title: document.title || "",
+      referrer: document.referrer || ""
+    };
+    try {
+      fetch(BASE + "/api/widget/track/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        credentials: "include",
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if (d && d.session_key) setSessionKey(d.session_key);
+      }).catch(function(){});
+    } catch(e) {}
+  }
+
+  // Initial pageview
+  trackPageView();
+
+  // SPA navigation hooks
+  var _push = history.pushState;
+  history.pushState = function() { _push.apply(this, arguments); setTimeout(trackPageView, 0); };
+  var _replace = history.replaceState;
+  history.replaceState = function() { _replace.apply(this, arguments); setTimeout(trackPageView, 0); };
+  window.addEventListener("popstate", function(){ setTimeout(trackPageView, 0); });
+  window.addEventListener("hashchange", function(){ setTimeout(trackPageView, 0); });
+
   var style = document.createElement("style");
   style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:all .3s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}";
   document.head.appendChild(style);
@@ -297,11 +453,20 @@ def widget_script(request):
 
   var frame = document.createElement("iframe");
   frame.className = "ltw-frame";
-  frame.src = BASE + "/api/widget/embed/?key=" + WIDGET_KEY;
+  // Pass current session_key into iframe so chat & tracking share the same visitor
+  var _sk = encodeURIComponent(getSessionKey() || "");
+  frame.src = BASE + "/api/widget/embed/?key=" + WIDGET_KEY + (_sk ? "&sk=" + _sk : "");
   frame.allow = "microphone;camera;display-capture";
 
   document.body.appendChild(btn);
   document.body.appendChild(frame);
+
+  function closePanel() {
+    isOpen = false;
+    frame.style.display = "none";
+    btn.innerHTML = "💬";
+    btn.style.fontSize = "22px";
+  }
 
   btn.onclick = function() {
     isOpen = !isOpen;
@@ -309,6 +474,23 @@ def widget_script(request):
     btn.innerHTML = isOpen ? "✕" : "💬";
     btn.style.fontSize = isOpen ? "18px" : "22px";
   };
+
+  // Listen for messages from the iframe (close button, session sync)
+  window.addEventListener("message", function(ev) {
+    var d = ev.data;
+    if (d === "ltw-close") { closePanel(); return; }
+    if (d && typeof d === "object") {
+      if (d.type === "ltw-close") { closePanel(); return; }
+      if (d.type === "ltw-session" && d.sessionKey) { setSessionKey(d.sessionKey); return; }
+      if (d.type === "ltw-open") {
+        isOpen = true;
+        frame.style.display = "block";
+        btn.innerHTML = "✕";
+        btn.style.fontSize = "18px";
+        return;
+      }
+    }
+  });
 
   // Proactive chat trigger
   if ("__PROACTIVE__" === "true") {
@@ -399,10 +581,11 @@ def widget_start_chat(request):
         if visitor.is_banned:
             return JsonResponse({'error': 'Chat disabled for this visitor. Please contact support.'}, status=403)
 
-        # Auto-close globally stale chats (30 min inactivity).
-        close_stale_chats(inactive_minutes=30)
+        # Sweep very old abandoned chats only (24h+) — never close active visitor sessions early.
+        close_stale_chats(inactive_minutes=24 * 60)
 
-        # Reuse existing open chat for same visitor if still active recently.
+        # Reuse existing open chat for the same visitor — visitor stays in the SAME room
+        # until they explicitly end it. No auto-close on the visitor's side.
         open_room = (
             ChatRoom.objects
             .filter(visitor=visitor, status__in=['waiting', 'active'])
@@ -411,35 +594,29 @@ def widget_start_chat(request):
             .first()
         )
         if open_room:
-            recent_cutoff = timezone.now() - timedelta(minutes=30)
-            last_activity = open_room.last_message_at or open_room.updated_at or open_room.created_at
-            if last_activity >= recent_cutoff:
-                messages = []
-                for msg in open_room.messages.order_by('timestamp')[:100]:
-                    messages.append({
-                        'sender_type': msg.sender_type,
-                        'sender_name': msg.sender_name,
-                        'content': msg.content,
-                        'msg_type': msg.msg_type,
-                        'file_name': msg.file_name,
-                        'file_url': msg.file.url if msg.file else '',
-                        'timestamp': msg.timestamp.isoformat(),
-                    })
-                return JsonResponse({
-                    'room_id': open_room.room_id,
-                    'status': open_room.status,
-                    'ws_token': create_ws_token(open_room.room_id, 'visitor', session_key),
-                    'reused': True,
-                    'messages': messages,
+            messages = []
+            for msg in open_room.messages.order_by('timestamp')[:200]:
+                messages.append({
+                    'sender_type': msg.sender_type,
+                    'sender_name': msg.sender_name,
+                    'content': msg.content,
+                    'msg_type': msg.msg_type,
+                    'file_name': msg.file_name,
+                    'file_url': msg.file.url if msg.file else '',
+                    'timestamp': msg.timestamp.isoformat(),
                 })
-
-            open_room.status = 'closed'
-            open_room.closed_at = timezone.now()
-            open_room.save(update_fields=['status', 'closed_at', 'updated_at'])
+            return JsonResponse({
+                'room_id': open_room.room_id,
+                'status': open_room.status,
+                'ws_token': create_ws_token(open_room.room_id, 'visitor', session_key),
+                'reused': True,
+                'messages': messages,
+                'session_key': session_key,
+            })
 
         # If restore_only mode, don't create new chat - just return no existing chat
         if data.get('restore_only'):
-            return JsonResponse({'reused': False, 'messages': []})
+            return JsonResponse({'reused': False, 'messages': [], 'session_key': session_key})
 
         room_id = uuid.uuid4().hex[:12]
         visitor_name = data.get('name', 'Visitor') or 'Visitor'
@@ -548,6 +725,7 @@ def widget_start_chat(request):
             'reused': False,
             'messages': welcome_messages,
             'queue_position': queue_position,
+            'session_key': session_key,
         })
     return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -611,6 +789,42 @@ def chat_file_upload(request, room_id):
         'sender_name': actor['sender_name'],
         'timestamp': msg.timestamp.isoformat(),
     })
+
+
+def widget_chat_transcript(request, room_id):
+    """Public transcript download for the visitor who owns the chat (no agent login required).
+    Auth: visitor must present their session_key as a query param OR own the Django session
+    that matches the room's visitor."""
+    from tracker.chat.models import ChatRoom
+    try:
+        room = ChatRoom.objects.select_related('visitor', 'organization', 'agent').get(room_id=room_id)
+    except ChatRoom.DoesNotExist:
+        return HttpResponse('Not found', status=404)
+
+    sk = (request.GET.get('sk') or '').strip()[:64]
+    cookie_sk = request.session.session_key or ''
+    if not (sk and room.visitor and sk == room.visitor.session_key) and \
+       not (cookie_sk and room.visitor and cookie_sk == room.visitor.session_key):
+        return HttpResponse('Forbidden', status=403)
+
+    lines = [
+        f'Chat Transcript - {room.visitor_name or "Visitor"}',
+        f'Room: {room.room_id}',
+        f'Date: {room.created_at.strftime("%Y-%m-%d %H:%M")}',
+        f'Agent: {room.agent.get_full_name() if room.agent else "Unassigned"}',
+        f'Status: {room.status}',
+        '-' * 50,
+        '',
+    ]
+    for msg in room.messages.order_by('timestamp'):
+        time_str = msg.timestamp.strftime('%H:%M')
+        lines.append(f'[{time_str}] {msg.sender_name} ({msg.sender_type}): {msg.content}')
+        if msg.file:
+            lines.append(f'  [File: {msg.file_name}]')
+
+    response = HttpResponse('\n'.join(lines), content_type='text/plain; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="transcript_{room.room_id}.txt"'
+    return response
 
 
 @csrf_exempt
@@ -692,12 +906,19 @@ def widget_embed_page(request):
     widget_key = request.GET.get('key', '')
     from tracker.core.models import Organization
     org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else Organization.objects.first()
-    if not request.session.session_key:
-        request.session.create()
+    # Prefer session_key passed by parent script (for cross-origin where cookies are blocked).
+    # Fall back to Django session cookie, then create one as a last resort.
+    parent_sk = (request.GET.get('sk') or '').strip()[:64]
+    if parent_sk:
+        session_key = parent_sk
+    else:
+        if not request.session.session_key:
+            request.session.create()
+        session_key = request.session.session_key
     return render(request, 'core/widget_embed.html', {
         'org': org,
         'widget_key': widget_key,
-        'session_key': request.session.session_key,
+        'session_key': session_key,
     })
 
 

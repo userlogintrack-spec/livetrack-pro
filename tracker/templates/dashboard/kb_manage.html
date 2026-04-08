@@ -16,12 +16,12 @@
     </div>
     <div class="stat-card green">
         <div class="stat-icon"><i class="fas fa-eye"></i></div>
-        <div class="stat-value">{% load humanize %}{% with total_views=0 %}{{ total_views }}{% endwith %}</div>
+        <div class="stat-value">{% load humanize %}{{ total_views|intcomma }}</div>
         <div class="stat-label">Total Views</div>
     </div>
     <div class="stat-card orange">
         <div class="stat-icon"><i class="fas fa-link"></i></div>
-        <div class="stat-value"><a href="{% url 'kb_public' org_slug=request.user.agent_profile.organization.slug %}" style="color:inherit;font-size:14px;" target="_blank">View Public KB <i class="fas fa-external-link-alt" style="font-size:12px;"></i></a></div>
+        <div class="stat-value">{% if request.user.agent_profile.organization %}<a href="{% url 'kb_public' org_slug=request.user.agent_profile.organization.slug %}" style="color:inherit;font-size:14px;" target="_blank">View Public KB <i class="fas fa-external-link-alt" style="font-size:12px;"></i></a>{% else %}—{% endif %}</div>
         <div class="stat-label">Public Link</div>
     </div>
 </div>
@@ -78,16 +78,18 @@
                 <thead><tr><th>Title</th><th>Category</th><th>Views</th><th>Helpful</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
                 {% for article in articles %}
-                <tr>
+                <tr id="row-{{ article.id }}" data-id="{{ article.id }}" data-title="{{ article.title }}">
                     <td style="font-weight:600;">{{ article.title }}</td>
                     <td><span style="background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:6px;font-size:11px;">{{ article.category.name }}</span></td>
                     <td>{{ article.views_count }}</td>
                     <td><span style="color:var(--success);">{{ article.helpful_yes }} <i class="fas fa-thumbs-up"></i></span> / <span style="color:var(--danger);">{{ article.helpful_no }} <i class="fas fa-thumbs-down"></i></span></td>
                     <td><span class="status {% if article.is_published %}status-online{% else %}status-offline{% endif %}"><span class="dot"></span> {% if article.is_published %}Published{% else %}Draft{% endif %}</span></td>
-                    <td>
-                        <button onclick="toggleArticle({{ article.id }}, {% if article.is_published %}false{% else %}true{% endif %})" class="btn btn-sm btn-secondary"><i class="fas fa-{% if article.is_published %}eye-slash{% else %}eye{% endif %}"></i></button>
-                        <button onclick="deleteArticle({{ article.id }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                    <td style="display:flex;gap:4px;">
+                        <button onclick="openEditFromRow(this)" class="btn btn-sm btn-secondary" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="toggleArticle({{ article.id }}, {% if article.is_published %}false{% else %}true{% endif %})" class="btn btn-sm btn-secondary" title="{% if article.is_published %}Unpublish{% else %}Publish{% endif %}"><i class="fas fa-{% if article.is_published %}eye-slash{% else %}eye{% endif %}"></i></button>
+                        <button onclick="deleteArticle({{ article.id }})" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
                     </td>
+                    <template class="article-content">{{ article.content }}</template>
                 </tr>
                 {% empty %}
                 <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No articles yet</td></tr>
@@ -98,16 +100,83 @@
     </div>
 </div>
 
+<!-- Edit Article Modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--bg-card);border-radius:16px;padding:24px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+            <h3 style="font-size:18px;font-weight:700;"><i class="fas fa-edit" style="color:var(--primary);"></i> Edit Article</h3>
+            <button onclick="closeEdit()" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="editTitle" class="form-control">
+        </div>
+        <div class="form-group">
+            <label>Content (Markdown supported)</label>
+            <textarea id="editContent" class="form-control" rows="12"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="closeEdit()" class="btn btn-secondary">Cancel</button>
+            <button onclick="saveEdit()" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
+    </div>
+</div>
+
 <script>
+var _editingId = null;
 function postJSON(url, data) {
     return fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify(data)}).then(r=>r.json());
 }
-function createCategory() { postJSON('', {action:'create_category', name:document.getElementById('catName').value, description:document.getElementById('catDesc').value}).then(()=>location.reload()); }
+function createCategory() {
+    var name = document.getElementById('catName').value.trim();
+    if (!name) { alert('Category name required'); return; }
+    postJSON('', {action:'create_category', name:name, description:document.getElementById('catDesc').value}).then(()=>location.reload());
+}
 function deleteCategory(id) { if(confirm('Delete category and all articles?')) postJSON('', {action:'delete_category', category_id:id}).then(()=>location.reload()); }
 function createArticle() {
-    postJSON('', {action:'create_article', category_id:parseInt(document.getElementById('articleCat').value), title:document.getElementById('articleTitle').value, content:document.getElementById('articleContent').value}).then(()=>location.reload());
+    var title = document.getElementById('articleTitle').value.trim();
+    var content = document.getElementById('articleContent').value.trim();
+    var catEl = document.getElementById('articleCat');
+    if (!catEl.value) { alert('Please create a category first'); return; }
+    if (!title || !content) { alert('Title and content required'); return; }
+    postJSON('', {action:'create_article', category_id:parseInt(catEl.value), title:title, content:content}).then(()=>location.reload());
 }
 function deleteArticle(id) { if(confirm('Delete this article?')) postJSON('', {action:'delete_article', article_id:id}).then(()=>location.reload()); }
 function toggleArticle(id, pub) { postJSON('', {action:'update_article', article_id:id, is_published:pub}).then(()=>location.reload()); }
+
+function openEditFromRow(btn) {
+    var row = btn.closest('tr');
+    var id = parseInt(row.dataset.id);
+    var title = row.dataset.title;
+    var tpl = row.querySelector('template.article-content');
+    var content = tpl ? tpl.innerHTML.trim() : '';
+    // unescape HTML entities
+    var ta = document.createElement('textarea');
+    ta.innerHTML = content;
+    content = ta.value;
+
+    _editingId = id;
+    document.getElementById('editTitle').value = title;
+    document.getElementById('editContent').value = content;
+    document.getElementById('editModal').style.display = 'flex';
+}
+function closeEdit() {
+    document.getElementById('editModal').style.display = 'none';
+    _editingId = null;
+}
+function saveEdit() {
+    if (!_editingId) return;
+    var title = document.getElementById('editTitle').value.trim();
+    var content = document.getElementById('editContent').value;
+    if (!title) { alert('Title required'); return; }
+    postJSON('', {action:'update_article', article_id:_editingId, title:title, content:content}).then(function(r) {
+        if (r && r.status === 'ok') location.reload();
+        else alert('Save failed');
+    });
+}
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('editModal').style.display === 'flex') closeEdit();
+});
 </script>
 {% endblock %}

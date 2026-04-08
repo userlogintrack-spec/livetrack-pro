@@ -68,6 +68,27 @@ class ChatRoom(models.Model):
         return self.messages.count()
 
 
+class ChatParticipant(models.Model):
+    """Tracks every agent/owner who joined a chat — supports multi-agent collaboration.
+    The first joiner is `is_primary=True` and is also written to ChatRoom.agent for
+    backwards compatibility. Additional joiners are collaborators."""
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='participants')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_participations')
+    is_primary = models.BooleanField(default=False)
+    joined_at = models.DateTimeField(default=timezone.now)
+    left_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [('room', 'user')]
+        ordering = ['joined_at']
+        indexes = [
+            models.Index(fields=['room', 'user']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} in {self.room.room_id}{' (primary)' if self.is_primary else ''}"
+
+
 class Message(models.Model):
     SENDER_CHOICES = [
         ('visitor', 'Visitor'),

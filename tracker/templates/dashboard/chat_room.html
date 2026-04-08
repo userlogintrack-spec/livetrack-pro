@@ -2321,8 +2321,11 @@
                 handleIceCandidate(data.data);
             }
             if (data.type === 'screen_share_stop' && data.sender_type === 'visitor') {
-                stopViewingScreen();
-                appendMessage('Visitor stopped screen sharing.', 'system', 'System', new Date().toISOString(), 'text');
+                // Only react if we were actually viewing — prevents an infinite stop loop
+                if (peerConnection || document.getElementById('screenShareViewer').classList.contains('show')) {
+                    stopViewingScreen({silent: true});
+                    appendMessage('Visitor stopped screen sharing.', 'system', 'System', new Date().toISOString(), 'text');
+                }
             }
             if (data.type === 'cobrowse_update' && data.sender_type === 'visitor') {
                 handleCobrowseUpdate(data.data);
@@ -3268,17 +3271,23 @@
         }
     }
 
-    function stopViewingScreen() {
-        document.getElementById('screenShareViewer').classList.remove('show');
+    function stopViewingScreen(opts) {
+        // Idempotent + supports silent (don't echo back when reacting to inbound stop)
+        var viewer = document.getElementById('screenShareViewer');
+        var hadAnything = !!(peerConnection || (viewer && viewer.classList.contains('show')));
+        if (!hadAnything) return;
+
+        if (viewer) viewer.classList.remove('show');
         document.body.style.overflow = '';
         var btn = document.getElementById('ssRequestBtn');
         if (btn) btn.style.color = '';
         if (peerConnection) {
-            peerConnection.close();
+            try { peerConnection.close(); } catch(_) {}
             peerConnection = null;
         }
-        if (chatSocket && chatSocket.readyState === 1) {
-            chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} }));
+        var silent = opts && opts.silent;
+        if (!silent && chatSocket && chatSocket.readyState === 1) {
+            try { chatSocket.send(JSON.stringify({ type: 'screen_share_stop', data: {} })); } catch(_) {}
         }
     }
 

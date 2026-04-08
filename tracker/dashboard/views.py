@@ -46,9 +46,19 @@ def dashboard_home(request):
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     last_30_min = now - timedelta(minutes=30)
 
+    # Role-based visibility — agents only see their own work; owners/admins see everything.
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+
     visitors_qs = Visitor.objects.filter(organization=org)
-    chats_qs = ChatRoom.objects.filter(organization=org)
     pageviews_qs = PageView.objects.filter(visitor__organization=org)
+    if is_owner:
+        chats_qs = ChatRoom.objects.filter(organization=org)
+    else:
+        # Agent sees: chats they handle + the unassigned/waiting queue (so they can pick).
+        chats_qs = ChatRoom.objects.filter(organization=org).filter(
+            Q(agent=request.user) | Q(agent__isnull=True)
+        )
 
     total_visitors = visitors_qs.count()
     online_visitors = visitors_qs.filter(last_seen__gte=last_30_min).count()
@@ -136,12 +146,16 @@ def dashboard_home(request):
         'sla_cutoff': sla_cutoff,
         'sla_minutes': sla_minutes,
         'org': org,
-        # Agent leaderboard
-        'agent_leaderboard': User.objects.filter(
-            agent_profile__organization=org
-        ).annotate(
-            chats_handled=Count('chat_rooms', filter=Q(chat_rooms__status='closed', chat_rooms__organization=org)),
-        ).order_by('-chats_handled')[:5],
+        'is_owner': is_owner,
+        # Agent leaderboard — owners only
+        'agent_leaderboard': (
+            User.objects.filter(
+                agent_profile__organization=org
+            ).annotate(
+                chats_handled=Count('chat_rooms', filter=Q(chat_rooms__status='closed', chat_rooms__organization=org)),
+            ).order_by('-chats_handled')[:5]
+            if is_owner else None
+        ),
     }
     return render(request, 'dashboard/home.html', context)
 
@@ -161,7 +175,13 @@ def chat_list(request):
     date_to = request.GET.get('to', '').strip()
 
     from django.db.models import Exists, OuterRef, Subquery
-    chats = ChatRoom.objects.filter(organization=org).select_related('visitor', 'agent').annotate(
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    base_chats = ChatRoom.objects.filter(organization=org)
+    if not is_owner:
+        # Agent sees only their own chats + the unassigned waiting queue
+        base_chats = base_chats.filter(Q(agent=request.user) | Q(agent__isnull=True))
+    chats = base_chats.select_related('visitor', 'agent').annotate(
         unread_count=Count('messages', filter=Q(messages__sender_type='visitor', messages__is_read=False)),
         notes_count=Count('internal_notes'),
         was_transferred=Exists(
@@ -190,8 +210,22 @@ def chat_list(request):
 
     chats = chats.order_by('-updated_at')
 
+    # Prefetch participants for collaboration display + mark which chats current user is in
+    from tracker.chat.models import ChatParticipant
+    from django.db.models import Prefetch
+    chats = chats.prefetch_related(
+        Prefetch(
+            'participants',
+            queryset=ChatParticipant.objects.select_related('user', 'user__agent_profile').order_by('joined_at'),
+        )
+    )
+    my_room_ids = set(
+        ChatParticipant.objects.filter(user=request.user, room__in=chats).values_list('room__room_id', flat=True)
+    )
+
     return render(request, 'dashboard/chat_list.html', {
         'chats': chats,
+        'my_room_ids': my_room_ids,
         'current_filter': status_filter,
         'search_q': search_q,
         'tag_filter': tag_filter,
@@ -212,27 +246,22 @@ def chat_room_view(request, room_id):
     visitor_notes = visitor.agent_notes.order_by('-created_at')[:10]
     canned_responses = CannedResponse.objects.filter(Q(is_global=True) | Q(created_by=request.user))
 
-    # Auto-join waiting chat (unless manual assignment rule)
+    # Multi-agent collaboration tracking + join logic
+    from tracker.chat.models import ChatParticipant
     manual_only = org and org.chat_assign_rule == 'manual'
     join_requested = request.GET.get('join') == '1'
-    if room.status == 'waiting' and request.user.is_authenticated and (not manual_only or join_requested):
-        room.agent = request.user
-        room.status = 'active'
-        room.save()
-        # Log activity + send "Agent joined" system message
-        agent_name = request.user.get_full_name() or request.user.username
-        _log_activity(org, request.user, 'agent.joined', f'{agent_name} joined chat #{room.room_id}', 'chat', room.room_id)
+    agent_name = request.user.get_full_name() or request.user.username
+    channel_layer = get_channel_layer()
+
+    def _broadcast_system(text):
         Message.objects.create(
-            room=room, sender_type='system', sender_name='System',
-            content=f'{agent_name} joined the chat.',
+            room=room, sender_type='system', sender_name='System', content=text,
         )
-        # Notify chat room via WebSocket
-        channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f'chat_{room.room_id}',
             {
                 'type': 'chat_message',
-                'message': f'{agent_name} joined the chat.',
+                'message': text,
                 'sender_type': 'system',
                 'sender_name': 'System',
                 'msg_type': 'text',
@@ -241,6 +270,31 @@ def chat_room_view(request, room_id):
                 'timestamp': timezone.now().isoformat(),
             }
         )
+
+    already_participant = (
+        request.user.is_authenticated and
+        ChatParticipant.objects.filter(room=room, user=request.user).exists()
+    )
+
+    if request.user.is_authenticated and not already_participant:
+        # First joiner of a waiting chat → becomes primary
+        if room.status == 'waiting' and (not manual_only or join_requested):
+            room.agent = request.user
+            room.status = 'active'
+            room.save()
+            ChatParticipant.objects.get_or_create(
+                room=room, user=request.user, defaults={'is_primary': True}
+            )
+            _log_activity(org, request.user, 'agent.joined', f'{agent_name} joined chat #{room.room_id}', 'chat', room.room_id)
+            _broadcast_system(f'{agent_name} joined the chat.')
+        # Active chat + explicit Join click → collaborator
+        elif room.status == 'active' and join_requested:
+            # Backfill primary if missing
+            if room.agent_id and not ChatParticipant.objects.filter(room=room, user_id=room.agent_id).exists():
+                ChatParticipant.objects.create(room=room, user_id=room.agent_id, is_primary=True)
+            ChatParticipant.objects.create(room=room, user=request.user, is_primary=False)
+            _log_activity(org, request.user, 'agent.collab_joined', f'{agent_name} joined chat #{room.room_id} as collaborator', 'chat', room.room_id)
+            _broadcast_system(f'{agent_name} joined as collaborator.')
 
     # Mark visitor messages as read when agent opens the chat.
     updated = Message.objects.filter(room=room, sender_type='visitor', is_read=False).update(is_read=True)
@@ -643,7 +697,10 @@ def export_chats_csv(request):
 
 @login_required
 def offline_messages_view(request):
-    """View offline messages."""
+    """View offline messages. Owner only."""
+    profile = getattr(request.user, 'agent_profile', None)
+    if not request.user.is_superuser and (not profile or profile.role not in ('owner', 'admin')):
+        return HttpResponse("Forbidden — owners only.", status=403)
     org = get_user_org(request.user)
     messages_list = OfflineMessage.objects.filter(organization=org)
     return render(request, 'dashboard/offline_messages.html', {
@@ -760,7 +817,10 @@ def canned_responses_view(request):
 
 @login_required
 def website_settings_view(request):
-    """Create or update website/widget settings from dashboard."""
+    """Create or update website/widget settings from dashboard. Owner only."""
+    profile = getattr(request.user, 'agent_profile', None)
+    if not request.user.is_superuser and (not profile or profile.role not in ('owner', 'admin')):
+        return HttpResponse("Forbidden — owners only.", status=403)
     org = get_user_org(request.user)
     saved = False
     error = ''
@@ -838,6 +898,9 @@ def add_agent_view(request):
     org = get_user_org(request.user)
     if not org:
         return HttpResponse("No organization found", status=403)
+    profile = getattr(request.user, 'agent_profile', None)
+    if not request.user.is_superuser and (not profile or profile.role not in ('owner', 'admin')):
+        return HttpResponse("Forbidden — owners only.", status=403)
     created = False
     error = ''
 
@@ -1889,11 +1952,14 @@ def kb_manage_view(request):
             KBCategory.objects.filter(id=data.get('category_id'), organization=org).delete()
             return JsonResponse({'status': 'ok'})
 
+    from django.db.models import Sum
     categories = KBCategory.objects.filter(organization=org).prefetch_related('articles')
-    articles = KBArticle.objects.filter(organization=org).select_related('category', 'author')
+    articles = KBArticle.objects.filter(organization=org).select_related('category', 'author').order_by('-updated_at')
+    total_views = articles.aggregate(total=Sum('views_count'))['total'] or 0
     return render(request, 'dashboard/kb_manage.html', {
         'categories': categories,
         'articles': articles,
+        'total_views': total_views,
     })
 
 
@@ -2938,9 +3004,12 @@ def tour_guide_view(request):
 
 @login_required
 def billing_view(request):
-    """Billing page — plan selection, payment history, usage."""
+    """Billing page — plan selection, payment history, usage. Owner only."""
     from tracker.core.models import Subscription, PaymentHistory
     from django.db.models import Sum
+    profile = getattr(request.user, 'agent_profile', None)
+    if not request.user.is_superuser and (not profile or profile.role not in ('owner', 'admin')):
+        return HttpResponse("Forbidden — owners only.", status=403)
     org = get_user_org(request.user)
     sub, _ = Subscription.objects.get_or_create(organization=org, defaults={'plan': 'free', 'status': 'active'})
     payments = PaymentHistory.objects.filter(organization=org)[:20]
@@ -3077,7 +3146,10 @@ def create_checkout_session(request):
             subscription_data={'metadata': {'org_id': str(org.id), 'plan': plan, 'interval': interval}},
         )
 
-        # Update subscription interval
+        # Persist intent so billing_success can recover plan/interval reliably
+        # (Stripe metadata can occasionally be empty when read back)
+        sub.pending_plan = plan
+        sub.pending_interval = interval
         sub.billing_interval = interval
         if applied_coupon:
             sub.coupon_applied = applied_coupon
@@ -3207,18 +3279,45 @@ def billing_success(request):
             log.info(f'Stripe session: status={session.status}, payment={session.payment_status}, sub={session.subscription}')
 
             if session.payment_status in ('paid', 'no_payment_required') or session.status == 'complete':
-                # Get metadata safely
+                # Read metadata safely (Stripe metadata access can be quirky across SDK versions)
+                meta = {}
                 try:
-                    meta = dict(session.metadata) if session.metadata else {}
-                except Exception:
-                    meta = {}
-                plan = meta.get('plan', 'pro')
-                interval = meta.get('interval', 'month')
+                    if session.metadata:
+                        # StripeObject supports .get() and is iterable
+                        for k in session.metadata:
+                            meta[k] = session.metadata.get(k)
+                except Exception as e:
+                    log.warning(f'Could not read session metadata: {e}')
 
+                # Source of truth priority: DB pending → metadata → amount-based detection → defaults
                 sub, _ = Subscription.objects.get_or_create(organization=org, defaults={'plan': 'free'})
+                amount_paid = (session.amount_total or 0) / 100
+
+                # 1. DB pending fields (most reliable — set right before checkout)
+                plan = sub.pending_plan or meta.get('plan') or ''
+                interval = sub.pending_interval or meta.get('interval') or ''
+
+                # 2. Amount-based detection if still missing
+                if not plan or not interval:
+                    AMOUNT_MAP = {
+                        19: ('pro', 'month'),    190: ('pro', 'year'),
+                        79: ('enterprise', 'month'), 790: ('enterprise', 'year'),
+                    }
+                    detected = AMOUNT_MAP.get(int(round(amount_paid)))
+                    if detected:
+                        plan, interval = detected
+                        log.info(f'Plan detected from amount ${amount_paid}: {plan}/{interval}')
+
+                # 3. Final fallback
+                plan = plan or 'pro'
+                interval = interval or 'month'
+
                 sub.plan = plan
                 sub.status = 'active'
                 sub.billing_interval = interval
+                # Clear pending intent — checkout consumed
+                sub.pending_plan = ''
+                sub.pending_interval = ''
 
                 # Save subscription ID (it's a string)
                 if session.subscription:
@@ -3227,8 +3326,6 @@ def billing_success(request):
                 sub.save()
                 log.info(f'Subscription updated: plan={plan}, interval={interval}')
 
-                # Get amount paid
-                amount_paid = (session.amount_total or 0) / 100
                 coupon_code = meta.get('coupon', '')
 
                 # Calculate original price and discount
@@ -3236,8 +3333,9 @@ def billing_success(request):
                 original_price = ORIGINAL_PRICES.get(plan, {}).get(interval, amount_paid)
                 discount_amount = round(original_price - amount_paid, 2) if amount_paid < original_price else 0
 
-                # Build description
-                desc = f'Upgraded to {plan.title()} plan ({interval}ly)'
+                # Build description — human readable
+                interval_word = 'Yearly' if interval == 'year' else 'Monthly'
+                desc = f'Upgraded to {plan.title()} plan ({interval_word})'
                 if coupon_code and discount_amount > 0:
                     desc += f' — Coupon: {coupon_code} (${discount_amount} off)'
 
@@ -3283,7 +3381,13 @@ def billing_success(request):
 
 @login_required
 def download_invoice(request):
-    """Get Stripe invoice PDF URL or generate local receipt."""
+    """Get the best PDF/receipt URL for an invoice.
+
+    Priority for PAID invoices:
+        1. Stripe receipt URL (clean — no "Pay online" link, marked as paid)
+        2. Stripe invoice PDF
+        3. Hosted invoice page
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -3296,16 +3400,36 @@ def download_invoice(request):
     try:
         import stripe
         stripe.api_key = settings.STRIPE_SECRET_KEY
-        invoice = stripe.Invoice.retrieve(invoice_id)
+        invoice = stripe.Invoice.retrieve(invoice_id, expand=['payment_intent', 'charge'])
 
-        # invoice_pdf is the direct download URL
-        pdf_url = invoice.invoice_pdf
+        # 1. Try the receipt URL — for paid invoices this is the cleanest doc (no Pay online link)
+        if getattr(invoice, 'status', '') == 'paid':
+            receipt_url = ''
+            try:
+                # Direct charge expansion
+                charge = getattr(invoice, 'charge', None)
+                if charge and not isinstance(charge, str):
+                    receipt_url = getattr(charge, 'receipt_url', '') or ''
+                # Via payment_intent → charges
+                if not receipt_url:
+                    pi = getattr(invoice, 'payment_intent', None)
+                    if pi and not isinstance(pi, str):
+                        charges = getattr(pi, 'charges', None)
+                        if charges and getattr(charges, 'data', None):
+                            receipt_url = charges.data[0].receipt_url or ''
+            except Exception:
+                pass
+            if receipt_url:
+                return JsonResponse({'pdf_url': receipt_url, 'kind': 'receipt'})
+
+        # 2. Direct invoice PDF (still has "Pay online" link in Stripe's PDF for unpaid invoices)
+        pdf_url = getattr(invoice, 'invoice_pdf', '')
         if pdf_url:
-            return JsonResponse({'pdf_url': pdf_url})
+            return JsonResponse({'pdf_url': pdf_url, 'kind': 'invoice_pdf'})
 
-        # Fallback: hosted invoice page
-        if invoice.hosted_invoice_url:
-            return JsonResponse({'pdf_url': invoice.hosted_invoice_url})
+        # 3. Hosted invoice page
+        if getattr(invoice, 'hosted_invoice_url', ''):
+            return JsonResponse({'pdf_url': invoice.hosted_invoice_url, 'kind': 'hosted'})
 
         return JsonResponse({'error': 'PDF not available for this invoice'}, status=400)
 
@@ -3390,13 +3514,14 @@ def stripe_webhook(request):
         invoice = event.data.object
         sub = Subscription.objects.filter(stripe_customer_id=invoice.customer).first()
         if sub:
+            interval_word = 'Yearly' if sub.billing_interval == 'year' else 'Monthly'
             PaymentHistory.objects.create(
                 organization=sub.organization,
                 amount=invoice.amount_paid / 100,
                 plan=sub.plan,
                 stripe_invoice_id=invoice.id,
                 stripe_payment_id=invoice.payment_intent or '',
-                description=f'Monthly {sub.plan.title()} plan payment',
+                description=f'{interval_word} {sub.plan.title()} plan renewal',
             )
 
     return HttpResponse(status=200)

@@ -6,9 +6,16 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block top_actions %}
-<span style="color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;">
-    <i class="fas fa-calendar"></i> {% now "D, d M Y" %}
-</span>
+<div style="display:flex;align-items:center;gap:10px;">
+    <span id="lastSyncLabel" style="color:var(--text-muted);font-size:11px;display:none;">Updated just now</span>
+    <button onclick="refreshDashboard()" id="refreshDashBtn" title="Refresh dashboard"
+        style="background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;transition:all .2s;">
+        <i class="fas fa-sync-alt" id="refreshDashIcon"></i> Refresh
+    </button>
+    <span style="color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;">
+        <i class="fas fa-calendar"></i> {% now "D, d M Y" %}
+    </span>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -206,24 +213,25 @@
         </div>
         <div class="card-body" style="padding:0;">
             <table>
-                <thead><tr><th>Visitor</th><th>Agent</th><th>Status</th><th>Time</th></tr></thead>
+                <thead><tr><th>Visitor</th>{% if is_owner %}<th>Agent</th>{% endif %}<th>Status</th><th>Time</th></tr></thead>
                 <tbody>
                 {% for chat in recent_chats %}
                 <tr>
                     <td><a href="{% url 'dashboard:chat_room' chat.room_id %}" style="color:var(--primary);text-decoration:none;font-weight:600;font-size:13px;">{{ chat.visitor_name }}</a><br><small style="color:var(--text-muted);">#{{ chat.room_id|truncatechars:8 }}</small></td>
-                    <td style="font-size:12px;">{{ chat.agent.get_full_name|default:"Unassigned" }}</td>
+                    {% if is_owner %}<td style="font-size:12px;">{{ chat.agent.get_full_name|default:"Unassigned" }}</td>{% endif %}
                     <td><span class="status status-{{ chat.status }}" style="font-size:10px;"><span class="dot"></span> {{ chat.status|title }}</span></td>
                     <td style="font-size:11px;color:var(--text-muted);">{{ chat.created_at|timesince }} ago</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="4"><div class="empty-state" style="padding:24px;"><i class="fas fa-comments"></i><p>No chats yet</p></div></td></tr>
+                <tr><td colspan="{% if is_owner %}4{% else %}3{% endif %}"><div class="empty-state" style="padding:24px;"><i class="fas fa-comments"></i><p>No chats yet</p></div></td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 
-    <!-- Agent Leaderboard -->
+    {% if is_owner and agent_leaderboard %}
+    <!-- Agent Leaderboard — owners/admins only -->
     <div class="card">
         <div class="card-header"><h3><i class="fas fa-trophy" style="color:#f59e0b;"></i> Agent Leaderboard</h3></div>
         <div class="card-body">
@@ -245,6 +253,25 @@
             {% endfor %}
         </div>
     </div>
+    {% else %}
+    <!-- Agent (non-owner): show their own personal summary instead -->
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-user-circle" style="color:var(--primary);"></i> My Performance</h3></div>
+        <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div style="padding:12px;background:var(--bg-hover);border-radius:10px;">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">My Active Chats</div>
+                    <div style="font-size:22px;font-weight:800;color:var(--primary);">{{ active_chats }}</div>
+                </div>
+                <div style="padding:12px;background:var(--bg-hover);border-radius:10px;">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">My Closed Today</div>
+                    <div style="font-size:22px;font-weight:800;color:var(--success);">{{ today_chats }}</div>
+                </div>
+            </div>
+            <a href="{% url 'dashboard:agent_stats' %}" class="btn btn-sm btn-secondary" style="margin-top:12px;width:100%;justify-content:center;display:flex;"><i class="fas fa-chart-line"></i> View Full Stats</a>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- ═══════ CSAT Breakdown ═══════ -->
@@ -271,8 +298,49 @@
 .live-visitor-row{transition:background .3s;}
 .live-visitor-row.new{animation:flashGreen .8s ease;}
 @keyframes flashGreen{0%{background:rgba(16,185,129,0.15);}100%{background:transparent;}}
+@keyframes spinIcon{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+#refreshDashIcon.spinning{animation:spinIcon .8s linear infinite;}
+#refreshDashBtn:hover{background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-1px);}
+.stat-card{transition:transform .2s,box-shadow .2s;}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,0.06);}
 </style>
 <script>
+// ─── Dashboard refresh (manual + auto every 30s) ───
+function refreshDashboard() {
+    var icon = document.getElementById('refreshDashIcon');
+    var label = document.getElementById('lastSyncLabel');
+    if (icon) icon.classList.add('spinning');
+    Promise.resolve(typeof refreshLiveVisitors === 'function' ? refreshLiveVisitors() : null)
+        .finally(function() {
+            setTimeout(function() {
+                if (icon) icon.classList.remove('spinning');
+                if (label) { label.style.display = 'inline'; label.textContent = 'Updated just now'; }
+            }, 400);
+            // For numbers/cards we still need a soft full refresh — fetch the page partial.
+            // Use a lightweight XHR-of-self approach: re-fetch and replace the stats grid.
+            fetch(location.pathname + '?_=' + Date.now(), {headers:{'X-Requested-With':'XMLHttpRequest'}})
+                .then(function(r){ return r.text(); })
+                .then(function(html) {
+                    try {
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(html, 'text/html');
+                        ['.stats-grid', '.grid-2', '.grid-3'].forEach(function(sel) {
+                            var fresh = doc.querySelectorAll(sel);
+                            var current = document.querySelectorAll(sel);
+                            for (var i = 0; i < Math.min(fresh.length, current.length); i++) {
+                                current[i].innerHTML = fresh[i].innerHTML;
+                            }
+                        });
+                    } catch(e) {}
+                }).catch(function(){});
+        });
+}
+// Auto-refresh dashboard numbers every 30s (live visitors poll separately)
+setInterval(function() {
+    if (document.hidden) return;
+    refreshDashboard();
+}, 30000);
+
 let prevVisitorIds = [];
 function refreshLiveVisitors() {
     fetch('/dashboard/api/live-visitors/')

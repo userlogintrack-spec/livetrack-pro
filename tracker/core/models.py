@@ -87,6 +87,9 @@ class Subscription(models.Model):
     # Coupon
     coupon_applied = models.ForeignKey('Coupon', on_delete=models.SET_NULL, null=True, blank=True, related_name='subscriptions')
     discount_percent = models.PositiveIntegerField(default=0)
+    # Pending purchase intent (set before redirecting to Stripe; consumed in billing_success)
+    pending_plan = models.CharField(max_length=20, blank=True, default='')
+    pending_interval = models.CharField(max_length=10, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
