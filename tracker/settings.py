@@ -21,7 +21,8 @@ DEBUG = os.getenv('DEBUG', 'True').lower() in {'1', 'true', 'yes', 'on'}
 if not DEBUG:
     if not os.getenv('SECRET_KEY'):
         raise ValueError("SECRET_KEY environment variable is REQUIRED in production. Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(50))\"")
-    if not os.getenv('ALLOWED_HOSTS'):
+    # ALLOWED_HOSTS is not required if running on Render — RENDER_EXTERNAL_HOSTNAME is auto-set.
+    if not os.getenv('ALLOWED_HOSTS') and not os.getenv('RENDER_EXTERNAL_HOSTNAME'):
         raise ValueError("ALLOWED_HOSTS environment variable is REQUIRED in production. Example: ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com")
 
 ALLOWED_HOSTS = [
@@ -30,6 +31,20 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
 ]
+
+# Auto-add Render's external hostname (Render sets RENDER_EXTERNAL_HOSTNAME automatically)
+RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
+if RENDER_EXTERNAL_HOSTNAME:
+    if RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    # Always allow the render.com wildcard subdomain too
+    if '.onrender.com' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('.onrender.com')
+    render_origin = f'https://{RENDER_EXTERNAL_HOSTNAME}'
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
+    if 'https://*.onrender.com' not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append('https://*.onrender.com')
 TRUST_X_FORWARDED_FOR = os.getenv('TRUST_X_FORWARDED_FOR', 'False').lower() in {'1', 'true', 'yes', 'on'}
 CHAT_SLA_MINUTES = int(os.getenv('CHAT_SLA_MINUTES', '5'))
 
