@@ -75,10 +75,28 @@ def get_referrer_source(referrer):
 
 
 def get_client_ip(request):
-    """Get the real client IP address."""
-    trust_proxy = getattr(settings, 'TRUST_X_FORWARDED_FOR', False)
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    """Get the real client IP address.
+
+    Auto-trusts X-Forwarded-For when running behind a known proxy (Render, Heroku,
+    Cloudflare) — even if TRUST_X_FORWARDED_FOR isn't explicitly set. This prevents
+    every visitor from showing up as 127.0.0.1 (the proxy's internal address).
+    """
+    import os
+    trust_proxy = (
+        getattr(settings, 'TRUST_X_FORWARDED_FOR', False)
+        or bool(os.getenv('RENDER_EXTERNAL_HOSTNAME'))     # Render
+        or bool(os.getenv('DYNO'))                          # Heroku
+        or 'HTTP_CF_CONNECTING_IP' in request.META          # Cloudflare
+    )
+
+    # Cloudflare's most reliable header (real visitor IP, not proxy chain)
+    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP', '').strip()
+    if cf_ip:
+        return cf_ip
+
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '').strip()
     if trust_proxy and x_forwarded_for:
+        # First IP in the list is the real client (rest are proxies)
         return x_forwarded_for.split(',')[0].strip()
     return request.META.get('REMOTE_ADDR', '0.0.0.0')
 
@@ -108,11 +126,29 @@ def get_geo_from_ip(ip_address):
 
 
 class VisitorTrackingMiddleware:
-    SKIP_PATHS = ('/static/', '/media/', '/admin/', '/favicon.ico', '/ws/', '/api/', '/accounts/')
+    """Tracks first-party visits to this Django site (e.g. the demo landing page).
+
+    For SaaS deployments, the customer's site uses the embeddable widget which calls
+    /api/widget/track/ directly — that endpoint creates Visitor rows scoped to the
+    customer's organization. This middleware should NOT run on the SaaS server itself
+    because it would track:
+      - Render healthcheck pings (showing as 127.0.0.1)
+      - Bots / crawlers hitting the marketing pages
+      - Admin browsing the dashboard while logged out
+    All of which pollute the visitor list with junk data.
+    """
+    SKIP_PATHS = ('/static/', '/media/', '/admin/', '/favicon.ico', '/ws/', '/api/', '/accounts/', '/dashboard')
     _default_org = None  # Class-level cache
 
     def __init__(self, get_response):
         self.get_response = get_response
+        # Hard-disable on cloud deployments — widget API is the only source of truth there.
+        import os
+        self._disabled = bool(
+            os.getenv('RENDER_EXTERNAL_HOSTNAME')
+            or os.getenv('DYNO')
+            or os.getenv('DISABLE_VISITOR_MIDDLEWARE')
+        )
 
     @classmethod
     def _get_default_org(cls):
@@ -122,13 +158,17 @@ class VisitorTrackingMiddleware:
         return cls._default_org
 
     def __call__(self, request):
+        # Skip entirely on cloud — widget API handles all visitor tracking there
+        if self._disabled:
+            return self.get_response(request)
+
         path = request.path
 
         # Fast skip - tuple check is faster than list
         if path.startswith(self.SKIP_PATHS):
             return self.get_response(request)
 
-        # Skip dashboard for agents
+        # Skip dashboard for authenticated agents
         if request.user.is_authenticated and path.startswith('/dashboard'):
             return self.get_response(request)
 
