@@ -80,13 +80,41 @@ def _rate_limit(request, scope, limit, window_seconds):
 
 
 def _resolve_room_actor(request, room):
-    if request.user.is_authenticated:
-        if room.agent_id and room.agent_id != request.user.id and not request.user.is_superuser:
-            return None
-        sender_name = request.user.get_full_name() or request.user.username
-        return {'sender_type': 'agent', 'sender_name': sender_name}
+    """Determine who is acting on a chat room (agent / collaborator / visitor).
 
-    session_key = request.session.session_key
+    For agents: primary agent OR any ChatParticipant on the room can act (collaboration).
+    For visitors: session_key must match room.visitor — accepts session_key from
+    cookie, POST body, form data, or query string (for cross-origin iframes where
+    third-party cookies are blocked).
+    """
+    if request.user.is_authenticated:
+        # Primary agent or superuser → always allowed
+        if not room.agent_id or room.agent_id == request.user.id or request.user.is_superuser:
+            sender_name = request.user.get_full_name() or request.user.username
+            return {'sender_type': 'agent', 'sender_name': sender_name}
+        # Collaborator (any joined participant) → allowed
+        from tracker.chat.models import ChatParticipant
+        if ChatParticipant.objects.filter(room=room, user=request.user).exists():
+            sender_name = request.user.get_full_name() or request.user.username
+            return {'sender_type': 'agent', 'sender_name': sender_name}
+        return None
+
+    # Visitor: try multiple sources for session_key (cookie may be blocked cross-origin)
+    session_key = request.session.session_key or ''
+    if not session_key:
+        # Body JSON
+        try:
+            body_data = json.loads(request.body) if request.body else {}
+            session_key = (body_data.get('session_key') or '').strip()
+        except (ValueError, AttributeError):
+            session_key = ''
+    if not session_key:
+        # POST form / multipart upload
+        session_key = (request.POST.get('session_key') or '').strip()
+    if not session_key:
+        # Query string fallback
+        session_key = (request.GET.get('sk') or '').strip()
+
     if not session_key or session_key != room.visitor.session_key:
         return None
     return {'sender_type': 'visitor', 'sender_name': room.visitor_name or 'Visitor'}

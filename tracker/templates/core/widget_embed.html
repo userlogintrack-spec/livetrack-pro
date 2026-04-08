@@ -464,13 +464,26 @@ function uploadFile(input) {
     if (file.size > 10*1024*1024) { alert('File too large (max 10MB)'); return; }
     var fd = new FormData();
     fd.append('file', file);
-    fetch(BASE + '/api/chat/upload/' + roomId + '/', {method:'POST',body:fd,credentials:'include'})
-    .then(function(r){return r.json();})
+    fd.append('session_key', SESSION);   // for cross-origin where the cookie may be blocked
+    fd.append('key', KEY);
+    var url = BASE + '/api/chat/upload/' + encodeURIComponent(roomId) + '/?sk=' + encodeURIComponent(SESSION);
+    fetch(url, {method:'POST', body:fd, credentials:'include'})
+    .then(function(r){
+        if (!r.ok) {
+            return r.json().then(function(j){ throw new Error(j.error || ('Upload failed (' + r.status + ')')); });
+        }
+        return r.json();
+    })
     .then(function(data) {
         if (data.file_url) {
             addMsg(data.file_name, 'visitor', new Date().toISOString(), data.msg_type, data.file_url, data.file_name);
-            socket.send(JSON.stringify({type:'chat_message',message:data.file_name,sender_type:'visitor',sender_name:visitorName,msg_type:data.msg_type,file_url:data.file_url,file_name:data.file_name}));
+            if (socket && socket.readyState === 1) {
+                socket.send(JSON.stringify({type:'chat_message',message:data.file_name,sender_type:'visitor',sender_name:visitorName,msg_type:data.msg_type,file_url:data.file_url,file_name:data.file_name}));
+            }
         }
+    })
+    .catch(function(err) {
+        addMsg('Upload failed: ' + (err.message || 'unknown error'), 'system', new Date().toISOString());
     });
     input.value = '';
 }
