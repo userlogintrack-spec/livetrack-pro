@@ -510,7 +510,7 @@ def widget_script(request):
 
   var btn = document.createElement("button");
   btn.className = "ltw-btn";
-  btn.innerHTML = "??";
+  btn.innerHTML = '<i class="fa fa-comment" aria-hidden="true"></i>';
 
   var frame = document.createElement("iframe");
   frame.className = "ltw-frame";
@@ -532,7 +532,7 @@ def widget_script(request):
   btn.onclick = function() {
     isOpen = !isOpen;
     frame.style.display = isOpen ? "block" : "none";
-    btn.innerHTML = isOpen ? "?" : "??";
+    btn.innerHTML = isOpen ? '<i class="fa fa-times" aria-hidden="true"></i>' : '<i class="fa fa-comment" aria-hidden="true"></i>';
     btn.style.fontSize = isOpen ? "18px" : "22px";
   };
 
