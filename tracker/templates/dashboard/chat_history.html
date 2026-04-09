@@ -5,7 +5,8 @@
 {% block page_title %}Chat History{% endblock %}
 
 {% block top_actions %}
-<a href="{% url 'dashboard:export_chats' %}{% if base_query %}?{{ base_query }}{% endif %}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> Export</a>
+<a href="{% url 'dashboard:export_chats' %}?{{ base_query }}{% if base_query %}&{% endif %}format=csv" class="btn btn-sm btn-secondary"><i class="fas fa-file-csv"></i> CSV</a>
+<a href="{% url 'dashboard:export_chats' %}?{{ base_query }}{% if base_query %}&{% endif %}format=pdf" class="btn btn-sm btn-secondary"><i class="fas fa-file-pdf"></i> PDF</a>
 {% endblock %}
 
 {% block extra_css %}
@@ -168,9 +169,10 @@
             </div>
         </form>
 
-        <div class="history-list">
+        <div class="history-list" id="historyList">
             {% for chat in chats %}
             <a class="history-row {% if selected_chat and selected_chat.room_id == chat.room_id %}active{% endif %}"
+               data-vrow="{{ forloop.counter0 }}"
                href="?{{ base_query }}{% if base_query %}&{% endif %}room={{ chat.room_id }}">
                 <div class="hr-top">
                     <span class="hr-name">{{ chat.visitor_name|default:"Visitor" }}</span>
@@ -193,6 +195,19 @@
             </div>
             {% endfor %}
         </div>
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span style="font-size:12px;color:var(--text-muted);">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <div style="display:flex;gap:6px;">
+                {% if page_obj.has_previous %}
+                <a class="btn btn-sm btn-secondary" href="?{{ base_query }}{% if base_query %}&{% endif %}page={{ page_obj.previous_page_number }}"><i class="fas fa-chevron-left"></i></a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a class="btn btn-sm btn-secondary" href="?{{ base_query }}{% if base_query %}&{% endif %}page={{ page_obj.next_page_number }}"><i class="fas fa-chevron-right"></i></a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </section>
 
     <section class="history-card history-detail">
@@ -239,6 +254,9 @@
                     <div class="info-box"><div class="info-k">OS / Device</div><div class="info-v">{{ selected_chat.visitor.os|default:"-" }} / {{ selected_chat.visitor.device_type|title }}</div></div>
                     <div class="info-box"><div class="info-k">Country / City</div><div class="info-v">{{ selected_chat.visitor.country|default:"-" }}{% if selected_chat.visitor.city %}, {{ selected_chat.visitor.city }}{% endif %}</div></div>
                     <div class="info-box"><div class="info-k">Past Chats</div><div class="info-v">{{ selected_chat.visitor.chat_rooms.count }}</div></div>
+                    <div class="info-box"><div class="info-k">UTM Source / Medium</div><div class="info-v">{{ selected_chat.visitor.utm_source|default:"-" }} / {{ selected_chat.visitor.utm_medium|default:"-" }}</div></div>
+                    <div class="info-box"><div class="info-k">UTM Campaign</div><div class="info-v">{{ selected_chat.visitor.utm_campaign|default:"-" }}</div></div>
+                    <div class="info-box"><div class="info-k">Landing Page</div><div class="info-v">{{ selected_chat.visitor.landing_page|default:"-" }}</div></div>
                 </div>
 
                 <div class="info-box" style="margin-bottom:10px;">
@@ -263,6 +281,21 @@
                         </li>
                         {% empty %}
                         <li>No previous chat for this visitor.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div class="info-box" style="margin-top:10px;">
+                    <div class="info-k">Last Seen Device Timeline</div>
+                    <ul class="past-list">
+                        {% for step in selected_device_timeline %}
+                        <li>
+                            <span style="color:var(--text-muted);">{{ step.timestamp|date:"M d h:i A" }}</span>
+                            • {{ selected_chat.visitor.browser|default:"-" }} / {{ selected_chat.visitor.os|default:"-" }} / {{ selected_chat.visitor.device_type|title }}
+                            <div style="font-size:11px;color:var(--text-muted);">{{ step.url|truncatechars:110 }}</div>
+                        </li>
+                        {% empty %}
+                        <li>No device timeline available.</li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -298,6 +331,23 @@
             if (target) target.classList.add('active');
         });
     });
+
+    // Virtual reveal: render rows progressively for smoother large lists
+    var listEl = document.getElementById('historyList');
+    if (listEl) {
+        var rows = Array.prototype.slice.call(listEl.querySelectorAll('.history-row'));
+        var visible = 40;
+        function applyVisibility() {
+            rows.forEach(function(row, idx) { row.style.display = idx < visible ? '' : 'none'; });
+        }
+        applyVisibility();
+        listEl.addEventListener('scroll', function() {
+            if (listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 120 && visible < rows.length) {
+                visible = Math.min(rows.length, visible + 25);
+                applyVisibility();
+            }
+        });
+    }
 })();
 </script>
 {% endblock %}

@@ -417,6 +417,109 @@
     .drop-overlay i { font-size: 36px; color: var(--primary); opacity: 0.6; }
     .drop-overlay span { font-size: 14px; font-weight: 600; color: var(--primary); }
 
+    .upload-queue {
+        position: absolute;
+        top: 112px;
+        right: 12px;
+        width: min(340px, calc(100% - 24px));
+        z-index: 70;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .upload-item {
+        pointer-events: auto;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        box-shadow: var(--shadow-md);
+    }
+    .upload-head { display: flex; align-items: center; gap: 8px; }
+    .upload-badge {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+        border-radius: 999px;
+        padding: 3px 7px;
+        background: rgba(99,102,241,0.12);
+        color: var(--primary);
+        flex-shrink: 0;
+    }
+    .upload-meta { min-width: 0; }
+    .upload-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .upload-size { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+    .upload-progress {
+        margin-top: 8px;
+        width: 100%;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(148,163,184,0.2);
+        overflow: hidden;
+    }
+    .upload-progress > span {
+        display: block;
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--primary-light));
+        transition: width .15s ease;
+    }
+    .upload-status {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    .upload-item.success .upload-status { color: var(--success); }
+    .upload-item.error .upload-status { color: var(--danger); }
+    .upload-actions {
+        margin-top: 8px;
+        display: flex;
+        gap: 6px;
+        justify-content: flex-end;
+    }
+    .upload-act-btn {
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        color: var(--text-secondary);
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 8px;
+        cursor: pointer;
+    }
+    .upload-act-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .upload-act-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+    .upload-policy-hint {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .upload-policy-hint .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-muted); opacity: 0.7; }
+    .priority-inline {
+        height: 30px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        background: var(--bg-card);
+        font-family: inherit;
+    }
+
     /* Message reactions */
     .msg-reactions {
         display: flex;
@@ -1567,6 +1670,7 @@
             <i class="fas fa-cloud-upload-alt"></i>
             <span>Drop file to send</span>
         </div>
+        <div id="uploadQueue" class="upload-queue"></div>
         <!-- Header Row 1: Visitor Info + Timer -->
         <div class="chat-header-bar">
             <div class="chat-header-row1">
@@ -1590,6 +1694,11 @@
             <!-- Header Row 2: Action Buttons (compact) -->
             <div class="chat-header-row2">
                 <div class="chat-actions">
+                    <select id="priorityInline" class="priority-inline" data-current="{{ room.priority }}" onchange="updatePriorityInline(this.value)" title="Priority">
+                        <option value="low" {% if room.priority == 'low' %}selected{% endif %}>Low</option>
+                        <option value="medium" {% if room.priority == 'medium' %}selected{% endif %}>Medium</option>
+                        <option value="high" {% if room.priority == 'high' %}selected{% endif %}>High</option>
+                    </select>
                     {% if room.status != 'closed' %}
                     <button class="chat-action-btn" onclick="requestVisitorScreenShare()" id="ssRequestBtn" title="View visitor's screen"><i class="fas fa-tv"></i></button>
                     {% endif %}
@@ -1853,6 +1962,12 @@
                     <i class="fas fa-microphone"></i>
                 </button>
             </div>
+            <div class="upload-policy-hint">
+                <i class="fas fa-info-circle"></i>
+                <span>Max upload: 10MB</span>
+                <span class="dot"></span>
+                <span>Allowed: images, pdf, doc/docx, xls/xlsx/csv, txt, zip/rar</span>
+            </div>
             <div class="input-row" style="position:relative;">
                 <!-- Canned response popup -->
                 <div class="canned-popup" id="cannedPopup">
@@ -1960,7 +2075,7 @@
                     <div class="info-card-body">
                         <div class="info-row"><span class="label">Room</span><span class="value" style="font-size: 11px; font-family: monospace;">{{ room.room_id }}</span></div>
                         <div class="info-row"><span class="label">Status</span><span class="value">{{ room.status|title }}</span></div>
-                        <div class="info-row"><span class="label">Priority</span><span class="value">{{ room.priority|title }}</span></div>
+                        <div class="info-row"><span class="label">Priority</span><span class="value" id="priorityInfoValue">{{ room.priority|title }}</span></div>
                         <div class="info-row"><span class="label">Subject</span><span class="value">{{ room.subject|default:"-" }}</span></div>
                         <div class="info-row"><span class="label">Agent</span><span class="value">{{ room.agent.get_full_name|default:room.agent.username|default:"Unassigned" }}</span></div>
                         <div class="info-row"><span class="label">Started</span><span class="value">{{ room.created_at|date:"M d, Y H:i" }}</span></div>
@@ -2173,6 +2288,52 @@
 <script>
     // ===== CUSTOM MODAL SYSTEM =====
     let _modalResolve = null;
+    let _toastWrap = null;
+
+    function getToastWrap() {
+        if (_toastWrap && document.body.contains(_toastWrap)) return _toastWrap;
+        _toastWrap = document.createElement('div');
+        _toastWrap.id = 'chatToastWrap';
+        _toastWrap.style.position = 'fixed';
+        _toastWrap.style.right = '18px';
+        _toastWrap.style.top = '82px';
+        _toastWrap.style.zIndex = '2200';
+        _toastWrap.style.display = 'flex';
+        _toastWrap.style.flexDirection = 'column';
+        _toastWrap.style.gap = '8px';
+        _toastWrap.style.pointerEvents = 'none';
+        document.body.appendChild(_toastWrap);
+        return _toastWrap;
+    }
+
+    function showToast(message, type) {
+        const wrap = getToastWrap();
+        const bg = type === 'error' ? '#991b1b' : (type === 'warning' ? '#92400e' : (type === 'success' ? '#065f46' : '#111827'));
+        const el = document.createElement('div');
+        el.textContent = message;
+        el.style.background = bg;
+        el.style.color = '#fff';
+        el.style.minWidth = '260px';
+        el.style.maxWidth = '460px';
+        el.style.fontSize = '12px';
+        el.style.lineHeight = '1.45';
+        el.style.padding = '10px 12px';
+        el.style.borderRadius = '12px';
+        el.style.boxShadow = '0 10px 26px rgba(0,0,0,0.22)';
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-8px)';
+        el.style.transition = 'all .2s ease';
+        wrap.appendChild(el);
+        requestAnimationFrame(function() {
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+        });
+        setTimeout(function() {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-8px)';
+            setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+        }, 2600);
+    }
 
     function showModal(opts) {
         return new Promise(function(resolve) {
@@ -2247,6 +2408,172 @@
     let typingTimeout;
     let isScreenSharing = false;
     let inputMode = 'reply'; // 'reply' or 'whisper'
+
+    async function parseApiResponse(response) {
+        const raw = await response.text();
+        let data = null;
+        if (raw) {
+            try { data = JSON.parse(raw); } catch (_) {}
+        }
+        if (!response.ok) {
+            const fallback = raw && !raw.trim().startsWith('<') ? raw : ('Request failed (' + response.status + ')');
+            throw new Error((data && (data.error || data.message)) || fallback || 'Request failed');
+        }
+        return data || {};
+    }
+
+    function formatFileSize(bytes) {
+        const val = Number(bytes || 0);
+        if (!val) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let size = val;
+        let idx = 0;
+        while (size >= 1024 && idx < units.length - 1) { size /= 1024; idx++; }
+        return (idx === 0 ? size.toFixed(0) : size.toFixed(1)) + ' ' + units[idx];
+    }
+
+    function detectFileBadge(file) {
+        const name = (file.name || '').toLowerCase();
+        if ((file.type || '').startsWith('image/')) return 'image';
+        if (name.endsWith('.pdf')) return 'pdf';
+        if (name.endsWith('.doc') || name.endsWith('.docx')) return 'doc';
+        if (name.endsWith('.xls') || name.endsWith('.xlsx') || name.endsWith('.csv')) return 'sheet';
+        if (name.endsWith('.zip') || name.endsWith('.rar')) return 'zip';
+        if (name.endsWith('.txt')) return 'text';
+        if (name.endsWith('.webm') || name.endsWith('.mp3') || name.endsWith('.wav') || (file.type || '').startsWith('audio/')) return 'audio';
+        return 'file';
+    }
+
+    let uploadSeq = 0;
+    const uploadState = {};
+
+    function createUploadItem(file, sourceTag) {
+        const queue = document.getElementById('uploadQueue');
+        if (!queue) return null;
+        const uploadId = 'up_' + (++uploadSeq);
+        const item = document.createElement('div');
+        item.className = 'upload-item';
+        item.dataset.uploadId = uploadId;
+        item.innerHTML = ''
+            + '<div class="upload-head">'
+            + '  <span class="upload-badge">' + escapeHtml(sourceTag || detectFileBadge(file)) + '</span>'
+            + '  <div class="upload-meta">'
+            + '    <div class="upload-name">' + escapeHtml(file.name || 'file') + '</div>'
+            + '    <div class="upload-size">' + formatFileSize(file.size) + '</div>'
+            + '  </div>'
+            + '</div>'
+            + '<div class="upload-progress"><span></span></div>'
+            + '<div class="upload-status">Uploading... 0%</div>'
+            + '<div class="upload-actions">'
+            + '  <button type="button" class="upload-act-btn danger js-upload-cancel">Cancel</button>'
+            + '  <button type="button" class="upload-act-btn js-upload-retry" style="display:none;">Retry</button>'
+            + '</div>';
+        queue.appendChild(item);
+        return { id: uploadId, el: item };
+    }
+
+    function sendUploadedMessage(data, fallbackType) {
+        if (!data || !data.file_url) return;
+        const msgType = data.msg_type || fallbackType || ((data.file_name || '').match(/\.(png|jpe?g|gif|webp|svg)$/i) ? 'image' : 'file');
+        chatSocket.send(JSON.stringify({
+            type: 'chat_message',
+            message: data.file_name,
+            sender_type: 'agent',
+            sender_name: agentName,
+            msg_type: msgType,
+            file_url: data.file_url,
+            file_name: data.file_name,
+        }));
+        appendMessage(data.file_name, 'agent', agentName, new Date().toISOString(), msgType, data.file_url, data.file_name);
+    }
+
+    function uploadWithUi(file, sourceTag, fallbackType) {
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) { showToast('File too large (max 10MB)', 'warning'); return; }
+        const itemRef = createUploadItem(file, sourceTag || detectFileBadge(file));
+        const item = itemRef ? itemRef.el : null;
+        const uploadId = itemRef ? itemRef.id : null;
+        const bar = item ? item.querySelector('.upload-progress > span') : null;
+        const status = item ? item.querySelector('.upload-status') : null;
+        const btnCancel = item ? item.querySelector('.js-upload-cancel') : null;
+        const btnRetry = item ? item.querySelector('.js-upload-retry') : null;
+
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/chat/upload/' + roomId + '/');
+            xhr.responseType = 'text';
+            if (uploadId) {
+                uploadState[uploadId] = { xhr: xhr, file: file, sourceTag: sourceTag, fallbackType: fallbackType };
+            }
+            if (btnCancel) {
+                btnCancel.onclick = function() {
+                    try { xhr.abort(); } catch (_) {}
+                };
+            }
+            if (btnRetry) {
+                btnRetry.onclick = function() {
+                    if (!uploadState[uploadId]) return;
+                    uploadWithUi(uploadState[uploadId].file, uploadState[uploadId].sourceTag, uploadState[uploadId].fallbackType).catch(() => {});
+                    delete uploadState[uploadId];
+                    if (item && item.parentNode) item.parentNode.removeChild(item);
+                };
+            }
+            xhr.upload.onprogress = function(ev) {
+                if (!bar || !status || !ev.lengthComputable) return;
+                const pct = Math.max(0, Math.min(100, Math.round((ev.loaded / ev.total) * 100)));
+                bar.style.width = pct + '%';
+                status.textContent = 'Uploading... ' + pct + '%';
+            };
+            xhr.onload = function() {
+                let data = null;
+                try { data = JSON.parse(xhr.responseText || '{}'); } catch (_) {}
+                if (xhr.status >= 200 && xhr.status < 300 && data && (data.file_url || data.status === 'ok')) {
+                    if (bar) bar.style.width = '100%';
+                    if (status) status.textContent = 'Uploaded';
+                    if (item) item.classList.add('success');
+                    if (btnCancel) btnCancel.style.display = 'none';
+                    if (btnRetry) btnRetry.style.display = 'none';
+                    sendUploadedMessage(data, fallbackType);
+                    setTimeout(function() { if (item && item.parentNode) item.parentNode.removeChild(item); }, 1400);
+                    if (uploadId) delete uploadState[uploadId];
+                    resolve(data);
+                    return;
+                }
+                const msg = (data && (data.error || data.message)) || ('Upload failed (' + xhr.status + ')');
+                if (status) status.textContent = msg;
+                if (item) item.classList.add('error');
+                if (btnCancel) btnCancel.style.display = 'none';
+                if (btnRetry) btnRetry.style.display = 'inline-block';
+                showToast(msg, 'error');
+                reject(new Error(msg));
+            };
+            xhr.onerror = function() {
+                const msg = 'Upload failed (network error)';
+                if (status) status.textContent = msg;
+                if (item) item.classList.add('error');
+                if (btnCancel) btnCancel.style.display = 'none';
+                if (btnRetry) btnRetry.style.display = 'inline-block';
+                showToast(msg, 'error');
+                reject(new Error(msg));
+            };
+            xhr.onabort = function() {
+                const msg = 'Upload canceled';
+                if (status) status.textContent = msg;
+                if (item) item.classList.add('error');
+                if (btnCancel) btnCancel.style.display = 'none';
+                if (btnRetry) btnRetry.style.display = 'inline-block';
+                showToast(msg, 'warning');
+                if (uploadId) delete uploadState[uploadId];
+                reject(new Error(msg));
+            };
+
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('sender_type', 'agent');
+            fd.append('sender_name', agentName);
+            xhr.send(fd);
+        });
+    }
 
     // ===== WEBSOCKET =====
     function connectWebSocket() {
@@ -2442,7 +2769,7 @@
                 headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: message }),
             })
-            .then(r => r.json())
+            .then(parseApiResponse)
             .then(data => {
                 if (data.status === 'ok') {
                     input.value = '';
@@ -2569,32 +2896,7 @@
     function uploadFile(input, type) {
         const file = input.files[0];
         if (!file) return;
-        if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
-
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('sender_type', 'agent');
-        formData.append('sender_name', agentName);
-
-        fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === 'ok') {
-                appendMessage(data.file_name, 'agent', agentName, data.timestamp, data.msg_type, data.file_url, data.file_name);
-
-                // Notify via WebSocket
-                chatSocket.send(JSON.stringify({
-                    type: 'chat_message',
-                    message: '📎 ' + data.file_name,
-                    sender_type: 'agent',
-                    sender_name: agentName,
-                    msg_type: data.msg_type,
-                    file_url: data.file_url,
-                    file_name: data.file_name,
-                }));
-            }
-        })
-        .catch(err => alert('Upload failed'));
+        uploadWithUi(file, 'manual', type || 'file').catch(() => {});
         input.value = '';
     }
 
@@ -2772,10 +3074,10 @@
             method: 'POST',
             headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email }),
-        }).then(r => r.json()).then(data => {
-            if (data.status === 'ok') alert('Transcript sent to ' + data.email);
-            else alert(data.error || 'Failed to send');
-        }).catch(() => alert('Failed to send'));
+        }).then(parseApiResponse).then(data => {
+            if (data.status === 'ok') showToast('Transcript sent to ' + data.email, 'success');
+            else showToast(data.error || 'Failed to send', 'error');
+        }).catch(() => showToast('Failed to send', 'error'));
     }
 
     // ===== CLOSE CHAT =====
@@ -2796,9 +3098,9 @@
         const ip = '{{ visitor.ip_address|default:"" }}';
         if (!ip) return;
         navigator.clipboard.writeText(ip).then(() => {
-            alert('IP copied: ' + ip);
+            showToast('IP copied: ' + ip, 'success');
         }).catch(() => {
-            alert('Copy failed');
+            showToast('Copy failed', 'error');
         });
     }
 
@@ -2809,7 +3111,7 @@
             headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
             body: JSON.stringify({ action }),
         })
-        .then(r => r.json())
+        .then(parseApiResponse)
         .then(data => {
             if (data.status === 'ok') {
                 const btn = document.getElementById('banVisitorBtn');
@@ -2817,16 +3119,16 @@
                     btn.className = 'qa-btn success';
                     btn.innerHTML = '<i class=\"fas fa-user-check\"></i> Unban';
                     btn.onclick = () => toggleBanVisitor(false);
-                    alert('Visitor banned');
+                    showToast('Visitor banned', 'success');
                 } else {
                     btn.className = 'qa-btn danger';
                     btn.innerHTML = '<i class=\"fas fa-user-slash\"></i> Ban';
                     btn.onclick = () => toggleBanVisitor(true);
-                    alert('Visitor unbanned');
+                    showToast('Visitor unbanned', 'success');
                 }
             }
         })
-        .catch(() => alert('Action failed'));
+        .catch(() => showToast('Action failed', 'error'));
     }
 
     function saveChatTags() {
@@ -2836,11 +3138,11 @@
             headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
             body: JSON.stringify({ tags }),
         })
-        .then(r => r.json())
+        .then(parseApiResponse)
         .then(data => {
-            if (data.status === 'ok') alert('Tags updated');
+            if (data.status === 'ok') showToast('Tags updated', 'success');
         })
-        .catch(() => alert('Tag update failed'));
+        .catch(() => showToast('Tag update failed', 'error'));
     }
 
     async function transferChat() {
@@ -2848,7 +3150,7 @@
         const sel2 = document.getElementById('transferAgentId2');
         const agentId = (sel1 && sel1.value) || (sel2 && sel2.value);
         if (!agentId) {
-            alert('Select an agent first');
+            showToast('Select an agent first', 'warning');
             return;
         }
         const ok = await showModal({title:'Transfer Chat',message:'Transfer this chat to the selected agent?',icon:'fa-share',type:'info',confirmText:'Transfer'});
@@ -2858,16 +3160,16 @@
             headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
             body: JSON.stringify({ agent_id: agentId }),
         })
-        .then(r => r.json())
+        .then(parseApiResponse)
         .then(data => {
             if (data.status === 'ok') {
-                alert('Chat transferred to ' + data.agent_name);
+                showToast('Chat transferred to ' + data.agent_name, 'success');
                 location.reload();
             } else {
-                alert(data.error || 'Transfer failed');
+                showToast(data.error || 'Transfer failed', 'error');
             }
         })
-        .catch(() => alert('Transfer failed'));
+        .catch(() => showToast('Transfer failed', 'error'));
     }
 
     // ===== INTERNAL NOTES =====
@@ -2880,15 +3182,15 @@
             headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: content }),
         })
-        .then(r => r.json())
+        .then(parseApiResponse)
         .then(data => {
             if (data.status === 'ok') {
                 input.value = '';
             } else {
-                alert(data.error || 'Failed to add note');
+                showToast(data.error || 'Failed to add note', 'error');
             }
         })
-        .catch(() => alert('Failed to add note'));
+        .catch(() => showToast('Failed to add note', 'error'));
     }
 
     function appendInternalNote(agentName, content, createdAt) {
@@ -2962,7 +3264,7 @@
             method: 'POST',
             headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: content }),
-        }).then(r => r.json()).then(data => {
+        }).then(parseApiResponse).then(data => {
             if (data.status === 'ok') {
                 const list = document.getElementById('visitorNotesList');
                 const div = document.createElement('div');
@@ -3125,7 +3427,7 @@
                 formData.append('sender_type', 'agent');
                 formData.append('sender_name', agentName);
                 fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
-                .then(r => r.json()).then(data => {
+                .then(parseApiResponse).then(data => {
                     if (data.file_url) {
                         chatSocket.send(JSON.stringify({
                             type: 'chat_message', message: 'Voice note',
@@ -3139,7 +3441,7 @@
             mediaRecorder.start();
             document.getElementById('voiceBtn').style.color = '#ef4444';
             document.getElementById('voiceBtn').title = 'Stop recording (click again)';
-        }).catch(() => alert('Microphone access denied'));
+        }).catch(() => showToast('Microphone access denied', 'error'));
     }
     function stopVoiceNote() {
         if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -3309,7 +3611,7 @@
             formData.append('sender_type', 'agent');
             formData.append('sender_name', agentName);
             fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
-            .then(r => r.json()).then(data => {
+            .then(parseApiResponse).then(data => {
                 if (data.file_url) {
                     chatSocket.send(JSON.stringify({
                         type: 'chat_message', message: 'Screen capture',
@@ -3339,7 +3641,7 @@
             const constraints = { audio: true, video: type === 'video' };
             localStream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch(err) {
-            alert('Cannot access ' + (type === 'video' ? 'camera & microphone' : 'microphone') + '. Please allow permission.');
+            showToast('Cannot access ' + (type === 'video' ? 'camera & microphone' : 'microphone') + '. Please allow permission.', 'error');
             return;
         }
 
@@ -3422,7 +3724,7 @@
             const constraints = { audio: true, video: currentCallType === 'video' };
             localStream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch(err) {
-            alert('Cannot access microphone/camera.');
+            showToast('Cannot access microphone/camera.', 'error');
             return;
         }
 
@@ -3656,9 +3958,9 @@
             method: 'POST',
             headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
             body: JSON.stringify({minutes: parseInt(min)}),
-        }).then(r => r.json()).then(data => {
+        }).then(parseApiResponse).then(data => {
             if (data.status === 'ok') {
-                alert('Chat snoozed for ' + min + ' minutes');
+                showToast('Chat snoozed for ' + min + ' minutes', 'success');
                 location.href = '/dashboard/chats/';
             }
         });
@@ -3666,14 +3968,66 @@
 
     // ===== BOOKMARK CHAT =====
     function bookmarkChat() {
+        const btn = document.getElementById('bookmarkBtn');
+        if (!btn) return;
+        const prevColor = btn.style.color;
+        const wasBookmarked = prevColor === 'var(--warning)';
+        const optimisticBookmarked = !wasBookmarked;
+        btn.style.color = optimisticBookmarked ? 'var(--warning)' : 'var(--text-muted)';
         fetch('/dashboard/chats/' + roomId + '/bookmark/', {
             method: 'POST',
             headers: {'X-CSRFToken': csrfToken},
-        }).then(r => r.json()).then(data => {
+        }).then(parseApiResponse).then(data => {
             if (data.status === 'ok') {
-                const btn = document.getElementById('bookmarkBtn');
                 btn.style.color = data.is_bookmarked ? 'var(--warning)' : 'var(--text-muted)';
+                showToast(data.is_bookmarked ? 'Bookmarked' : 'Bookmark removed', 'success');
+            } else {
+                btn.style.color = prevColor;
+                showToast(data.error || 'Bookmark update failed', 'error');
             }
+        }).catch((err) => {
+            btn.style.color = prevColor;
+            showToast(err && err.message ? err.message : 'Bookmark update failed', 'error');
+        });
+    }
+
+    function updatePriorityUi(priority) {
+        const sel = document.getElementById('priorityInline');
+        const info = document.getElementById('priorityInfoValue');
+        if (sel) sel.value = priority;
+        if (info) info.textContent = priority.charAt(0).toUpperCase() + priority.slice(1);
+    }
+
+    function updatePriorityInline(priority) {
+        const sel = document.getElementById('priorityInline');
+        if (!sel) return;
+        const prev = sel.dataset.current || '{{ room.priority|escapejs }}';
+        const next = (priority || '').toLowerCase();
+        if (!['low', 'medium', 'high'].includes(next)) {
+            updatePriorityUi(prev);
+            return;
+        }
+        updatePriorityUi(next);
+        sel.disabled = true;
+        fetch('/dashboard/chats/' + roomId + '/priority/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priority: next }),
+        }).then(parseApiResponse).then(data => {
+            if (data.status === 'ok') {
+                const saved = (data.priority || next).toLowerCase();
+                sel.dataset.current = saved;
+                updatePriorityUi(saved);
+                showToast('Priority updated to ' + saved, 'success');
+            } else {
+                updatePriorityUi(prev);
+                showToast(data.error || 'Priority update failed', 'error');
+            }
+        }).catch((err) => {
+            updatePriorityUi(prev);
+            showToast(err && err.message ? err.message : 'Priority update failed', 'error');
+        }).finally(() => {
+            sel.disabled = false;
         });
     }
 
@@ -3716,9 +4070,9 @@
         fetch('/dashboard/chats/' + roomId + '/takeover/', {
             method: 'POST',
             headers: { 'X-CSRFToken': csrfToken },
-        }).then(r => r.json()).then(data => {
+        }).then(parseApiResponse).then(data => {
             if (data.status === 'ok') location.reload();
-            else alert(data.error || 'Failed');
+            else showToast(data.error || 'Failed', 'error');
         });
     }
 
@@ -3841,25 +4195,8 @@
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 const file = files[0];
-                if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
-                const isImage = file.type.startsWith('image/');
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('sender_type', 'agent');
-                formData.append('sender_name', agentName);
-                fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.file_url) {
-                        const msgType = isImage ? 'image' : 'file';
-                        chatSocket.send(JSON.stringify({
-                            type: 'chat_message', message: data.file_name,
-                            sender_type: 'agent', sender_name: agentName,
-                            msg_type: msgType, file_url: data.file_url, file_name: data.file_name,
-                        }));
-                        appendMessage(data.file_name, 'agent', agentName, new Date().toISOString(), msgType, data.file_url, data.file_name);
-                    }
-                });
+                const msgType = file.type.startsWith('image/') ? 'image' : 'file';
+                uploadWithUi(file, 'drop', msgType).catch(() => {});
             }
         });
     })();
@@ -3872,23 +4209,8 @@
             if (items[i].type.startsWith('image/')) {
                 e.preventDefault();
                 const file = items[i].getAsFile();
-                if (!file || file.size > 10 * 1024 * 1024) return;
-                const formData = new FormData();
-                formData.append('file', file, 'screenshot_' + Date.now() + '.png');
-                formData.append('sender_type', 'agent');
-                formData.append('sender_name', agentName);
-                fetch('/api/chat/upload/' + roomId + '/', { method: 'POST', body: formData })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.file_url) {
-                        chatSocket.send(JSON.stringify({
-                            type: 'chat_message', message: data.file_name,
-                            sender_type: 'agent', sender_name: agentName,
-                            msg_type: 'image', file_url: data.file_url, file_name: data.file_name,
-                        }));
-                        appendMessage(data.file_name, 'agent', agentName, new Date().toISOString(), 'image', data.file_url, data.file_name);
-                    }
-                });
+                if (!file) return;
+                uploadWithUi(file, 'paste', 'image').catch(() => {});
                 break;
             }
         }
@@ -3904,16 +4226,16 @@
         // ? = show shortcuts
         if (e.key === '?' && !e.target.matches('input,textarea')) {
             e.preventDefault();
-            alert(
-                'Keyboard Shortcuts:\n\n' +
-                '/ = Canned responses\n' +
-                'Enter = Send message\n' +
-                'Ctrl+F = Search in chat\n' +
-                'Ctrl+V = Paste screenshot\n' +
-                'Esc = Close popups\n' +
-                '? = Show this help'
-            );
+            showModal({
+                title: 'Keyboard Shortcuts',
+                message: '/ = Canned responses | Enter = Send message | Ctrl+F = Search in chat | Ctrl+V = Paste screenshot | Esc = Close popups | ? = Show this help',
+                icon: 'fa-keyboard',
+                type: 'info',
+                confirmText: 'OK'
+            });
         }
     });
 </script>
 {% endblock %}
+
+

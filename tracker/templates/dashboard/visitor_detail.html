@@ -138,15 +138,17 @@
     <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
         <div id="pvBody">
             {% for pv in page_views %}
-            <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);">
-                <div style="width:28px;height:28px;border-radius:8px;background:rgba(99,102,241,0.08);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <i class="fas fa-file" style="color:var(--text-muted);font-size:11px;"></i>
+            <div class="pv-row">
+                <div class="pv-icon">
+                    <i class="fas fa-file"></i>
                 </div>
-                <div style="flex:1;min-width:0;">
-                    <a href="{{ pv.url }}" target="_blank" style="font-size:12px;color:var(--primary-light);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pv.url }}</a>
-                    <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">{{ pv.page_title|default:"" }}</div>
+                <div class="pv-main">
+                    <a href="{{ pv.url }}" target="_blank" class="pv-link">{{ pv.url }}</a>
+                    {% if pv.page_title and pv.page_title != pv.url %}
+                    <div class="pv-title">{{ pv.page_title }}</div>
+                    {% endif %}
                 </div>
-                <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">{{ pv.timestamp|date:"M d, H:i:s" }}</div>
+                <div class="pv-time">{{ pv.timestamp|date:"M d, H:i:s" }}</div>
             </div>
             {% empty %}
             <div id="pvEmpty" style="text-align:center;padding:30px;color:var(--text-muted);font-size:12px;">No page views recorded</div>
@@ -159,6 +161,61 @@
 @keyframes livePulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
 @keyframes flashRow{0%{background:rgba(16,185,129,0.15);}100%{background:transparent;}}
 .pv-new{animation:flashRow 1.2s ease;}
+.pv-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:10px 16px;
+    border-bottom:1px solid var(--border);
+    opacity:1;
+    filter:none;
+    transition:background .15s ease;
+    text-rendering:optimizeLegibility;
+    -webkit-font-smoothing:antialiased;
+}
+.pv-row:hover{
+    background:rgba(99,102,241,0.05);
+    opacity:1;
+    filter:none;
+}
+.pv-icon{
+    width:28px;
+    height:28px;
+    border-radius:8px;
+    background:rgba(99,102,241,0.08);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    color:var(--text-muted);
+    font-size:11px;
+}
+.pv-main{ flex:1; min-width:0; }
+.pv-link{
+    font-size:12px;
+    color:#2563eb;
+    text-decoration:none;
+    display:block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-weight:600;
+}
+.pv-link:hover{ color:#1d4ed8; text-decoration:underline; }
+.pv-title{
+    font-size:10px;
+    color:var(--text-muted);
+    margin-top:1px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.pv-time{
+    font-size:11px;
+    color:var(--text-muted);
+    white-space:nowrap;
+    flex-shrink:0;
+}
 </style>
 
 <script>
@@ -191,11 +248,10 @@ window.addEventListener('livetrack:visitor', function(e) {
     const urlDisplay = v.current_page.length > 80 ? v.current_page.substring(0, 80) + '...' : v.current_page;
 
     const div = document.createElement('div');
-    div.className = 'pv-new';
-    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);';
-    div.innerHTML = '<div style="width:28px;height:28px;border-radius:8px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-bolt" style="color:#10b981;font-size:11px;"></i></div>'
-        + '<div style="flex:1;min-width:0;"><a href="' + v.current_page + '" target="_blank" style="font-size:12px;color:var(--primary-light);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + urlDisplay + '</a><div style="font-size:10px;color:#10b981;margin-top:1px;font-weight:600;">Just now</div></div>'
-        + '<div style="font-size:11px;color:#10b981;white-space:nowrap;flex-shrink:0;font-weight:600;">' + dateStr + ', ' + timeStr + '</div>';
+    div.className = 'pv-row pv-new';
+    div.innerHTML = '<div class="pv-icon" style="background:rgba(16,185,129,0.12);"><i class="fas fa-bolt" style="color:#10b981;font-size:11px;"></i></div>'
+        + '<div class="pv-main"><a href="' + v.current_page + '" target="_blank" class="pv-link">' + urlDisplay + '</a></div>'
+        + '<div class="pv-time" style="color:#10b981;font-weight:600;">' + dateStr + ', ' + timeStr + '</div>';
     body.insertBefore(div, body.firstChild);
 
     // Update count
@@ -205,8 +261,9 @@ window.addEventListener('livetrack:visitor', function(e) {
     setTimeout(function() {
         const icon = div.querySelector('.fa-bolt');
         if (icon) { icon.className = 'fas fa-file'; icon.style.color = 'var(--text-muted)'; }
-        div.querySelector('.fa-bolt')?.closest('div')?.style && (div.children[0].style.background = 'rgba(99,102,241,0.08)');
-        const justNow = div.querySelector('div[style*="10b981"]');
+        if (div.children[0]) div.children[0].style.background = 'rgba(99,102,241,0.08)';
+        const timeEl = div.querySelector('.pv-time');
+        if (timeEl) { timeEl.style.color = 'var(--text-muted)'; timeEl.style.fontWeight = '400'; }
     }, 5000);
 });
 </script>

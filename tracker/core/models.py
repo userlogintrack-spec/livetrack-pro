@@ -58,6 +58,10 @@ class Organization(models.Model):
         default='',
         help_text='Comma or newline separated domains (e.g. example.com)',
     )
+    attack_mode_enabled = models.BooleanField(default=False)
+    attack_mode_message = models.TextField(
+        default='High traffic detected. Please try again in a minute.',
+    )
 
     def save(self, *args, **kwargs):
         if not self.widget_key:

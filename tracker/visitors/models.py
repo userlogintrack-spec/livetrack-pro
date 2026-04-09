@@ -5,6 +5,7 @@ from django.utils import timezone
 class Visitor(models.Model):
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='visitors', null=True, blank=True)
     session_key = models.CharField(max_length=100, db_index=True)
+    visitor_fingerprint = models.CharField(max_length=100, blank=True, default='', db_index=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True, default='')
     browser = models.CharField(max_length=100, blank=True, default='')

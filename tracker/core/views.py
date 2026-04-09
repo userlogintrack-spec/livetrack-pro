@@ -1,5 +1,7 @@
 import json
 import logging
+import hashlib
+import re
 import uuid
 from datetime import timedelta
 from urllib.parse import urlparse
@@ -81,7 +83,65 @@ def _rate_limit(request, scope, limit, window_seconds):
     return False
 
 
-def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
+def _adaptive_rate_limit(request, scope, org=None, base_limit=30, window_seconds=60, session_key=''):
+    """Rate limiter with org-aware attack mode and IP burst protection."""
+    ip = _client_ip(request)
+    org_id = getattr(org, 'id', 0) or 0
+    sk = (session_key or request.session.session_key or '')[:24]
+    strict = bool(getattr(org, 'attack_mode_enabled', False))
+    limit = max(3, int(base_limit * (0.35 if strict else 1.0)))
+    global_limit = max(8, int(limit * (2 if strict else 4)))
+
+    key = f"arl:{scope}:{org_id}:{ip}:{sk}"
+    gkey = f"arlg:{scope}:{org_id}:{ip}"
+    current = cache.get(key, 0)
+    gcurrent = cache.get(gkey, 0)
+    if current >= limit or gcurrent >= global_limit:
+        return True
+
+    if current == 0:
+        cache.set(key, 1, timeout=window_seconds)
+    else:
+        cache.incr(key)
+    if gcurrent == 0:
+        cache.set(gkey, 1, timeout=window_seconds)
+    else:
+        cache.incr(gkey)
+    return False
+
+
+def _is_honeypot_triggered(data):
+    return bool(
+        (data.get('website') or '').strip()
+        or (data.get('company') or '').strip()
+        or (data.get('fax') or '').strip()
+    )
+
+
+def _spam_score(text):
+    text = (text or '').strip()
+    if not text:
+        return 0
+    score = 0
+    if len(text) > 1000:
+        score += 2
+    url_hits = len(re.findall(r'(https?://|www\.)', text, flags=re.IGNORECASE))
+    if url_hits >= 2:
+        score += 3
+    if re.search(r'(.)\1{7,}', text):
+        score += 2
+    words = re.findall(r'\w+', text.lower())
+    if len(words) >= 12:
+        uniq_ratio = len(set(words)) / max(1, len(words))
+        if uniq_ratio < 0.35:
+            score += 2
+    uppercase_ratio = sum(1 for c in text if c.isupper()) / max(1, len(text))
+    if len(text) > 20 and uppercase_ratio > 0.6:
+        score += 1
+    return score
+
+
+def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None, visitor_fingerprint=''):
     """Centralised dedup: returns the canonical Visitor row for this device.
 
     Match priority:
@@ -102,8 +162,38 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
         if v:
             return v, False
 
-    # 2. Create new
-    create_kwargs = {'organization': org, 'session_key': session_key, 'ip_address': ip, 'user_agent': ua}
+    # 2. Fingerprint fallback (for cookie/session-restricted environments)
+    if visitor_fingerprint:
+        cutoff = timezone.now() - timedelta(days=30)
+        v = (Visitor.objects.filter(
+            organization=org, visitor_fingerprint=visitor_fingerprint, last_seen__gte=cutoff
+        ).order_by('-last_seen').first())
+        if v:
+            if session_key and v.session_key != session_key:
+                v.session_key = session_key
+            if ip and not v.ip_address:
+                v.ip_address = ip
+            if ua and not v.user_agent:
+                v.user_agent = ua
+            updates = []
+            if session_key and v.session_key == session_key:
+                updates.append('session_key')
+            if ip and v.ip_address == ip:
+                updates.append('ip_address')
+            if ua and v.user_agent == ua:
+                updates.append('user_agent')
+            if updates:
+                v.save(update_fields=updates)
+            return v, False
+
+    # 3. Create new
+    create_kwargs = {
+        'organization': org,
+        'session_key': session_key,
+        'visitor_fingerprint': (visitor_fingerprint or '')[:100],
+        'ip_address': ip,
+        'user_agent': ua,
+    }
     if defaults:
         create_kwargs.update(defaults)
     v = Visitor.objects.create(**create_kwargs)
@@ -149,6 +239,55 @@ def _extract_parent_domain(request, body_data=None):
         if domain:
             return domain
     return ''
+
+
+def _extract_fingerprint(body_data=None):
+    body_data = body_data or {}
+    fp = (body_data.get('fingerprint') or body_data.get('visitor_fingerprint') or '').strip()
+    if not fp:
+        return ''
+    # Keep only safe compact token chars.
+    fp = re.sub(r'[^a-zA-Z0-9:_-]', '', fp)
+    return fp[:100]
+
+
+def _monthly_visitor_limit_state(org, session_key='', visitor_fingerprint=''):
+    """Return whether org can create a *new* visitor this month.
+
+    Rules:
+    - Free plan: max 100 visitors/month
+    - Paid plans: unlimited visitors
+    - Existing visitors (same session_key/fingerprint) always allowed
+    """
+    from tracker.core.models import Subscription
+    from tracker.visitors.models import Visitor
+
+    if not org:
+        return {'allowed': True, 'is_new': False, 'limit': None, 'count': 0, 'plan': 'free'}
+
+    sub = Subscription.objects.filter(organization=org).first()
+    plan = (sub.plan if sub else 'free').lower()
+    if plan != 'free':
+        return {'allowed': True, 'is_new': False, 'limit': None, 'count': 0, 'plan': plan}
+
+    existing = None
+    if session_key:
+        existing = Visitor.objects.filter(organization=org, session_key=session_key).first()
+    if not existing and visitor_fingerprint:
+        cutoff = timezone.now() - timedelta(days=30)
+        existing = Visitor.objects.filter(
+            organization=org,
+            visitor_fingerprint=visitor_fingerprint,
+            last_seen__gte=cutoff
+        ).order_by('-last_seen').first()
+    if existing:
+        return {'allowed': True, 'is_new': False, 'limit': 100, 'count': 0, 'plan': plan}
+
+    month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_count = Visitor.objects.filter(organization=org, first_visit__gte=month_start).count()
+    if monthly_count >= 100:
+        return {'allowed': False, 'is_new': True, 'limit': 100, 'count': monthly_count, 'plan': plan}
+    return {'allowed': True, 'is_new': True, 'limit': 100, 'count': monthly_count, 'plan': plan}
 
 
 def _domain_allowed(org, domain):
@@ -397,7 +536,19 @@ def widget_init(request):
 
         body_data = _parse_json_body(request) or {}
         body_session = (body_data.get('session_key') or '').strip()
+        visitor_fingerprint = _extract_fingerprint(body_data)
         session_key = body_session or request.session.session_key
+        limit_state = _monthly_visitor_limit_state(org, session_key=session_key, visitor_fingerprint=visitor_fingerprint)
+        if not limit_state.get('allowed', True):
+            return JsonResponse({
+                'error': 'Free plan visitor limit reached (100/month). Upgrade for unlimited visitors.',
+                'code': 'VISITOR_LIMIT_REACHED',
+                'limit': limit_state.get('limit'),
+                'count': limit_state.get('count'),
+            }, status=402)
+        if _adaptive_rate_limit(request, 'widget_init', org=org, base_limit=40, window_seconds=60, session_key=session_key):
+            msg = org.attack_mode_message if getattr(org, 'attack_mode_enabled', False) else 'Too many requests. Please wait and retry.'
+            return JsonResponse({'error': msg}, status=429)
         parent_domain = _extract_parent_domain(request, body_data)
         if not _domain_allowed(org, parent_domain):
             return JsonResponse({'error': 'Widget blocked on this domain.', 'blocked': True}, status=403)
@@ -409,7 +560,7 @@ def widget_init(request):
         browser, os_name, device_type = parse_user_agent(ua)
 
         visitor, _ = _resolve_or_create_visitor(
-            org=org, ip=ip, ua=ua, session_key=session_key,
+            org=org, ip=ip, ua=ua, session_key=session_key, visitor_fingerprint=visitor_fingerprint,
             defaults={
                 'browser': browser, 'os': os_name, 'device_type': device_type,
                 'country': country_name, 'city': city_name,
@@ -435,14 +586,12 @@ def widget_track_pageview(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    if _rate_limit(request, 'widget_track', limit=120, window_seconds=60):
-        return JsonResponse({'error': 'Too many requests'}, status=429)
-
     data = _parse_json_body(request) or {}
     url = (data.get('url') or '')[:500]
     title = (data.get('title') or '')[:300]
     referrer = (data.get('referrer') or '')[:500]
     body_session = data.get('session_key', '')
+    visitor_fingerprint = _extract_fingerprint(data)
 
     if not url:
         return JsonResponse({'error': 'url required'}, status=400)
@@ -462,6 +611,17 @@ def widget_track_pageview(request):
     if not request.session.session_key:
         request.session.create()
     session_key = (body_session or request.session.session_key or '').strip()
+    limit_state = _monthly_visitor_limit_state(org, session_key=session_key, visitor_fingerprint=visitor_fingerprint)
+    if not limit_state.get('allowed', True):
+        return JsonResponse({
+            'error': 'Free plan visitor limit reached (100/month). Upgrade for unlimited visitors.',
+            'code': 'VISITOR_LIMIT_REACHED',
+            'limit': limit_state.get('limit'),
+            'count': limit_state.get('count'),
+        }, status=402)
+    if _adaptive_rate_limit(request, 'widget_track', org=org, base_limit=120, window_seconds=60, session_key=session_key):
+        msg = org.attack_mode_message if getattr(org, 'attack_mode_enabled', False) else 'Too many requests.'
+        return JsonResponse({'error': msg}, status=429)
 
     ip = get_client_ip(request)
     country_name, country_code, city_name = _resolve_country_for_request(request, ip)
@@ -471,7 +631,7 @@ def widget_track_pageview(request):
     browser, os_name, device_type = parse_user_agent(ua)
 
     visitor, created = _resolve_or_create_visitor(
-        org=org, ip=ip, ua=ua, session_key=session_key,
+        org=org, ip=ip, ua=ua, session_key=session_key, visitor_fingerprint=visitor_fingerprint,
         defaults={
             'browser': browser, 'os': os_name, 'device_type': device_type,
             'referrer': referrer, 'referrer_source': get_referrer_source(referrer),
@@ -589,9 +749,23 @@ def widget_script(request):
   function getSessionKey() {
     try { return localStorage.getItem(SK_KEY) || ""; } catch(e) { return ""; }
   }
-  function setSessionKey(k) {
-    try { localStorage.setItem(SK_KEY, k); } catch(e) {}
-  }
+	  function setSessionKey(k) {
+	    try { localStorage.setItem(SK_KEY, k); } catch(e) {}
+	  }
+	  function getFingerprint() {
+	    try {
+	      var raw = [
+	        navigator.userAgent || "",
+	        navigator.language || "",
+	        navigator.platform || "",
+	        (screen.width || 0) + "x" + (screen.height || 0),
+	        new Date().getTimezoneOffset()
+	      ].join("|");
+	      var h = 0;
+	      for (var i = 0; i < raw.length; i++) { h = ((h << 5) - h) + raw.charCodeAt(i); h |= 0; }
+	      return "fp_" + Math.abs(h);
+	    } catch(e) { return ""; }
+	  }
 
   // ===== Page view tracking =====
   var lastTrackedUrl = "";
@@ -602,6 +776,7 @@ def widget_script(request):
     var payload = {
       key: WIDGET_KEY,
 	      session_key: getSessionKey(),
+	      fingerprint: getFingerprint(),
 	      parent_domain: location.hostname || "",
 	      url: url,
       title: document.title || "",
@@ -730,12 +905,12 @@ def _get_time_greeting(name):
 def widget_start_chat(request):
     """Start a new chat from the widget."""
     if request.method == 'POST':
-        if _rate_limit(request, 'widget_start_chat', limit=10, window_seconds=60):
-            return JsonResponse({'error': 'Too many requests. Please wait and try again.'}, status=429)
-
         data = _parse_json_body(request)
         if data is None:
             return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+        if _is_honeypot_triggered(data):
+            return JsonResponse({'error': 'Unable to start chat right now.'}, status=400)
+        visitor_fingerprint = _extract_fingerprint(data)
 
         # Get session  prefer cookie, fallback to session_key in body (cross-origin widget)
         if not request.session.session_key:
@@ -749,6 +924,18 @@ def widget_start_chat(request):
 
         # Resolve org from widget key
         org = _get_org_from_request(request)
+        limit_state = _monthly_visitor_limit_state(org, session_key=session_key, visitor_fingerprint=visitor_fingerprint)
+        if not limit_state.get('allowed', True):
+            return JsonResponse({
+                'error': 'Free plan visitor limit reached (100/month). Upgrade for unlimited visitors.',
+                'code': 'VISITOR_LIMIT_REACHED',
+                'limit': limit_state.get('limit'),
+                'count': limit_state.get('count'),
+            }, status=402)
+
+        if _adaptive_rate_limit(request, 'widget_start_chat', org=org, base_limit=10, window_seconds=60, session_key=session_key):
+            msg = org.attack_mode_message if getattr(org, 'attack_mode_enabled', False) else 'Too many requests. Please wait and try again.'
+            return JsonResponse({'error': msg}, status=429)
         parent_domain = _extract_parent_domain(request, data)
         if not _domain_allowed(org, parent_domain):
             return JsonResponse({'error': 'Widget blocked on this domain.', 'blocked': True}, status=403)
@@ -760,13 +947,27 @@ def widget_start_chat(request):
         # Find or create visitor (with smart dedup by IP+UA so we don't create duplicates)
         from tracker.visitors.middleware import get_client_ip, parse_user_agent
         ip = get_client_ip(request)
+        subject_text = (data.get('subject') or '').strip()
+        spam_score = _spam_score(subject_text)
+        if spam_score >= 4:
+            return JsonResponse({'error': 'Message blocked for safety checks. Please rephrase and try again.'}, status=429)
+        if subject_text:
+            msg_hash = hashlib.sha1(subject_text.lower().encode('utf-8')).hexdigest()[:16]
+            dup_key = f'spamdup:{getattr(org, "id", 0)}:{ip}:{msg_hash}'
+            dup_count = cache.get(dup_key, 0)
+            if dup_count >= 3:
+                return JsonResponse({'error': 'Repeated messages detected. Please wait before retrying.'}, status=429)
+            if dup_count == 0:
+                cache.set(dup_key, 1, timeout=600)
+            else:
+                cache.incr(dup_key)
         country_name, country_code, city_name = _resolve_country_for_request(request, ip)
         if _country_blocked(org, country_name, country_code):
             return JsonResponse({'error': 'Widget is blocked in your country.', 'blocked': True}, status=403)
         ua = request.META.get('HTTP_USER_AGENT', '')
         browser, os_name, device_type = parse_user_agent(ua)
         visitor, _ = _resolve_or_create_visitor(
-            org=org, ip=ip, ua=ua, session_key=session_key,
+            org=org, ip=ip, ua=ua, session_key=session_key, visitor_fingerprint=visitor_fingerprint,
             defaults={
                 'browser': browser, 'os': os_name, 'device_type': device_type,
                 'is_online': True,
@@ -873,7 +1074,7 @@ def widget_start_chat(request):
                 logger.exception('Failed to send new-chat notification email for room=%s', room_id)
 
         # Save the visitor's initial message (subject/query) as their first chat message
-        subject_text = data.get('subject', '').strip()
+        subject_text = (data.get('subject') or '').strip()
         if subject_text:
             Message.objects.create(
                 room=room,
@@ -1070,15 +1271,14 @@ def chat_rate(request, room_id):
 def submit_offline_message(request):
     """Submit a message when no agents are online."""
     if request.method == 'POST':
-        if _rate_limit(request, 'offline_message', limit=5, window_seconds=600):
-            return JsonResponse({'error': 'Too many messages. Please try again later.'}, status=429)
-
         from tracker.chat.models import OfflineMessage
         from tracker.visitors.middleware import get_client_ip
 
         data = _parse_json_body(request)
         if data is None:
             return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+        if _is_honeypot_triggered(data):
+            return JsonResponse({'error': 'Unable to submit right now.'}, status=400)
 
         name = data.get('name', '').strip()
         email = data.get('email', '').strip()
@@ -1091,6 +1291,11 @@ def submit_offline_message(request):
             return JsonResponse({'error': 'Invalid email address'}, status=400)
 
         org = _get_org_from_request(request)
+        if _adaptive_rate_limit(request, 'offline_message', org=org, base_limit=5, window_seconds=600):
+            msg = org.attack_mode_message if getattr(org, 'attack_mode_enabled', False) else 'Too many messages. Please try again later.'
+            return JsonResponse({'error': msg}, status=429)
+        if _spam_score(message) >= 4:
+            return JsonResponse({'error': 'Message blocked for safety checks. Please rephrase and try again.'}, status=429)
         OfflineMessage.objects.create(
             organization=org,
             name=name,

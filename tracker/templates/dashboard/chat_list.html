@@ -90,6 +90,45 @@
     .part-text { font-size: 11px; color: var(--text-muted); }
     .part-text strong { color: var(--text-secondary); font-weight: 600; }
     .part-unassigned { color: #94a3b8; font-style: italic; }
+
+    @media (max-width: 900px) {
+        .chat-row { align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+        .cr-main { min-width: 0; width: calc(100% - 66px); }
+        .cr-top { flex-wrap: wrap; row-gap: 2px; }
+        .cr-time { margin-left: 0; flex-basis: 100%; }
+        .cr-preview { max-width: 100%; }
+        .cr-badges { width: 100%; margin-left: 50px; flex-wrap: wrap; }
+        .cr-action { margin-left: auto; }
+    }
+
+    .bulk-toast-wrap {
+        position: fixed;
+        right: 18px;
+        top: 82px;
+        z-index: 2100;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .bulk-toast {
+        min-width: 260px;
+        max-width: 420px;
+        background: #111827;
+        color: #fff;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 12px;
+        line-height: 1.45;
+        box-shadow: 0 10px 26px rgba(0,0,0,0.22);
+        transform: translateY(-8px);
+        opacity: 0;
+        transition: all .2s ease;
+    }
+    .bulk-toast.show { transform: translateY(0); opacity: 1; }
+    .bulk-toast.success { background: #065f46; }
+    .bulk-toast.warning { background: #92400e; }
+    .bulk-toast.error { background: #991b1b; }
 </style>
 {% endblock %}
 
@@ -136,7 +175,7 @@
 <div class="card">
     <div class="card-body" style="padding:0;">
         {% for chat in chats %}
-        <div class="chat-row priority-{{ chat.priority }}">
+        <div class="chat-row priority-{{ chat.priority }}" data-room-id="{{ chat.room_id }}" data-priority="{{ chat.priority }}" data-bookmarked="{% if chat.is_bookmarked %}1{% else %}0{% endif %}">
             <input type="checkbox" class="cr-checkbox chat-checkbox" value="{{ chat.room_id }}" onchange="updateBulkBar()">
 
             <div class="cr-avatar">
@@ -147,7 +186,7 @@
             <a href="{% url 'dashboard:chat_room' chat.room_id %}" class="cr-main" style="text-decoration:none;color:inherit;">
                 <div class="cr-top">
                     <span class="cr-name">{{ chat.visitor_name }}</span>
-                    {% if chat.is_bookmarked %}<i class="fas fa-bookmark" style="color:#f59e0b;font-size:10px;"></i>{% endif %}
+                    <i class="fas fa-bookmark cr-bookmark" style="color:#f59e0b;font-size:10px;display:{% if chat.is_bookmarked %}inline-block{% else %}none{% endif %};"></i>
                     {% if chat.was_transferred %}<i class="fas fa-exchange-alt" style="color:#6366f1;font-size:9px;"></i>{% endif %}
                     <span class="cr-time">{{ chat.created_at|timesince }} ago</span>
                 </div>
@@ -191,7 +230,7 @@
                 <span class="cr-badge" style="background:rgba(245,158,11,0.1);color:#f59e0b;"><i class="fas fa-sticky-note"></i> {{ chat.notes_count }}</span>
                 {% endif %}
 
-                <span class="cr-badge" style="{% if chat.priority == 'high' %}background:rgba(239,68,68,0.1);color:#ef4444;{% elif chat.priority == 'medium' %}background:rgba(245,158,11,0.1);color:#f59e0b;{% else %}background:rgba(16,185,129,0.1);color:#10b981;{% endif %}">
+                <span class="cr-badge cr-badge-priority" style="{% if chat.priority == 'high' %}background:rgba(239,68,68,0.1);color:#ef4444;{% elif chat.priority == 'medium' %}background:rgba(245,158,11,0.1);color:#f59e0b;{% else %}background:rgba(16,185,129,0.1);color:#10b981;{% endif %}">
                     {{ chat.priority|title }}
                 </span>
 
@@ -231,6 +270,8 @@
     </div>
 </div>
 
+<div id="bulkToastWrap" class="bulk-toast-wrap"></div>
+
 <script>
 function toggleSelectAll(el) {
     document.querySelectorAll('.chat-checkbox').forEach(cb => cb.checked = el.checked);
@@ -245,17 +286,114 @@ function updateBulkBar() {
 function getSelectedIds() {
     return Array.from(document.querySelectorAll('.chat-checkbox:checked')).map(cb => cb.value);
 }
+function showBulkToast(message, type) {
+    const wrap = document.getElementById('bulkToastWrap');
+    if (!wrap) return;
+    const el = document.createElement('div');
+    el.className = 'bulk-toast ' + (type || 'success');
+    el.textContent = message;
+    wrap.appendChild(el);
+    requestAnimationFrame(function() { el.classList.add('show'); });
+    setTimeout(function() {
+        el.classList.remove('show');
+        setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+    }, 2500);
+}
+async function parseApiResponse(response) {
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    const raw = await response.text();
+    let data = null;
+    if (raw && contentType.includes('application/json')) {
+        try { data = JSON.parse(raw); } catch (_) {}
+    }
+    if (!response.ok) {
+        const fallback = raw && !raw.trim().startsWith('<') ? raw : ('Request failed (' + response.status + ')');
+        throw new Error((data && (data.error || data.message)) || fallback);
+    }
+    if (data) return data;
+    if (raw) {
+        try { return JSON.parse(raw); } catch (_) {}
+    }
+    return {};
+}
+function actionVerb(action) {
+    if (action === 'close') return 'closed';
+    if (action === 'high_priority') return 'marked high priority';
+    if (action === 'bookmark') return 'bookmarked';
+    return action;
+}
+function applyPriorityVisual(row, value) {
+    row.classList.remove('priority-low', 'priority-medium', 'priority-high');
+    row.classList.add('priority-' + value);
+    row.dataset.priority = value;
+    const badge = row.querySelector('.cr-badge-priority');
+    if (badge) {
+        badge.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+        if (value === 'high') badge.style.cssText = 'background:rgba(239,68,68,0.1);color:#ef4444;';
+        else if (value === 'medium') badge.style.cssText = 'background:rgba(245,158,11,0.1);color:#f59e0b;';
+        else badge.style.cssText = 'background:rgba(16,185,129,0.1);color:#10b981;';
+    }
+}
+function applyBookmarkVisual(row, value) {
+    row.dataset.bookmarked = value ? '1' : '0';
+    const icon = row.querySelector('.cr-bookmark');
+    if (icon) icon.style.display = value ? 'inline-block' : 'none';
+}
 function bulkAction(action) {
     const ids = getSelectedIds();
     if (!ids.length) return;
+    const selected = ids.length;
+    const rollbacks = [];
+    if (action === 'bookmark' || action === 'high_priority') {
+        ids.forEach(function(id) {
+            const row = document.querySelector('.chat-row[data-room-id="' + id + '"]');
+            if (!row) return;
+            const prev = {
+                priority: row.dataset.priority || 'low',
+                bookmarked: row.dataset.bookmarked === '1'
+            };
+            rollbacks.push(function() {
+                applyPriorityVisual(row, prev.priority);
+                applyBookmarkVisual(row, prev.bookmarked);
+            });
+            if (action === 'bookmark') applyBookmarkVisual(row, true);
+            if (action === 'high_priority') applyPriorityVisual(row, 'high');
+        });
+    }
     fetch('/dashboard/chats/bulk-action/', {
         method: 'POST',
         headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
         body: JSON.stringify({action: action, room_ids: ids}),
-    }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.status === 'ok') location.reload();
-        else alert(data.error || 'Failed');
-    }).catch(function(err) { console.error('Bulk action error:', err); alert('Failed: ' + err); });
+    }).then(parseApiResponse).then(function(data) {
+        if (data.status !== 'ok') {
+            showBulkToast(data.error || 'Action failed', 'error');
+            return;
+        }
+        const affected = Number(data.affected || 0);
+        const failed = Number(data.failed != null ? data.failed : Math.max(selected - affected, 0));
+        const verb = actionVerb(action);
+        if (affected > 0 && failed === 0) {
+            showBulkToast(selected + ' selected: ' + affected + ' ' + verb + '.', 'success');
+            if (action !== 'close') clearBulk();
+        } else if (affected > 0) {
+            showBulkToast(selected + ' selected: ' + affected + ' ' + verb + ', ' + failed + ' failed.', 'warning');
+            if (action === 'bookmark' || action === 'high_priority') {
+                rollbacks.forEach(function(fn) { fn(); });
+            }
+        } else {
+            showBulkToast(selected + ' selected: 0 ' + verb + ', ' + failed + ' failed.', 'error');
+            if (action === 'bookmark' || action === 'high_priority') {
+                rollbacks.forEach(function(fn) { fn(); });
+            }
+        }
+        if (action === 'close') setTimeout(function() { location.reload(); }, 700);
+    }).catch(function(err) {
+        console.error('Bulk action error:', err);
+        if (action === 'bookmark' || action === 'high_priority') {
+            rollbacks.forEach(function(fn) { fn(); });
+        }
+        showBulkToast('Failed: ' + (err && err.message ? err.message : err), 'error');
+    });
 }
 function clearBulk() {
     document.querySelectorAll('.chat-checkbox').forEach(cb => cb.checked = false);

@@ -237,6 +237,15 @@ def chat_list(request):
         chats = chats.filter(message_count_db__gte=int(min_messages))
 
     chats = chats.order_by('-updated_at')
+    chats_all = chats
+
+    # Pagination for heavy history lists
+    page_obj = None
+    if status_filter == 'closed':
+        from django.core.paginator import Paginator
+        paginator = Paginator(chats, 50)
+        page_obj = paginator.get_page(request.GET.get('page') or 1)
+        chats = page_obj.object_list
 
     # Prefetch participants for collaboration display + mark which chats current user is in
     from tracker.chat.models import ChatParticipant
@@ -253,17 +262,21 @@ def chat_list(request):
 
     selected_chat = None
     if selected_room_id:
-        selected_chat = chats.filter(room_id=selected_room_id).first()
+        selected_chat = chats_all.filter(room_id=selected_room_id).first()
     if not selected_chat:
         selected_chat = chats.first()
 
     selected_messages = []
     selected_pageviews = []
     selected_previous_chats = []
+    selected_device_timeline = []
     if selected_chat:
         selected_messages = selected_chat.messages.order_by('timestamp')[:300]
         selected_pageviews = selected_chat.visitor.page_views.order_by('-timestamp')[:15]
         selected_previous_chats = selected_chat.visitor.chat_rooms.exclude(pk=selected_chat.pk).order_by('-created_at')[:10]
+        selected_device_timeline = selected_chat.visitor.page_views.order_by('-timestamp').values(
+            'timestamp', 'url', 'page_title'
+        )[:30]
 
     tab_counts = {
         'all': base_chats.count(),
@@ -297,9 +310,11 @@ def chat_list(request):
         'selected_messages': selected_messages,
         'selected_pageviews': selected_pageviews,
         'selected_previous_chats': selected_previous_chats,
+        'selected_device_timeline': selected_device_timeline,
         'tab_counts': tab_counts,
         'agent_options': agent_options,
         'base_query': base_query,
+        'page_obj': page_obj,
         'sla_cutoff': sla_cutoff,
         'sla_minutes': sla_minutes,
     })
@@ -824,31 +839,128 @@ def export_visitors_csv(request):
 
 @login_required
 def export_chats_csv(request):
-    """Export all chats as CSV."""
+    """Export currently filtered chats as CSV/PDF."""
     org = get_user_org(request.user)
+    status_filter = request.GET.get('status', 'all')
+    search_q = request.GET.get('q', '').strip()
+    tag_filter = request.GET.get('tag', '').strip()
+    priority_filter = request.GET.get('priority', 'all').strip()
     date_from = request.GET.get('from', '').strip()
     date_to = request.GET.get('to', '').strip()
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="chats_export.csv"'
+    agent_filter = request.GET.get('agent', 'all').strip()
+    rating_filter = request.GET.get('rating', 'all').strip()
+    unread_only = request.GET.get('unread', '').strip() == '1'
+    min_messages = request.GET.get('min_messages', '').strip()
+    visitor_name_filter = request.GET.get('visitor_name', '').strip()
+    visitor_email_filter = request.GET.get('visitor_email', '').strip()
+    export_format = (request.GET.get('format') or 'csv').strip().lower()
 
-    writer = csv.writer(response)
-    writer.writerow(['Room ID', 'Visitor', 'Email', 'Agent', 'Status', 'Subject', 'Rating', 'Tags', 'Messages', 'Created', 'Closed'])
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    chats_qs = ChatRoom.objects.filter(organization=org).select_related('agent').annotate(
+        unread_count=Count('messages', filter=Q(messages__sender_type='visitor', messages__is_read=False)),
+        message_count_db=Count('messages'),
+    )
+    if not is_owner:
+        chats_qs = chats_qs.filter(Q(agent=request.user) | Q(agent__isnull=True))
 
-    chats_qs = ChatRoom.objects.filter(organization=org).select_related('agent')
+    if status_filter != 'all':
+        chats_qs = chats_qs.filter(status=status_filter)
+    if search_q:
+        chats_qs = chats_qs.filter(
+            Q(visitor_name__icontains=search_q) |
+            Q(visitor_email__icontains=search_q) |
+            Q(subject__icontains=search_q) |
+            Q(room_id__icontains=search_q) |
+            Q(messages__content__icontains=search_q)
+        ).distinct()
+    if tag_filter:
+        chats_qs = chats_qs.filter(tags__icontains=tag_filter)
+    if priority_filter in {'low', 'medium', 'high'}:
+        chats_qs = chats_qs.filter(priority=priority_filter)
     if date_from:
         chats_qs = chats_qs.filter(created_at__date__gte=date_from)
     if date_to:
         chats_qs = chats_qs.filter(created_at__date__lte=date_to)
+    if unread_only:
+        chats_qs = chats_qs.filter(unread_count__gt=0)
+    if rating_filter == 'good':
+        chats_qs = chats_qs.filter(rating__gte=4)
+    elif rating_filter == 'bad':
+        chats_qs = chats_qs.filter(rating__lte=2)
+    elif rating_filter == 'rated':
+        chats_qs = chats_qs.filter(rating__isnull=False)
+    elif rating_filter == 'unrated':
+        chats_qs = chats_qs.filter(rating__isnull=True)
+    if visitor_name_filter:
+        chats_qs = chats_qs.filter(visitor_name__icontains=visitor_name_filter)
+    if visitor_email_filter:
+        chats_qs = chats_qs.filter(visitor_email__icontains=visitor_email_filter)
+    if agent_filter == 'unassigned':
+        chats_qs = chats_qs.filter(agent__isnull=True)
+    elif agent_filter.isdigit():
+        chats_qs = chats_qs.filter(agent_id=int(agent_filter))
+    if min_messages.isdigit():
+        chats_qs = chats_qs.filter(message_count_db__gte=int(min_messages))
+    chats_qs = chats_qs.order_by('-updated_at')
 
+    if export_format == 'pdf':
+        from io import BytesIO
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=20, rightMargin=20, topMargin=20, bottomMargin=20)
+        styles = getSampleStyleSheet()
+        elements = [
+            Paragraph("Chat History Export", styles['Heading2']),
+            Paragraph(f"Organization: {org.name if org else '-'}", styles['Normal']),
+            Paragraph(f"Rows: {chats_qs.count()}", styles['Normal']),
+            Spacer(1, 10),
+        ]
+        rows = [['Room', 'Visitor', 'Agent', 'Status', 'Priority', 'Msgs', 'Created', 'Closed']]
+        for c in chats_qs[:1000]:
+            rows.append([
+                c.room_id,
+                (c.visitor_name or '')[:24],
+                (c.agent.get_full_name() if c.agent else '-')[:20],
+                c.status,
+                c.priority,
+                str(c.message_count_db),
+                c.created_at.strftime('%Y-%m-%d %H:%M'),
+                c.closed_at.strftime('%Y-%m-%d %H:%M') if c.closed_at else '-',
+            ])
+        table = Table(rows, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ede9fe')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1e1b4b')),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#d4d4d8')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(table)
+        doc.build(elements)
+        pdf = buffer.getvalue()
+        buffer.close()
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="chats_export.pdf"'
+        return response
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="chats_export.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['Room ID', 'Visitor', 'Email', 'Agent', 'Status', 'Priority', 'Subject', 'Rating', 'Tags', 'Messages', 'Unread', 'Created', 'Closed'])
     for c in chats_qs:
         writer.writerow([
             c.room_id, c.visitor_name, c.visitor_email,
             c.agent.get_full_name() if c.agent else '-',
-            c.status, c.subject, c.rating or '-', c.tags,
-            c.message_count, c.created_at.strftime('%Y-%m-%d %H:%M'),
+            c.status, c.priority, c.subject, c.rating or '-', c.tags,
+            c.message_count_db, c.unread_count, c.created_at.strftime('%Y-%m-%d %H:%M'),
             c.closed_at.strftime('%Y-%m-%d %H:%M') if c.closed_at else '-',
         ])
-
     return response
 
 
@@ -983,6 +1095,14 @@ def website_settings_view(request):
     error = ''
 
     if request.method == 'POST':
+        old_state = {
+            'blocked_countries_enabled': org.blocked_countries_enabled,
+            'blocked_countries': org.blocked_countries,
+            'allowed_domains_enabled': org.allowed_domains_enabled,
+            'allowed_domains': org.allowed_domains,
+            'attack_mode_enabled': getattr(org, 'attack_mode_enabled', False),
+            'attack_mode_message': getattr(org, 'attack_mode_message', ''),
+        }
         site_name = request.POST.get('site_name', '').strip()
         welcome_message = request.POST.get('welcome_message', '').strip()
         offline_message = request.POST.get('offline_message', '').strip()
@@ -1039,7 +1159,23 @@ def website_settings_view(request):
             org.allowed_domains_enabled = request.POST.get('allowed_domains_enabled') == 'on'
             allowed_domains = request.POST.get('allowed_domains', '')
             org.allowed_domains = '\n'.join([x.strip().lower() for x in allowed_domains.replace(',', '\n').splitlines() if x.strip()])
+            org.attack_mode_enabled = request.POST.get('attack_mode_enabled') == 'on'
+            org.attack_mode_message = (
+                request.POST.get('attack_mode_message', '').strip()
+                or 'High traffic detected. Please try again in a minute.'
+            )
             org.save()
+            changed = []
+            for key, old_val in old_state.items():
+                new_val = getattr(org, key, None)
+                if (old_val or '') != (new_val or ''):
+                    changed.append(f"{key}: '{old_val}' -> '{new_val}'")
+            if changed:
+                _log_activity(
+                    org, request.user, 'settings.updated',
+                    'Website settings updated. ' + '; '.join(changed[:8]),
+                    target_type='organization', target_id=str(org.id),
+                )
             saved = True
 
     script_url = request.build_absolute_uri('/api/widget/script.js')
@@ -1642,6 +1778,8 @@ def chat_bulk_action(request):
         return JsonResponse({'error': 'No chats selected'}, status=400)
 
     rooms = ChatRoom.objects.filter(room_id__in=room_ids, organization=org)
+    selected_count = len(room_ids)
+    matched_count = rooms.count()
     count = 0
 
     if action == 'close':
@@ -1657,8 +1795,16 @@ def chat_bulk_action(request):
     elif action == 'high_priority':
         count = rooms.update(priority='high')
 
+    failed_count = max(selected_count - count, 0)
     _log_activity(org, request.user, f'bulk.{action}', f'Bulk {action} on {count} chats')
-    return JsonResponse({'status': 'ok', 'affected': count})
+    return JsonResponse({
+        'status': 'ok',
+        'action': action,
+        'selected': selected_count,
+        'matched': matched_count,
+        'affected': count,
+        'failed': failed_count,
+    })
 
 
 # ===== SAVED REPLIES =====
