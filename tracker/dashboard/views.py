@@ -289,10 +289,18 @@ def chat_room_view(request, room_id):
             _broadcast_system(f'{agent_name} joined the chat.')
         # Active chat + explicit Join click → collaborator
         elif room.status == 'active' and join_requested:
-            # Backfill primary if missing
-            if room.agent_id and not ChatParticipant.objects.filter(room=room, user_id=room.agent_id).exists():
-                ChatParticipant.objects.create(room=room, user_id=room.agent_id, is_primary=True)
-            ChatParticipant.objects.create(room=room, user=request.user, is_primary=False)
+            # Backfill primary if missing, but avoid duplicate inserts under concurrent requests.
+            if room.agent_id:
+                ChatParticipant.objects.get_or_create(
+                    room=room,
+                    user_id=room.agent_id,
+                    defaults={'is_primary': True},
+                )
+            ChatParticipant.objects.get_or_create(
+                room=room,
+                user=request.user,
+                defaults={'is_primary': False},
+            )
             _log_activity(org, request.user, 'agent.collab_joined', f'{agent_name} joined chat #{room.room_id} as collaborator', 'chat', room.room_id)
             _broadcast_system(f'{agent_name} joined as collaborator.')
 
@@ -1172,7 +1180,7 @@ h1{{font-size:18px;color:#1e1b4b;}} .meta{{color:#6b7280;font-size:12px;margin-b
     for msg in messages_list:
         t = msg.timestamp.strftime("%H:%M")
         html += f'<div class="msg {msg.sender_type}"><div class="sender">{msg.sender_name}</div>{msg.content}<div class="time">{t}</div></div>\n'
-    html += '<div style="text-align:center;margin-top:30px;color:#9ca3af;font-size:11px;">Exported from LiveTrack</div></body></html>'
+    html += '<div style="text-align:center;margin-top:30px;color:#9ca3af;font-size:11px;">Exported from LiveVisitorHub</div></body></html>'
 
     response = HttpResponse(html, content_type='text/html; charset=utf-8')
     response['Content-Disposition'] = f'attachment; filename="chat_{room.room_id}.html"'
@@ -2652,7 +2660,7 @@ def _send_scheduled_report(report, org):
     from django.core.mail import send_mail
     now = timezone.now()
     last_7 = now - timedelta(days=7)
-    lines = [f"LiveTrack Pro — {report.name}", f"Period: {last_7.strftime('%b %d')} - {now.strftime('%b %d, %Y')}", ""]
+    lines = [f"LiveVisitorHub — {report.name}", f"Period: {last_7.strftime('%b %d')} - {now.strftime('%b %d, %Y')}", ""]
 
     if report.include_visitors:
         total = Visitor.objects.filter(organization=org, first_visit__gte=last_7).count()
@@ -2670,11 +2678,11 @@ def _send_scheduled_report(report, org):
         completions = GoalCompletion.objects.filter(goal__organization=org, completed_at__gte=last_7).count()
         lines += [f"GOAL COMPLETIONS: {completions}"]
 
-    lines += ["", f"View full analytics: /dashboard/advanced-analytics/", "", "— LiveTrack Pro"]
+    lines += ["", f"View full analytics: /dashboard/advanced-analytics/", "", "— LiveVisitorHub"]
 
     try:
         send_mail(
-            f"[LiveTrack] {report.name} - {now.strftime('%b %d')}",
+            f"[LiveVisitorHub] {report.name} - {now.strftime('%b %d')}",
             '\n'.join(lines), 'noreply@livetrack.app', [report.email],
             fail_silently=True,
         )
@@ -3161,7 +3169,7 @@ def create_checkout_session(request):
         'pro': {'month': 1900, 'year': 19000},       # $19/mo or $190/yr (save $38)
         'enterprise': {'month': 7900, 'year': 79000}, # $79/mo or $790/yr (save $158)
     }
-    PLAN_NAMES = {'pro': 'LiveTrack Pro', 'enterprise': 'LiveTrack Enterprise'}
+    PLAN_NAMES = {'pro': 'LiveVisitorHub', 'enterprise': 'LiveVisitorHub Enterprise'}
 
     if plan not in PRICES:
         return JsonResponse({'error': 'Invalid plan'}, status=400)
@@ -3683,3 +3691,4 @@ def super_admin_view(request):
         'total_messages': total_messages,
         'total_offline': total_offline,
     })
+

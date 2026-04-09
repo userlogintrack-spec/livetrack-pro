@@ -5,7 +5,7 @@ PUBLIC_PAGES = [
     {
         'title': 'Compare',
         'url': '/compare/',
-        'summary': 'Compare LiveTrack Pro with Google Analytics, Microsoft Clarity, Intercom, Hotjar, Tawk.to and more.',
+        'summary': 'Compare LiveVisitorHub with Google Analytics, Microsoft Clarity, Intercom, Hotjar, Tawk.to and more.',
         'keywords': 'compare comparison vs alternative google analytics clarity intercom hotjar tawk',
     },
     {
@@ -17,7 +17,7 @@ PUBLIC_PAGES = [
     {
         'title': 'About Us',
         'url': '/about/',
-        'summary': 'Our story, mission, numbers, and team behind LiveTrack Pro.',
+        'summary': 'Our story, mission, numbers, and team behind LiveVisitorHub.',
         'keywords': 'about company mission story team',
     },
     {
@@ -91,3 +91,4 @@ def features(request):
 
 def compare(request):
     return render(request, 'pages/compare.html')
+

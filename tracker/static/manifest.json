@@ -1,6 +1,6 @@
 {
-    "name": "LiveTrack Pro",
-    "short_name": "LiveTrack",
+    "name": "LiveVisitorHub",
+    "short_name": "LiveVisitorHub",
     "description": "Real-time visitor tracking & live chat platform",
     "start_url": "/dashboard/",
     "display": "standalone",
@@ -37,3 +37,4 @@
         }
     ]
 }
+

@@ -1,4 +1,4 @@
-// LiveTrack Pro - Service Worker for PWA
+// LiveVisitorHub - Service Worker for PWA
 const CACHE_NAME = 'livetrack-v1';
 const OFFLINE_URL = '/dashboard/';
 
@@ -83,10 +83,10 @@ self.addEventListener('fetch', function(event) {
 // Push notifications for new chats
 self.addEventListener('push', function(event) {
     var data = {};
-    try { data = event.data.json(); } catch(e) { data = {title: 'LiveTrack', body: event.data ? event.data.text() : 'New notification'}; }
+    try { data = event.data.json(); } catch(e) { data = {title: 'LiveVisitorHub', body: event.data ? event.data.text() : 'New notification'}; }
 
     event.waitUntil(
-        self.registration.showNotification(data.title || 'LiveTrack Pro', {
+        self.registration.showNotification(data.title || 'LiveVisitorHub', {
             body: data.body || 'You have a new notification',
             icon: '/static/images/icon-192.png',
             badge: '/static/images/icon-192.png',
@@ -113,3 +113,4 @@ self.addEventListener('notificationclick', function(event) {
         })
     );
 });
+

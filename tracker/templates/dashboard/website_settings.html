@@ -50,7 +50,7 @@
                     </div>
                     <div class="form-group">
                         <label>Widget Title</label>
-                        <input class="form-control" type="text" name="widget_title" value="{{ org.widget_title }}" placeholder="LiveTrack Support">
+                        <input class="form-control" type="text" name="widget_title" value="{{ org.widget_title }}" placeholder="LiveVisitorHub Support">
                     </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
@@ -294,7 +294,7 @@ document.getElementById('colorText').addEventListener('input', function() {
 
 // Widget title
 document.querySelector('[name="widget_title"]').addEventListener('input', function() {
-    document.getElementById('previewTitle').textContent = this.value || 'LiveTrack Support';
+    document.getElementById('previewTitle').textContent = this.value || 'LiveVisitorHub Support';
 });
 
 // Welcome message
@@ -361,3 +361,4 @@ document.querySelector('[name="require_email"]').addEventListener('change', func
 });
 </script>
 {% endblock %}
+

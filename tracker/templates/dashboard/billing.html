@@ -615,7 +615,7 @@ function generateLocalInvoice(paymentId) {
     var amount = cells[3] ? cells[3].textContent.trim() : '';
 
     var w = window.open('', '_blank');
-    w.document.write('<html><head><title>Invoice — LiveTrack Pro</title><style>');
+    w.document.write('<html><head><title>Invoice — LiveVisitorHub</title><style>');
     w.document.write('body{font-family:Inter,Arial,sans-serif;max-width:600px;margin:40px auto;padding:20px;color:#1e1b4b;}');
     w.document.write('h1{font-size:24px;margin-bottom:4px;} .meta{color:#6b7280;font-size:13px;margin-bottom:30px;}');
     w.document.write('table{width:100%;border-collapse:collapse;margin:20px 0;} th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #e5e2ff;}');
@@ -625,7 +625,7 @@ function generateLocalInvoice(paymentId) {
     w.document.write('@media print{body{margin:0;} button{display:none !important;}}');
     w.document.write('</style></head><body>');
     w.document.write('<div style="display:flex;justify-content:space-between;align-items:start;">');
-    w.document.write('<div><h1>Invoice</h1><div class="meta">LiveTrack Pro</div></div>');
+    w.document.write('<div><h1>Invoice</h1><div class="meta">LiveVisitorHub</div></div>');
     w.document.write('<div style="text-align:right;"><span class="badge">PAID</span><div style="font-size:12px;color:#6b7280;margin-top:6px;">' + date + '</div></div></div>');
     w.document.write('<table><tr><th>Description</th><th>Plan</th><th style="text-align:right;">Amount</th></tr>');
     w.document.write('<tr><td>' + desc + '</td><td>' + plan + '</td><td style="text-align:right;font-weight:700;">' + amount + '</td></tr>');
@@ -639,7 +639,7 @@ function generateLocalInvoice(paymentId) {
     w.document.write('<strong>Email:</strong> {{ request.user.email }}<br>');
     w.document.write('<strong>Plan:</strong> ' + plan + '</div>');
     w.document.write('<div style="margin-top:20px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">Print / Save as PDF</button></div>');
-    w.document.write('<div class="footer">LiveTrack Pro &middot; Invoice generated automatically &middot; Questions? Contact support</div>');
+    w.document.write('<div class="footer">LiveVisitorHub &middot; Invoice generated automatically &middot; Questions? Contact support</div>');
     w.document.write('</body></html>');
     w.document.close();
 }
@@ -655,3 +655,4 @@ setTimeout(function() { upgradePlan('{{ upgrade_plan }}'); }, 500);
 {% endif %}
 </script>
 {% endblock %}
+

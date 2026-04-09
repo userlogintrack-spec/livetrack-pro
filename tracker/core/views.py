@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 import uuid
 from datetime import timedelta
@@ -83,8 +83,8 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
     """Centralised dedup: returns the canonical Visitor row for this device.
 
     Match priority (within last 24h):
-        1. existing row with same session_key + org → exact match
-        2. existing row with same ip + user_agent + org → adopt session_key
+        1. existing row with same session_key + org ? exact match
+        2. existing row with same ip + user_agent + org ? adopt session_key
         3. brand new row with the given session_key
 
     This prevents duplicate visitor rows when the parent script and iframe race
@@ -122,16 +122,16 @@ def _resolve_room_actor(request, room):
     """Determine who is acting on a chat room (agent / collaborator / visitor).
 
     For agents: primary agent OR any ChatParticipant on the room can act (collaboration).
-    For visitors: session_key must match room.visitor — accepts session_key from
+    For visitors: session_key must match room.visitor � accepts session_key from
     cookie, POST body, form data, or query string (for cross-origin iframes where
     third-party cookies are blocked).
     """
     if request.user.is_authenticated:
-        # Primary agent or superuser → always allowed
+        # Primary agent or superuser ? always allowed
         if not room.agent_id or room.agent_id == request.user.id or request.user.is_superuser:
             sender_name = request.user.get_full_name() or request.user.username
             return {'sender_type': 'agent', 'sender_name': sender_name}
-        # Collaborator (any joined participant) → allowed
+        # Collaborator (any joined participant) ? allowed
         from tracker.chat.models import ChatParticipant
         if ChatParticipant.objects.filter(room=room, user=request.user).exists():
             sender_name = request.user.get_full_name() or request.user.username
@@ -432,7 +432,7 @@ def widget_script(request):
     <script src="https://your-domain/api/widget/script.js?key=YOUR_KEY"></script>
     """
     base_url = request.build_absolute_uri('/').rstrip('/')
-    # Force HTTPS for any deployment whose host is NOT localhost — prevents mixed-content
+    # Force HTTPS for any deployment whose host is NOT localhost � prevents mixed-content
     # blocks when the customer's site is on HTTPS but our absolute URL ended up http://
     # (happens behind some proxies even with SECURE_PROXY_SSL_HEADER set).
     host = request.get_host().split(':')[0]
@@ -444,7 +444,7 @@ def widget_script(request):
     from tracker.core.models import Organization
     org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else None
     widget_color = org.widget_color if org else '#7c3aed'
-    widget_title = org.widget_title if org else 'LiveTrack Support'
+    widget_title = org.widget_title if org else 'LiveVisitorHub Support'
     widget_position = org.widget_position if org else 'bottom-right'
     pos_css = 'left:24px' if widget_position == 'bottom-left' else 'right:24px'
     panel_pos_css = 'left:24px' if widget_position == 'bottom-left' else 'right:24px'
@@ -510,7 +510,7 @@ def widget_script(request):
 
   var btn = document.createElement("button");
   btn.className = "ltw-btn";
-  btn.innerHTML = "💬";
+  btn.innerHTML = "??";
 
   var frame = document.createElement("iframe");
   frame.className = "ltw-frame";
@@ -525,14 +525,14 @@ def widget_script(request):
   function closePanel() {
     isOpen = false;
     frame.style.display = "none";
-    btn.innerHTML = "💬";
+    btn.innerHTML = "??";
     btn.style.fontSize = "22px";
   }
 
   btn.onclick = function() {
     isOpen = !isOpen;
     frame.style.display = isOpen ? "block" : "none";
-    btn.innerHTML = isOpen ? "✕" : "💬";
+    btn.innerHTML = isOpen ? "?" : "??";
     btn.style.fontSize = isOpen ? "18px" : "22px";
   };
 
@@ -546,7 +546,7 @@ def widget_script(request):
       if (d.type === "ltw-open") {
         isOpen = true;
         frame.style.display = "block";
-        btn.innerHTML = "✕";
+        btn.innerHTML = "?";
         btn.style.fontSize = "18px";
         return;
       }
@@ -609,7 +609,7 @@ def widget_start_chat(request):
         if data is None:
             return JsonResponse({'error': 'Invalid JSON body'}, status=400)
 
-        # Get session — prefer cookie, fallback to session_key in body (cross-origin widget)
+        # Get session � prefer cookie, fallback to session_key in body (cross-origin widget)
         if not request.session.session_key:
             request.session.create()
         session_key = request.session.session_key
@@ -644,10 +644,10 @@ def widget_start_chat(request):
         if visitor.is_banned:
             return JsonResponse({'error': 'Chat disabled for this visitor. Please contact support.'}, status=403)
 
-        # Sweep very old abandoned chats only (24h+) — never close active visitor sessions early.
+        # Sweep very old abandoned chats only (24h+) � never close active visitor sessions early.
         close_stale_chats(inactive_minutes=24 * 60)
 
-        # Reuse existing open chat for the same visitor — visitor stays in the SAME room
+        # Reuse existing open chat for the same visitor � visitor stays in the SAME room
         # until they explicitly end it. No auto-close on the visitor's side.
         open_room = (
             ChatRoom.objects
@@ -965,7 +965,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 
 @xframe_options_exempt
 def widget_embed_page(request):
-    """Standalone widget page — loaded inside iframe on external sites."""
+    """Standalone widget page � loaded inside iframe on external sites."""
     widget_key = request.GET.get('key', '')
     from tracker.core.models import Organization
     org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else Organization.objects.first()
@@ -984,11 +984,11 @@ def widget_embed_page(request):
 </style></head>
 <body>
   <div class='box'>
-    <div class='icon'>⚠️</div>
+    <div class='icon'>??</div>
     <h2>Widget not configured</h2>
     <p>The widget key in your embed script does not match any organization on this server.</p>
     <p>Provided key:<br><code>{widget_key[:64]}</code></p>
-    <p style='font-size:11px;margin-top:14px'>Log in to your dashboard → <b>Settings → Widget</b> to copy the correct key.</p>
+    <p style='font-size:11px;margin-top:14px'>Log in to your dashboard ? <b>Settings ? Widget</b> to copy the correct key.</p>
   </div>
 </body></html>"""
         from django.http import HttpResponse
@@ -1030,3 +1030,4 @@ def home_redirect(request):
     if request.user.is_authenticated:
         return redirect('dashboard:home')
     return redirect('core:login')
+

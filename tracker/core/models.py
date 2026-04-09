@@ -12,7 +12,7 @@ class Organization(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Widget customization
-    widget_title = models.CharField(max_length=100, default='LiveTrack Support')
+    widget_title = models.CharField(max_length=100, default='LiveVisitorHub Support')
     widget_color = models.CharField(max_length=7, default='#7c3aed')
     widget_position = models.CharField(max_length=20, default='bottom-right',
         choices=[('bottom-right', 'Bottom Right'), ('bottom-left', 'Bottom Left')])
@@ -238,3 +238,4 @@ class WebsiteSettings(models.Model):
 
     def __str__(self):
         return self.site_name
+
