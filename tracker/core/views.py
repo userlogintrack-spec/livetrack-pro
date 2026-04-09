@@ -33,15 +33,15 @@ ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}
 ALLOWED_MIME_TYPES = {
     'application/pdf',
     'application/msword',
-    'application/vnd.openxmlformatsofficedocument.wordprocessingml.document',
-    'application/vnd.msexcel',
-    'application/vnd.openxmlformatsofficedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'text/plain',
     'text/csv',
     'application/zip',
-    'application/xzipcompressed',
-    'application/xrarcompressed',
-    'application/octetstream',
+    'application/x-zip-compressed',
+    'application/x-rar-compressed',
+    'application/octet-stream',
     'image/jpeg',
     'image/png',
     'image/gif',
@@ -91,7 +91,7 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
     each other to create sessions before localStorage syncs.
     """
     from tracker.visitors.models import Visitor
-    cutoff = timezone.now()  timedelta(hours=24)
+    cutoff = timezone.now() - timedelta(hours=24)
 
     # 1. Exact session match
     if session_key:
@@ -103,7 +103,7 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
     if ip and ua and ip not in ('127.0.0.1', '0.0.0.0', '::1'):
         v = (Visitor.objects
              .filter(organization=org, ip_address=ip, user_agent=ua, last_seen__gte=cutoff)
-             .order_by('last_seen').first())
+             .order_by('-last_seen').first())
         if v:
             if session_key and v.session_key != session_key:
                 v.session_key = session_key
@@ -123,8 +123,8 @@ def _resolve_room_actor(request, room):
 
     For agents: primary agent OR any ChatParticipant on the room can act (collaboration).
     For visitors: session_key must match room.visitor accepts session_key from
-    cookie, POST body, form data, or query string (for crossorigin iframes where
-    thirdparty cookies are blocked).
+    cookie, POST body, form data, or query string (for cross-origin iframes where
+    third-party cookies are blocked).
     """
     if request.user.is_authenticated:
         # Primary agent or superuser ? always allowed
@@ -138,7 +138,7 @@ def _resolve_room_actor(request, room):
             return {'sender_type': 'agent', 'sender_name': sender_name}
         return None
 
-    # Visitor: try multiple sources for session_key (cookie may be blocked crossorigin)
+    # Visitor: try multiple sources for session_key (cookie may be blocked cross-origin)
     session_key = request.session.session_key or ''
     if not session_key:
         # Body JSON
@@ -248,7 +248,7 @@ def register_view(request):
         slug = slugify(org_name)[:90]
         # Ensure unique slug
         if Organization.objects.filter(slug=slug).exists():
-            slug = f"{slug}{_uuid.uuid4().hex[:6]}"
+            slug = f"{slug}-{_uuid.uuid4().hex[:6]}"
         org = Organization.objects.create(
             name=org_name,
             slug=slug,
@@ -291,7 +291,7 @@ def _get_org_from_request(request):
 
 @csrf_exempt
 def widget_init(request):
-    """Initialize chat widget  creates visitor session and returns config."""
+    """Initialize chat widget - creates visitor session and returns config."""
     if request.method == 'POST':
         if not request.session.session_key:
             request.session.create()
@@ -379,7 +379,7 @@ def widget_track_pageview(request):
         is_bounced=page_count <= 1,
     )
 
-    # Mark previous pageview as notexit
+    # Mark previous pageview as not-exit
     PageView.objects.filter(visitor=visitor, is_exit=True).update(is_exit=False)
 
     PageView.objects.create(
@@ -390,7 +390,7 @@ def widget_track_pageview(request):
         is_exit=True,
     )
 
-    # Realtime broadcast to dashboard (throttled)
+    # Real-time broadcast to dashboard (throttled)
     cache_key = f'ws_broadcast_{visitor.id}'
     if visitor.organization_id and not cache.get(cache_key):
         cache.set(cache_key, True, 2)
@@ -429,10 +429,10 @@ def widget_script(request):
     """
     Public embeddable widget script.
     Usage:
-    <script src="https://yourdomain/api/widget/script.js?key=YOUR_KEY"></script>
+    <script src="https://your-domain/api/widget/script.js?key=YOUR_KEY"></script>
     """
     base_url = request.build_absolute_uri('/').rstrip('/')
-    # Force HTTPS for any deployment whose host is NOT localhost  prevents mixedcontent
+    # Force HTTPS for any deployment whose host is NOT localhost prevents mixed-content
     # blocks when the customer's site is on HTTPS but our absolute URL ended up http://
     # (happens behind some proxies even with SECURE_PROXY_SSL_HEADER set).
     host = request.get_host().split(':')[0]
@@ -445,9 +445,9 @@ def widget_script(request):
     org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else None
     widget_color = org.widget_color if org else '#7c3aed'
     widget_title = org.widget_title if org else 'LiveVisitorHub Support'
-    widget_position = org.widget_position if org else 'bottomright'
-    pos_css = 'left:24px' if widget_position == 'bottomleft' else 'right:24px'
-    panel_pos_css = 'left:24px' if widget_position == 'bottomleft' else 'right:24px'
+    widget_position = org.widget_position if org else 'bottom-right'
+    pos_css = 'left:24px' if widget_position == 'bottom-left' else 'right:24px'
+    panel_pos_css = 'left:24px' if widget_position == 'bottom-left' else 'right:24px'
 
     js = r"""
 (function() {
@@ -458,7 +458,7 @@ def widget_script(request):
   var WC = "__WIDGET_COLOR__";
   var isOpen = false;
 
-  // ===== Visitor session persistence (crosspage) =====
+  // ===== Visitor session persistence (cross-page) =====
   var SK_KEY = "ltw_session_key_" + WIDGET_KEY;
   function getSessionKey() {
     try { return localStorage.getItem(SK_KEY) || ""; } catch(e) { return ""; }
@@ -483,7 +483,7 @@ def widget_script(request):
     try {
       fetch(BASE + "/api/widget/track/", {
         method: "POST",
-        headers: {"ContentType": "application/json"},
+        headers: {"Content-Type": "application/json"},
         credentials: "include",
         body: JSON.stringify(payload),
         keepalive: true
@@ -505,19 +505,19 @@ def widget_script(request):
   window.addEventListener("hashchange", function(){ setTimeout(trackPageView, 0); });
 
   var style = document.createElement("style");
-  style.textContent = ".ltwbtn{position:fixed;__POS_CSS__;bottom:24px;zindex:999999;width:58px;height:58px;borderradius:50%;border:0;cursor:pointer;color:#fff;fontsize:22px;background:"+WC+";boxshadow:0 8px 24px rgba(0,0,0,.2);transition:all .3s;display:flex;alignitems:center;justifycontent:center;}.ltwbtn:hover{transform:scale(1.08);boxshadow:0 12px 32px rgba(0,0,0,.3)}.ltwframe{position:fixed;__PANEL_POS_CSS__;bottom:94px;zindex:999999;width:min(400px,calc(100vw  24px));height:min(600px,calc(100vh  120px));border:none;borderradius:20px;boxshadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(maxwidth:480px){.ltwbtn{width:48px;height:48px;fontsize:18px;bottom:16px}.ltwframe{bottom:72px;width:calc(100vw  16px);height:calc(100vh  88px);borderradius:16px}}";
+  style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:all .3s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}";
   document.head.appendChild(style);
 
   var btn = document.createElement("button");
-  btn.className = "ltwbtn";
+  btn.className = "ltw-btn";
   btn.innerHTML = "??";
 
   var frame = document.createElement("iframe");
-  frame.className = "ltwframe";
+  frame.className = "ltw-frame";
   // Pass current session_key into iframe so chat & tracking share the same visitor
   var _sk = encodeURIComponent(getSessionKey() || "");
   frame.src = BASE + "/api/widget/embed/?key=" + WIDGET_KEY + (_sk ? "&sk=" + _sk : "");
-  frame.allow = "microphone;camera;displaycapture";
+  frame.allow = "microphone;camera;display-capture";
 
   document.body.appendChild(btn);
   document.body.appendChild(frame);
@@ -539,11 +539,11 @@ def widget_script(request):
   // Listen for messages from the iframe (close button, session sync)
   window.addEventListener("message", function(ev) {
     var d = ev.data;
-    if (d === "ltwclose") { closePanel(); return; }
+    if (d === "ltw-close") { closePanel(); return; }
     if (d && typeof d === "object") {
-      if (d.type === "ltwclose") { closePanel(); return; }
-      if (d.type === "ltwsession" && d.sessionKey) { setSessionKey(d.sessionKey); return; }
-      if (d.type === "ltwopen") {
+      if (d.type === "ltw-close") { closePanel(); return; }
+      if (d.type === "ltw-session" && d.sessionKey) { setSessionKey(d.sessionKey); return; }
+      if (d.type === "ltw-open") {
         isOpen = true;
         frame.style.display = "block";
         btn.innerHTML = "?";
@@ -557,10 +557,10 @@ def widget_script(request):
   if ("__PROACTIVE__" === "true") {
     setTimeout(function() {
       if (!isOpen) {
-        btn.style.animation = "ltwpulse 1.5s ease infinite";
+        btn.style.animation = "ltw-pulse 1.5s ease infinite";
         var notif = document.createElement("div");
-        notif.style.cssText = "position:fixed;__PANEL_POS_CSS__;bottom:90px;zindex:999999;background:#fff;border:1px solid #e5e7eb;borderradius:12px;padding:12px 16px;boxshadow:0 8px 24px rgba(0,0,0,0.12);fontfamily:Inter,Arial,sansserif;maxwidth:260px;cursor:pointer;";
-        notif.innerHTML = '<div style="fontsize:13px;fontweight:600;color:#1f2937;">__PROACTIVE_MSG__</div><div style="fontsize:11px;color:#9ca3af;margintop:4px;">Click to chat with us</div>';
+        notif.style.cssText = "position:fixed;__PANEL_POS_CSS__;bottom:90px;z-index:999999;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.12);font-family:Inter,Arial,sans-serif;max-width:260px;cursor:pointer;";
+        notif.innerHTML = '<div style="font-size:13px;font-weight:600;color:#1f2937;">__PROACTIVE_MSG__</div><div style="font-size:11px;color:#9ca3af;margin-top:4px;">Click to chat with us</div>';
         notif.onclick = function() { notif.remove(); btn.click(); };
         document.body.appendChild(notif);
         setTimeout(function() { if (notif.parentNode) notif.remove(); }, 10000);
@@ -583,11 +583,11 @@ def widget_script(request):
     js = js.replace("__PROACTIVE__", proactive_enabled)
     js = js.replace("__PROACTIVE_MSG__", proactive_msg.replace('"', '\\"'))
     js = js.replace("__PROACTIVE_DELAY__", proactive_delay)
-    return HttpResponse(js, content_type='application/javascript; charset=utf8')
+    return HttpResponse(js, content_type='application/javascript; charset=utf-8')
 
 
 def _get_time_greeting(name):
-    """Generate timebased greeting."""
+    """Generate time-based greeting."""
     hour = timezone.now().hour
     if hour < 12:
         greeting = 'Good morning'
@@ -609,12 +609,12 @@ def widget_start_chat(request):
         if data is None:
             return JsonResponse({'error': 'Invalid JSON body'}, status=400)
 
-        # Get session  prefer cookie, fallback to session_key in body (crossorigin widget)
+        # Get session  prefer cookie, fallback to session_key in body (cross-origin widget)
         if not request.session.session_key:
             request.session.create()
         session_key = request.session.session_key
 
-        # Crossorigin fallback: widget passes session_key from init response
+        # Cross-origin fallback: widget passes session_key from init response
         body_session = data.get('session_key', '')
         if body_session:
             session_key = body_session
@@ -648,12 +648,12 @@ def widget_start_chat(request):
         close_stale_chats(inactive_minutes=24 * 60)
 
         # Reuse existing open chat for the same visitor  visitor stays in the SAME room
-        # until they explicitly end it. No autoclose on the visitor's side.
+        # until they explicitly end it. No auto-close on the visitor's side.
         open_room = (
             ChatRoom.objects
             .filter(visitor=visitor, status__in=['waiting', 'active'])
             .annotate(last_message_at=Max('messages__timestamp'))
-            .order_by('updated_at')
+            .order_by('-updated_at')
             .first()
         )
         if open_room:
@@ -677,7 +677,7 @@ def widget_start_chat(request):
                 'session_key': session_key,
             })
 
-        # If restore_only mode, don't create new chat  just return no existing chat
+        # If restore_only mode, don't create new chat - just return no existing chat
         if data.get('restore_only'):
             return JsonResponse({'reused': False, 'messages': [], 'session_key': session_key})
 
@@ -721,8 +721,8 @@ def widget_start_chat(request):
             try:
                 from django.core.mail import send_mail
                 send_mail(
-                    f'New chat from {visitor_name}  {org.name}',
-                    f'New chat started by {visitor_name}.\nSubject: {data.get("subject", "")}\nRoom: {room_id}\n\nLogin to respond: {request.build_absolute_uri("/dashboard/")}',
+                    f'New chat from {visitor_name} - {org.name}',
+                    f'New chat started by {visitor_name}.\nSubject: {data.get("subject", "-")}\nRoom: {room_id}\n\nLogin to respond: {request.build_absolute_uri("/dashboard/")}',
                     'noreply@livetrack.app',
                     [org.notify_email],
                     fail_silently=True,
@@ -742,7 +742,7 @@ def widget_start_chat(request):
                 timestamp=now + timedelta(seconds=1),
             )
 
-        # Notify dashboard clients to refresh badge counts in realtime
+        # Notify dashboard clients to refresh badge counts in real-time
         channel_layer = get_channel_layer()
         dashboard_group = f'dashboard_updates_{org.id}' if org else 'dashboard_updates'
         async_to_sync(channel_layer.group_send)(
@@ -820,7 +820,7 @@ def chat_file_upload(request, room_id):
         return JsonResponse({'error': 'File too large (max 10MB)'}, status=400)
 
     original_name = uploaded_file.name
-    ext = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
+    ext = original_name.rsplit('.', 1)[-1].lower() if '.' in original_name else ''
     mime_type = (uploaded_file.content_type or '').lower()
 
     if ext not in ALLOWED_FILE_EXTENSIONS and ext not in ALLOWED_IMAGE_EXTENSIONS:
@@ -871,12 +871,12 @@ def widget_chat_transcript(request, room_id):
         return HttpResponse('Forbidden', status=403)
 
     lines = [
-        f'Chat Transcript  {room.visitor_name or "Visitor"}',
+        f'Chat Transcript - {room.visitor_name or "Visitor"}',
         f'Room: {room.room_id}',
-        f'Date: {room.created_at.strftime("%Y%m%d %H:%M")}',
+        f'Date: {room.created_at.strftime("%Y-%m-%d %H:%M")}',
         f'Agent: {room.agent.get_full_name() if room.agent else "Unassigned"}',
         f'Status: {room.status}',
-        '' * 50,
+        '-' * 50,
         '',
     ]
     for msg in room.messages.order_by('timestamp'):
@@ -885,8 +885,8 @@ def widget_chat_transcript(request, room_id):
         if msg.file:
             lines.append(f'  [File: {msg.file_name}]')
 
-    response = HttpResponse('\n'.join(lines), content_type='text/plain; charset=utf8')
-    response['ContentDisposition'] = f'attachment; filename="transcript_{room.room_id}.txt"'
+    response = HttpResponse('\n'.join(lines), content_type='text/plain; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="transcript_{room.room_id}.txt"'
     return response
 
 
@@ -973,14 +973,14 @@ def widget_embed_page(request):
     # Show a clear setup error when the key is invalid (instead of a blank panel).
     if widget_key and not org:
         html = f"""<!DOCTYPE html>
-<html><head><meta charset='UTF8'><title>Widget setup needed</title>
+<html><head><meta charset='UTF-8'><title>Widget setup needed</title>
 <style>
-  body{{margin:0;fontfamily:applesystem,Inter,Arial,sansserif;background:#fff;color:#1f2937;height:100vh;display:flex;alignitems:center;justifycontent:center;padding:24px;textalign:center;}}
-  .box{{maxwidth:320px}}
-  h2{{fontsize:16px;margin:0 0 8px;color:#dc2626}}
-  p{{fontsize:13px;lineheight:1.5;color:#6b7280;margin:0 0 12px}}
-  code{{background:#f3f4f6;padding:2px 6px;borderradius:4px;fontsize:11px;wordbreak:breakall}}
-  .icon{{fontsize:36px;marginbottom:8px}}
+  body{{margin:0;font-family:-apple-system,Inter,Arial,sans-serif;background:#fff;color:#1f2937;height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;}}
+  .box{{max-width:320px}}
+  h2{{font-size:16px;margin:0 0 8px;color:#dc2626}}
+  p{{font-size:13px;line-height:1.5;color:#6b7280;margin:0 0 12px}}
+  code{{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:11px;word-break:break-all}}
+  .icon{{font-size:36px;margin-bottom:8px}}
 </style></head>
 <body>
   <div class='box'>
@@ -988,13 +988,13 @@ def widget_embed_page(request):
     <h2>Widget not configured</h2>
     <p>The widget key in your embed script does not match any organization on this server.</p>
     <p>Provided key:<br><code>{widget_key[:64]}</code></p>
-    <p style='fontsize:11px;margintop:14px'>Log in to your dashboard ? <b>Settings ? Widget</b> to copy the correct key.</p>
+    <p style='font-size:11px;margin-top:14px'>Log in to your dashboard ? <b>Settings ? Widget</b> to copy the correct key.</p>
   </div>
 </body></html>"""
         from django.http import HttpResponse
-        return HttpResponse(html, content_type='text/html; charset=utf8')
+        return HttpResponse(html, content_type='text/html; charset=utf-8')
 
-    # Prefer session_key passed by parent script (for crossorigin where cookies are blocked).
+    # Prefer session_key passed by parent script (for cross-origin where cookies are blocked).
     # Fall back to Django session cookie, then create one as a last resort.
     parent_sk = (request.GET.get('sk') or '').strip()[:64]
     if parent_sk:
