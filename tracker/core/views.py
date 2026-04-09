@@ -83,7 +83,7 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
     """Centralised dedup: returns the canonical Visitor row for this device.
 
     Match priority (within last 24h):
-        1. existing row with same session_key + org ? exact match
+        1. existing row with  session_key + org ? exact match
         2. existing row with same ip + user_agent + org ? adopt session_key
         3. brand new row with the given session_key
 
