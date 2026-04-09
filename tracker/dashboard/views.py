@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
-from django.db.models import Count, Q, Avg, Sum, F, Max
+from django.db.models import Count, Q, Avg, Sum, F, Max, Subquery, OuterRef
 from django.views.decorators.csrf import csrf_exempt
 from datetime import timedelta
 import json
@@ -341,10 +341,34 @@ def visitor_list(request):
     search_q = request.GET.get('q', '').strip()
     date_from = request.GET.get('from', '').strip()
     date_to = request.GET.get('to', '').strip()
+    group_by = request.GET.get('group_by', 'activity').strip().lower()
+
+    group_options = [
+        ('activity', 'Activity'),
+        ('ip', 'IP Address'),
+        ('page_title', 'Page title'),
+        ('page_url', 'Page URL'),
+        ('country', 'Country'),
+        ('serving_agent', 'Serving agent'),
+        ('department', 'Department'),
+        ('browser', 'Browser'),
+        ('search_engine', 'Search engine'),
+        ('search_term', 'Search term'),
+    ]
+    allowed_group_by = {key for key, _ in group_options}
+    if group_by not in allowed_group_by:
+        group_by = 'activity'
+
+    latest_pageviews = PageView.objects.filter(visitor_id=OuterRef('pk')).order_by('-timestamp')
+    latest_chats = ChatRoom.objects.filter(visitor_id=OuterRef('pk')).order_by('-created_at')
 
     visitors = Visitor.objects.filter(organization=org).annotate(
         page_count=Count('page_views'),
         chat_count=Count('chat_rooms'),
+        latest_page_title=Subquery(latest_pageviews.values('page_title')[:1]),
+        latest_page_url=Subquery(latest_pageviews.values('url')[:1]),
+        latest_agent_id=Subquery(latest_chats.values('agent_id')[:1]),
+        latest_agent_username=Subquery(latest_chats.values('agent__username')[:1]),
     )
 
     if filter_type == 'online':
@@ -365,13 +389,70 @@ def visitor_list(request):
     if date_to:
         visitors = visitors.filter(first_visit__date__lte=date_to)
 
+    visitors = visitors.order_by('-last_seen')[:200]
+    visitor_list_data = list(visitors)
+
+    # Map latest serving agent -> first department name for grouping.
+    latest_agent_user_ids = {
+        v.latest_agent_id for v in visitor_list_data if getattr(v, 'latest_agent_id', None)
+    }
+    user_to_profile = dict(
+        AgentProfile.objects.filter(user_id__in=latest_agent_user_ids)
+        .values_list('user_id', 'id')
+    ) if latest_agent_user_ids else {}
+
+    profile_to_department = {}
+    profile_ids = list(user_to_profile.values())
+    if profile_ids:
+        for member in (
+            DepartmentMember.objects.filter(agent_id__in=profile_ids)
+            .select_related('department')
+            .order_by('joined_at')
+        ):
+            if member.agent_id not in profile_to_department:
+                profile_to_department[member.agent_id] = member.department.name
+
+    for v in visitor_list_data:
+        if group_by == 'ip':
+            v.group_value = v.ip_address or 'Unknown IP'
+        elif group_by == 'activity':
+            v.group_value = 'Online' if v.last_seen >= last_30_min else 'Inactive'
+        elif group_by == 'page_title':
+            v.group_value = (v.latest_page_title or '').strip() or 'Unknown page title'
+        elif group_by == 'page_url':
+            v.group_value = (v.latest_page_url or '').strip() or 'Unknown page URL'
+        elif group_by == 'country':
+            v.group_value = (v.country or '').strip() or 'Unknown country'
+        elif group_by == 'serving_agent':
+            v.group_value = (v.latest_agent_username or '').strip() or 'Unassigned'
+        elif group_by == 'department':
+            profile_id = user_to_profile.get(v.latest_agent_id)
+            v.group_value = profile_to_department.get(profile_id, 'No Department')
+        elif group_by == 'browser':
+            v.group_value = (v.browser or '').strip() or 'Unknown browser'
+        elif group_by == 'search_engine':
+            v.group_value = (v.referrer_source or '').strip() or 'Direct'
+        elif group_by == 'search_term':
+            v.group_value = (v.utm_term or '').strip() or '(none)'
+        else:
+            v.group_value = 'Other'
+
+    visitor_list_data.sort(
+        key=lambda x: ((x.group_value or '').lower(), -x.last_seen.timestamp())
+    )
+
+    group_by_label = dict(group_options).get(group_by, 'Activity')
+
     return render(request, 'dashboard/visitor_list.html', {
-        'visitors': visitors[:100],
+        'visitors': visitor_list_data[:100],
         'current_filter': filter_type,
         'last_30_min': last_30_min,
         'search_q': search_q,
         'date_from': date_from,
         'date_to': date_to,
+        'group_by': group_by,
+        'group_by_label': group_by_label,
+        'group_options': group_options,
     })
 
 

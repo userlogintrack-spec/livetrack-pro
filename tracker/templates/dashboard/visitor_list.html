@@ -56,29 +56,43 @@
 <!-- Search -->
 <form method="get" style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <input type="hidden" name="filter" value="{{ current_filter }}">
+    <input type="hidden" name="group_by" value="{{ group_by }}">
     <div style="flex:1;min-width:200px;position:relative;">
         <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;"></i>
         <input type="text" name="q" value="{{ search_q }}" class="form-control" placeholder="Search IP, browser, OS, country..." style="padding-left:36px;">
     </div>
     <input type="date" name="from" value="{{ date_from }}" class="form-control" style="max-width:150px;">
     <input type="date" name="to" value="{{ date_to }}" class="form-control" style="max-width:150px;">
+    <select name="group_by" class="form-control" style="max-width:190px;" onchange="this.form.submit()">
+        {% for opt_value, opt_label in group_options %}
+        <option value="{{ opt_value }}" {% if group_by == opt_value %}selected{% endif %}>Group by {{ opt_label }}</option>
+        {% endfor %}
+    </select>
     <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-search"></i></button>
     {% if search_q or date_from or date_to %}
-    <a href="?filter={{ current_filter }}" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></a>
+    <a href="?filter={{ current_filter }}&group_by={{ group_by }}" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></a>
     {% endif %}
 </form>
 
 <!-- Tabs -->
 <div class="filter-tabs">
-    <a href="?filter=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}"><i class="fas fa-users"></i> All Visitors</a>
-    <a href="?filter=online" class="filter-tab {% if current_filter == 'online' %}active{% endif %}"><i class="fas fa-circle" style="font-size:8px;color:#10b981;"></i> Online Now</a>
-    <a href="?filter=today" class="filter-tab {% if current_filter == 'today' %}active{% endif %}"><i class="fas fa-calendar-day"></i> Today</a>
+    <a href="?filter=all&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'all' %}active{% endif %}"><i class="fas fa-users"></i> All Visitors</a>
+    <a href="?filter=online&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'online' %}active{% endif %}"><i class="fas fa-circle" style="font-size:8px;color:#10b981;"></i> Online Now</a>
+    <a href="?filter=today&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'today' %}active{% endif %}"><i class="fas fa-calendar-day"></i> Today</a>
 </div>
 
 <!-- Visitor List -->
 <div class="card">
     <div class="card-body" style="padding:0;">
-        {% for v in visitors %}
+        {% if visitors %}
+        {% regroup visitors by group_value as grouped_visitors %}
+        {% for grp in grouped_visitors %}
+        <div style="padding:10px 18px;background:var(--bg-primary);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;">
+            <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;letter-spacing:.04em;">{{ group_by_label }}</span>
+            <span style="font-size:13px;font-weight:700;color:var(--text-primary);margin-left:8px;">{{ grp.grouper }}</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">({{ grp.list|length }})</span>
+        </div>
+        {% for v in grp.list %}
         <div class="v-row">
             <a href="{% url 'dashboard:visitor_detail' v.id %}" class="v-avatar" style="text-decoration:none;color:white;">
                 {{ v.ip_address|truncatechars:2 }}
@@ -128,13 +142,15 @@
                 <i class="fas fa-arrow-right"></i>
             </a>
         </div>
-        {% empty %}
+        {% endfor %}
+        {% endfor %}
+        {% else %}
         <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
             <i class="fas fa-users" style="font-size:40px;opacity:0.15;display:block;margin-bottom:12px;"></i>
             <p style="font-size:15px;font-weight:600;">No visitors found</p>
             <p style="font-size:13px;margin-top:4px;">Visitors will appear here when they browse your website.</p>
         </div>
-        {% endfor %}
+        {% endif %}
     </div>
 </div>
 {% endblock %}
