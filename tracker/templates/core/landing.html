@@ -10,6 +10,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
+            --nav-height: 68px;
             --primary: #7c3aed;
             --primary-light: #a78bfa;
             --primary-soft: #c4b5fd;
@@ -69,7 +70,9 @@
 
         /* ==================== NAVBAR ==================== */
         .navbar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            position: -webkit-sticky;
+            position: sticky; top: 0; z-index: 1000;
+            left: 0; right: 0; width: 100%;
             padding: 0 40px; height: 68px;
             display: flex; align-items: center; justify-content: space-between;
             background: rgba(255,255,255,0.85);
@@ -77,6 +80,7 @@
             -webkit-backdrop-filter: blur(24px) saturate(200%);
             border-bottom: 1px solid rgba(0,0,0,0.04);
             transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+            isolation: isolate;
         }
         .navbar.scrolled {
             background: rgba(255,255,255,0.95);
@@ -110,6 +114,7 @@
         .nav-links a:hover { color: var(--primary); background: rgba(99,102,241,0.06); }
         .nav-links a.active { color: var(--primary); background: rgba(99,102,241,0.08); font-weight: 600; }
 
+        .nav-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
 
         .btn {
@@ -146,18 +151,24 @@
         .nav-links.show {
             display: flex !important;
             flex-direction: column;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
+            position: absolute;
+            top: 100%; left: 0; right: 0;
             background: rgba(255,255,255,0.98);
             backdrop-filter: blur(24px);
-            z-index: 1000;
-            justify-content: center;
+            -webkit-backdrop-filter: blur(24px);
+            z-index: 1002;
+            justify-content: flex-start;
             align-items: center;
             gap: 8px;
-            padding: 80px 24px 40px;
+            padding: 20px 24px 40px;
+            min-height: calc(100dvh - var(--nav-height));
+            max-height: calc(100dvh - var(--nav-height));
+            overflow-y: auto;
             animation: mobileMenuIn 0.3s ease;
         }
+        .nav-links.show li { width: 100%; max-width: 320px; }
         .nav-links.show a {
+            display: block;
             font-size: 18px;
             padding: 14px 32px;
             border-radius: 12px;
@@ -177,7 +188,7 @@
 
         /* ==================== HERO (DARK) ==================== */
         .hero {
-            position: relative; padding: 140px 48px 100px;
+            position: relative; padding: 72px 48px 100px;
             text-align: center; overflow: hidden;
             background: var(--bg-hero);
             color: white;
@@ -381,6 +392,15 @@
             display: grid; grid-template-columns: 1fr 1fr;
             gap: 80px; align-items: center; max-width: 1200px; margin: 0 auto;
         }
+        .showcase-content,
+        .showcase-preview {
+            width: 100%;
+            min-width: 0;
+        }
+        .showcase-content > * {
+            width: 100%;
+            max-width: 100%;
+        }
         .showcase-features { list-style: none; margin-bottom: 32px; }
         .showcase-features li {
             display: flex; align-items: flex-start; gap: 12px;
@@ -391,7 +411,7 @@
         .showcase-preview {
             background: var(--bg-card);
             border: 1px solid var(--border-light);
-            border-radius: var(--radius-xl); padding: 28px;
+            border-radius: 8px; padding: 8px;
             box-shadow: var(--shadow-lg);
             position: relative;
         }
@@ -435,6 +455,21 @@
             padding: 24px;
             background: linear-gradient(180deg, #f8fafc, #f1f5f9);
             min-height: 300px;
+        }
+        .placeholder-dash > div:first-child {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .placeholder-dash > div:nth-child(2) {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+            gap: 10px;
+        }
+        .placeholder-dash > div:first-child > div,
+        .placeholder-dash > div:nth-child(2) > div {
+            min-width: 0;
         }
         /* Screenshot grid for multiple previews */
         .screenshot-tabs {
@@ -795,7 +830,7 @@
             .navbar { padding: 0 28px; }
             .nav-links a { font-size: 12px; padding: 6px 10px; }
             section { padding: 80px 32px; }
-            .hero { padding: 120px 32px 80px; }
+            .hero { padding: 64px 32px 80px; }
             .hero h1 { font-size: 56px; }
             .features-grid { gap: 18px; }
             .showcase-grid { gap: 48px; }
@@ -815,19 +850,22 @@
             .stats-bar { gap: 32px; }
             .stat-item .number { font-size: 32px; }
             .nav-links { gap: 2px; }
+            .nav-end { gap: 8px; }
             .nav-actions .btn { padding: 8px 14px; font-size: 12px; }
         }
 
         /* Tablets portrait (768px) */
         @media (max-width: 768px) {
+            :root { --nav-height: 60px; }
             .navbar { padding: 0 16px; height: 60px; }
             .navbar.scrolled { height: 56px; }
             .nav-links { display: none; }
             .mobile-menu-btn { display: block; }
+            .nav-end { gap: 6px; }
             .nav-actions .btn-ghost { display: none; }
 
             section, .hero { padding: 60px 20px; }
-            .hero { padding-top: 110px; padding-bottom: 60px; }
+            .hero { padding-top: 48px; padding-bottom: 60px; }
             .hero h1 { font-size: 36px; letter-spacing: -1px; }
             .hero p.subtitle { font-size: 15px; max-width: 420px; }
             .hero-cta { flex-direction: column; gap: 10px; }
@@ -852,6 +890,9 @@
             .showcase-grid { grid-template-columns: 1fr; gap: 28px; }
             .showcase-preview { max-width: 100%; }
             .showcase-features li { font-size: 14px; }
+            .placeholder-dash { padding: 18px; }
+            .placeholder-dash > div:first-child { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .placeholder-dash > div:nth-child(2) { grid-template-columns: 1fr; }
 
             .price-card { padding: 28px 24px; }
             .price-card.featured { transform: none; }
@@ -897,12 +938,14 @@
 
         /* Large phones (480px - 767px) */
         @media (max-width: 480px) {
+            :root { --nav-height: 56px; }
             .navbar { padding: 0 12px; height: 56px; }
             .nav-brand h1 { font-size: 16px; }
             .nav-brand .logo-icon { width: 32px; height: 32px; font-size: 13px; }
+            .nav-end { gap: 4px; }
             .nav-actions .btn-primary { padding: 7px 12px; font-size: 11px; }
 
-            .hero { padding: 100px 16px 50px; }
+            .hero { padding: 40px 16px 50px; }
             .hero h1 { font-size: 28px; letter-spacing: -0.8px; line-height: 1.15; }
             .hero p.subtitle { font-size: 14px; max-width: 320px; margin-bottom: 28px; }
             .hero-badge { font-size: 10px; padding: 5px 12px; margin-bottom: 20px; }
@@ -976,6 +1019,9 @@
             .browser-topbar { padding: 8px 12px; }
             .browser-dots span { width: 8px; height: 8px; }
             .browser-url { font-size: 9px; padding: 4px 10px; }
+            .placeholder-dash { padding: 14px; }
+            .placeholder-dash > div:first-child { gap: 8px; }
+            .placeholder-dash > div:nth-child(2) { gap: 8px; }
         }
 
         /* Small phones (375px and below) */
@@ -1026,17 +1072,19 @@
         <li><a href="{% url 'pages:about' %}">About</a></li>
         <li><a href="{% url 'pages:contact' %}">Contact</a></li>
     </ul>
-    <div class="nav-actions">
-        {% if request.user.is_authenticated %}
-        <a href="{% url 'dashboard:home' %}" class="btn btn-primary"><i class="fas fa-th-large"></i> Dashboard</a>
-        {% else %}
-        <a href="{% url 'core:login' %}" class="btn btn-ghost">Sign In</a>
-        <a href="{% url 'core:register' %}" class="btn btn-primary"><i class="fas fa-rocket"></i> Get Started Free</a>
-        {% endif %}
+    <div class="nav-end">
+        <div class="nav-actions">
+            {% if request.user.is_authenticated %}
+            <a href="{% url 'dashboard:home' %}" class="btn btn-primary"><i class="fas fa-th-large"></i> Dashboard</a>
+            {% else %}
+            <a href="{% url 'core:login' %}" class="btn btn-ghost">Sign In</a>
+            <a href="{% url 'core:register' %}" class="btn btn-primary"><i class="fas fa-rocket"></i> Get Started Free</a>
+            {% endif %}
+        </div>
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu('navLinks', this)">
+            <i class="fas fa-bars"></i>
+        </button>
     </div>
-    <button class="mobile-menu-btn" onclick="document.getElementById('navLinks').classList.toggle('show');this.querySelector('i').classList.toggle('fa-bars');this.querySelector('i').classList.toggle('fa-times');">
-        <i class="fas fa-bars"></i>
-    </button>
 </nav>
 
 <!-- HERO -->
@@ -1211,34 +1259,34 @@
 </section>
 
 <!-- USE CASES -->
-<section id="use-cases" style="padding:80px;background:var(--bg-soft);">
+<section id="use-cases" style="padding:20px;background:var(--bg-soft);">
     <div class="section-header">
         <div class="section-label"><i class="fas fa-briefcase"></i> Use Cases</div>
         <h2 class="section-title">Built for Every Industry</h2>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;max-width:1100px;margin:30px auto 0;">
-        <div style="background:white;border-radius:16px;padding:28px;text-align:center;border:1px solid var(--border-light);transition:all .3s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+    <div style="display:flex;grid-template-columns:repeat(4,1fr);gap:20px;/* max-width:1100px; */margin:30px auto 0;flex-wrap:wrap;">
+        <div style="background:white;border-radius:16px;padding:20px;text-align:center;border:1px solid var(--border-light);transition:all .3s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
             <div style="width:50px;height:50px;border-radius:14px;background:rgba(99,102,241,0.1);display:inline-flex;align-items:center;justify-content:center;font-size:22px;color:#6366f1;margin-bottom:14px;">
                 <i class="fas fa-shopping-cart"></i>
             </div>
             <h4 style="font-size:15px;font-weight:700;color:#1e1b4b;margin-bottom:6px;">E-Commerce</h4>
             <p style="font-size:12px;color:#6b7280;line-height:1.6;">Help shoppers find products, recover abandoned carts, and increase conversions with real-time chat.</p>
         </div>
-        <div style="background:white;border-radius:16px;padding:28px;text-align:center;border:1px solid var(--border-light);transition:all .3s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="background:white;border-radius:16px;padding:20px;text-align:center;border:1px solid var(--border-light);transition:all .3s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
             <div style="width:50px;height:50px;border-radius:14px;background:rgba(16,185,129,0.1);display:inline-flex;align-items:center;justify-content:center;font-size:22px;color:#10b981;margin-bottom:14px;">
                 <i class="fas fa-laptop-code"></i>
             </div>
             <h4 style="font-size:15px;font-weight:700;color:#1e1b4b;margin-bottom:6px;">SaaS &amp; Tech</h4>
             <p style="font-size:12px;color:#6b7280;line-height:1.6;">Onboard users, handle technical support, and track feature adoption with visitor analytics.</p>
         </div>
-        <div style="background:white;border-radius:16px;padding:28px;text-align:center;border:1px solid var(--border-light);transition:all .3s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="background:white;border-radius:16px;padding:20px;text-align:center;border:1px solid var(--border-light);transition:all .3s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
             <div style="width:50px;height:50px;border-radius:14px;background:rgba(245,158,11,0.1);display:inline-flex;align-items:center;justify-content:center;font-size:22px;color:#f59e0b;margin-bottom:14px;">
                 <i class="fas fa-graduation-cap"></i>
             </div>
             <h4 style="font-size:15px;font-weight:700;color:#1e1b4b;margin-bottom:6px;">Education</h4>
             <p style="font-size:12px;color:#6b7280;line-height:1.6;">Answer student queries, guide admissions, and provide real-time academic support.</p>
         </div>
-        <div style="background:white;border-radius:16px;padding:28px;text-align:center;border:1px solid var(--border-light);transition:all .3s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="background:white;border-radius:16px;padding:20px;text-align:center;border:1px solid var(--border-light);transition:all .3s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
             <div style="width:50px;height:50px;border-radius:14px;background:rgba(239,68,68,0.1);display:inline-flex;align-items:center;justify-content:center;font-size:22px;color:#ef4444;margin-bottom:14px;">
                 <i class="fas fa-heartbeat"></i>
             </div>
@@ -1938,6 +1986,39 @@
 </style>
 
 <script>
+    function toggleMobileMenu(menuId, button) {
+        const menu = document.getElementById(menuId);
+        const icon = button.querySelector('i');
+        const isOpen = menu.classList.toggle('show');
+        icon.classList.toggle('fa-bars', !isOpen);
+        icon.classList.toggle('fa-times', isOpen);
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+
+    document.addEventListener('click', function(event) {
+        const menu = document.getElementById('navLinks');
+        const button = document.querySelector('.mobile-menu-btn');
+        if (!menu || !button || !menu.classList.contains('show')) return;
+        if (menu.contains(event.target) || button.contains(event.target)) return;
+        menu.classList.remove('show');
+        button.querySelector('i').classList.remove('fa-times');
+        button.querySelector('i').classList.add('fa-bars');
+        document.body.style.overflow = '';
+    });
+
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            const menu = document.getElementById('navLinks');
+            const button = document.querySelector('.mobile-menu-btn');
+            if (menu) menu.classList.remove('show');
+            if (button) {
+                button.querySelector('i').classList.remove('fa-times');
+                button.querySelector('i').classList.add('fa-bars');
+            }
+            document.body.style.overflow = '';
+        }
+    });
+
     window.addEventListener('scroll', () => {
         document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
         // Scroll spy - highlight active nav link

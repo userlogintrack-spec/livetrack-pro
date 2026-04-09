@@ -9,6 +9,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
+            --nav-height: 72px;
             --primary: #7c3aed;
             --primary-light: #a78bfa;
             --primary-soft: #c4b5fd;
@@ -37,11 +38,14 @@
 
         /* Navbar */
         .navbar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            position: -webkit-sticky;
+            position: sticky; top: 0; z-index: 1000;
+            left: 0; right: 0; width: 100%;
             padding: 0 48px; height: 72px;
             display: flex; align-items: center; justify-content: space-between;
             background: rgba(255,255,255,0.7); backdrop-filter: blur(20px) saturate(180%);
             border-bottom: 1px solid rgba(124,58,237,0.08);
+            isolation: isolate;
         }
         .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .nav-brand .logo-icon {
@@ -51,36 +55,12 @@
         }
         .nav-brand h1 { font-size: 20px; font-weight: 800; color: var(--text-dark); }
         .nav-brand h1 em { font-style: normal; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
-        .nav-links a:hover { color: var(--primary); }
-        .nav-actions { display: flex; gap: 10px; }
-        .nav-search {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(124,58,237,0.06);
-            border: 1px solid var(--border-light);
-            border-radius: 10px;
-            padding: 4px 6px;
-        }
-        .nav-search input {
-            border: none;
-            background: transparent;
-            outline: none;
-            width: 180px;
-            font-size: 13px;
-            color: var(--text-dark);
-        }
-        .nav-search button {
-            border: none;
-            background: var(--gradient-primary);
-            color: white;
-            border-radius: 8px;
-            padding: 7px 10px;
-            cursor: pointer;
-            font-size: 12px;
-        }
+        .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; transition: all 0.2s; padding: 6px 14px; border-radius: 8px; }
+        .nav-links a:hover { color: var(--primary); background: rgba(99,102,241,0.06); }
+        .nav-links a.active { color: var(--primary); background: rgba(99,102,241,0.08); font-weight: 600; }
+        .nav-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
         .btn {
             display: inline-flex; align-items: center; gap: 8px;
             padding: 10px 22px; border-radius: 12px; font-size: 14px; font-weight: 600;
@@ -93,7 +73,7 @@
 
         /* Page Hero (Dark) */
         .page-hero {
-            padding: 140px 48px 60px; text-align: center;
+            padding: 68px 48px 60px; text-align: center;
             background: var(--bg-hero); color: white;
             position: relative; overflow: hidden;
         }
@@ -196,17 +176,20 @@
         .nav-links.show {
             display: flex !important;
             flex-direction: column;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
+            position: absolute;
+            top: 100%; left: 0; right: 0;
             background: rgba(255,255,255,0.97);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            z-index: 1000;
-            justify-content: center;
+            z-index: 1002;
+            justify-content: flex-start;
             align-items: center;
             gap: 8px;
-            padding: 90px 24px 40px;
+            padding: 20px 24px 40px;
             list-style: none;
+            min-height: calc(100dvh - var(--nav-height));
+            max-height: calc(100dvh - var(--nav-height));
+            overflow-y: auto;
             animation: mobileMenuIn .3s ease;
         }
         .nav-links.show li { width: 100%; max-width: 320px; }
@@ -229,19 +212,21 @@
 
         @media (max-width: 1024px) {
             .navbar { padding: 0 24px; }
-            .nav-search { display: none; }
+            .nav-end { gap: 8px; }
             .footer-grid { grid-template-columns: 1fr 1fr 1fr; }
         }
 
         @media (max-width: 768px) {
+            :root { --nav-height: 60px; }
             .navbar { padding: 0 16px; height: 60px; }
             .nav-links { display: none; }
             .mobile-menu-btn { display: inline-flex; align-items: center; justify-content: center; }
+            .nav-end { gap: 6px; }
             .nav-actions .btn-ghost { display: none; }
             .nav-actions .btn-primary { padding: 8px 14px; font-size: 12px; }
             .nav-brand h1 { font-size: 17px; }
 
-            .page-hero { padding: 100px 18px 40px; }
+            .page-hero { padding: 40px 18px 40px; }
             .page-hero h1 { font-size: 30px; letter-spacing: -1px; }
             .page-hero p { font-size: 15px; }
             .page-content { padding: 24px 14px 60px; }
@@ -257,9 +242,11 @@
         }
 
         @media (max-width: 480px) {
+            :root { --nav-height: 60px; }
             .navbar { padding: 0 12px; }
             .nav-brand h1 { font-size: 15px; }
             .nav-brand .logo-icon { width: 30px; height: 30px; font-size: 13px; }
+            .nav-end { gap: 4px; }
             .nav-actions .btn-primary { padding: 7px 12px; font-size: 11px; }
             .page-hero h1 { font-size: 26px; }
             .page-hero p { font-size: 14px; }
@@ -277,31 +264,27 @@
         <h1>Live<em>Track</em> Pro</h1>
     </a>
     <ul class="nav-links" id="navLinks">
-        <li><a href="{% url 'pages:features' %}">Features</a></li>
+        <li><a href="/#features">Features</a></li>
         <li><a href="{% url 'pages:compare' %}">Compare</a></li>
+        <li><a href="/#integrations">Integrations</a></li>
         <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/#faq">FAQ</a></li>
         <li><a href="{% url 'pages:about' %}">About</a></li>
         <li><a href="{% url 'pages:contact' %}">Contact</a></li>
-        <li><a href="{% url 'pages:all_pages' %}">All Pages</a></li>
     </ul>
-    <div class="nav-actions">
-        <form class="nav-search" method="get" action="{% url 'pages:all_pages' %}">
-            <input type="text" name="q" placeholder="Search pages">
-            <button type="submit"><i class="fas fa-search"></i></button>
-        </form>
-        <a href="{% url 'core:login' %}" class="btn btn-ghost">Sign In</a>
-        <a href="{% url 'core:register' %}" class="btn btn-primary">Get Started Free</a>
+    <div class="nav-end">
+        <div class="nav-actions">
+            {% if request.user.is_authenticated %}
+            <a href="{% url 'dashboard:home' %}" class="btn btn-primary"><i class="fas fa-th-large"></i> Dashboard</a>
+            {% else %}
+            <a href="{% url 'core:login' %}" class="btn btn-ghost">Sign In</a>
+            <a href="{% url 'core:register' %}" class="btn btn-primary"><i class="fas fa-rocket"></i> Get Started Free</a>
+            {% endif %}
+        </div>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu" onclick="toggleMobileMenu('navLinks', this)">
+            <i class="fas fa-bars"></i>
+        </button>
     </div>
-    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu" onclick="
-        var n=document.getElementById('navLinks');
-        var i=this.querySelector('i');
-        n.classList.toggle('show');
-        i.classList.toggle('fa-bars');
-        i.classList.toggle('fa-times');
-        document.body.style.overflow = n.classList.contains('show') ? 'hidden' : '';
-    ">
-        <i class="fas fa-bars"></i>
-    </button>
 </nav>
 
 {% block hero %}{% endblock %}
@@ -336,6 +319,41 @@
         </div>
     </div>
 </footer>
+
+<script>
+    function toggleMobileMenu(menuId, button) {
+        const menu = document.getElementById(menuId);
+        const icon = button.querySelector('i');
+        const isOpen = menu.classList.toggle('show');
+        icon.classList.toggle('fa-bars', !isOpen);
+        icon.classList.toggle('fa-times', isOpen);
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+
+    document.addEventListener('click', function(event) {
+        const menu = document.getElementById('navLinks');
+        const button = document.getElementById('mobileMenuBtn');
+        if (!menu || !button || !menu.classList.contains('show')) return;
+        if (menu.contains(event.target) || button.contains(event.target)) return;
+        menu.classList.remove('show');
+        button.querySelector('i').classList.remove('fa-times');
+        button.querySelector('i').classList.add('fa-bars');
+        document.body.style.overflow = '';
+    });
+
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            const menu = document.getElementById('navLinks');
+            const button = document.getElementById('mobileMenuBtn');
+            if (menu) menu.classList.remove('show');
+            if (button) {
+                button.querySelector('i').classList.remove('fa-times');
+                button.querySelector('i').classList.add('fa-bars');
+            }
+            document.body.style.overflow = '';
+        }
+    });
+</script>
 
 </body>
 </html>
