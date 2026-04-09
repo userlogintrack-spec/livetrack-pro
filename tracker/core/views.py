@@ -2,7 +2,9 @@ import json
 import logging
 import uuid
 from datetime import timedelta
+from urllib.parse import urlparse
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
@@ -82,16 +84,17 @@ def _rate_limit(request, scope, limit, window_seconds):
 def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
     """Centralised dedup: returns the canonical Visitor row for this device.
 
-    Match priority (within last 24h):
-        1. existing row with  session_key + org ? exact match
-        2. existing row with same ip + user_agent + org ? adopt session_key
-        3. brand new row with the given session_key
+    Match priority:
+        1. existing row with session_key + org -> exact match
+        2. brand new row with the given session_key
 
-    This prevents duplicate visitor rows when the parent script and iframe race
-    each other to create sessions before localStorage syncs.
+    Important: do not merge by IP/User-Agent. Multiple users can share the same
+    office/public IP and often the same browser UA, which can leak chat history
+    between different people. Visitor identity must remain session-based.
     """
     from tracker.visitors.models import Visitor
-    cutoff = timezone.now() - timedelta(hours=24)
+    if not session_key:
+        session_key = uuid.uuid4().hex
 
     # 1. Exact session match
     if session_key:
@@ -99,23 +102,95 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None):
         if v:
             return v, False
 
-    # 2. IP + UA match (excluding localhost/internal IPs)
-    if ip and ua and ip not in ('127.0.0.1', '0.0.0.0', '::1'):
-        v = (Visitor.objects
-             .filter(organization=org, ip_address=ip, user_agent=ua, last_seen__gte=cutoff)
-             .order_by('-last_seen').first())
-        if v:
-            if session_key and v.session_key != session_key:
-                v.session_key = session_key
-                v.save(update_fields=['session_key'])
-            return v, False
-
-    # 3. Create new
+    # 2. Create new
     create_kwargs = {'organization': org, 'session_key': session_key, 'ip_address': ip, 'user_agent': ua}
     if defaults:
         create_kwargs.update(defaults)
     v = Visitor.objects.create(**create_kwargs)
     return v, True
+
+
+def _split_multiline_csv(value):
+    if not value:
+        return []
+    return [item.strip() for item in value.replace(',', '\n').splitlines() if item.strip()]
+
+
+def _normalize_domain(host):
+    host = (host or '').strip().lower()
+    if not host:
+        return ''
+    if host.startswith('http://') or host.startswith('https://'):
+        try:
+            host = urlparse(host).hostname or host
+        except Exception:
+            pass
+    if ':' in host:
+        host = host.split(':', 1)[0]
+    if host.startswith('www.'):
+        host = host[4:]
+    return host
+
+
+def _extract_parent_domain(request, body_data=None):
+    body_data = body_data or {}
+    candidates = [
+        body_data.get('parent_domain', ''),
+        request.GET.get('pd', ''),
+    ]
+    origin = request.META.get('HTTP_ORIGIN', '')
+    if origin:
+        candidates.append(origin)
+    referer = request.META.get('HTTP_REFERER', '')
+    if referer:
+        candidates.append(referer)
+    for raw in candidates:
+        domain = _normalize_domain(raw)
+        if domain:
+            return domain
+    return ''
+
+
+def _domain_allowed(org, domain):
+    if not org or not org.allowed_domains_enabled:
+        return True
+    allowed = [_normalize_domain(x) for x in _split_multiline_csv(org.allowed_domains)]
+    allowed = [d for d in allowed if d]
+    if not allowed:
+        return True
+    if not domain:
+        return False
+    return any(domain == rule or domain.endswith('.' + rule) for rule in allowed)
+
+
+def _resolve_country_for_request(request, ip_address):
+    country_name = ''
+    country_code = (request.META.get('HTTP_CF_IPCOUNTRY') or '').strip().upper()
+    city_name = ''
+    cache_key = f'geoip:{ip_address}'
+    cached = cache.get(cache_key)
+    if cached:
+        country_name = cached.get('country', '')
+        city_name = cached.get('city', '')
+    else:
+        try:
+            from tracker.visitors.middleware import get_geo_from_ip
+            country_name, city_name = get_geo_from_ip(ip_address)
+            cache.set(cache_key, {'country': country_name, 'city': city_name}, 60 * 60 * 24)
+        except Exception:
+            country_name, city_name = '', ''
+    return (country_name or '').strip(), country_code, (city_name or '').strip()
+
+
+def _country_blocked(org, country_name, country_code):
+    if not org or not org.blocked_countries_enabled:
+        return False
+    blocked = [x.strip().lower() for x in _split_multiline_csv(org.blocked_countries)]
+    if not blocked:
+        return False
+    name_token = (country_name or '').strip().lower()
+    code_token = (country_code or '').strip().lower()
+    return (name_token and name_token in blocked) or (code_token and code_token in blocked)
 
 
 def _resolve_room_actor(request, room):
@@ -263,6 +338,26 @@ def register_view(request):
         if selected_plan not in ('free', 'pro', 'enterprise'):
             selected_plan = 'free'
         Subscription.objects.get_or_create(organization=org, defaults={'plan': selected_plan if selected_plan == 'free' else 'free', 'status': 'active'})
+
+        # Best-effort welcome email. Do not block signup if SMTP is unavailable.
+        if user.email:
+            try:
+                from django.core.mail import send_mail
+                send_mail(
+                    'Welcome to LiveVisitorHub',
+                    (
+                        f'Hi {first_name or username},\n\n'
+                        'Welcome to LiveVisitorHub. Your account is ready.\n'
+                        f'Login: {request.build_absolute_uri("/accounts/login/")}\n'
+                        'Dashboard: /dashboard/\n\n'
+                        'Thanks,\nLiveVisitorHub Team'
+                    ),
+                    settings.DEFAULT_FROM_EMAIL,
+                    [user.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception('Failed to send welcome email to %s', user.email)
         login(request, user)
         # If paid plan selected, redirect to billing to complete payment
         if selected_plan in ('pro', 'enterprise'):
@@ -303,7 +398,13 @@ def widget_init(request):
         body_data = _parse_json_body(request) or {}
         body_session = (body_data.get('session_key') or '').strip()
         session_key = body_session or request.session.session_key
+        parent_domain = _extract_parent_domain(request, body_data)
+        if not _domain_allowed(org, parent_domain):
+            return JsonResponse({'error': 'Widget blocked on this domain.', 'blocked': True}, status=403)
         ip = get_client_ip(request)
+        country_name, country_code, city_name = _resolve_country_for_request(request, ip)
+        if _country_blocked(org, country_name, country_code):
+            return JsonResponse({'error': 'Widget is blocked in your country.', 'blocked': True}, status=403)
         ua = request.META.get('HTTP_USER_AGENT', '')
         browser, os_name, device_type = parse_user_agent(ua)
 
@@ -311,8 +412,13 @@ def widget_init(request):
             org=org, ip=ip, ua=ua, session_key=session_key,
             defaults={
                 'browser': browser, 'os': os_name, 'device_type': device_type,
+                'country': country_name, 'city': city_name,
             },
         )
+        if (country_name and not visitor.country) or (city_name and not visitor.city):
+            visitor.country = visitor.country or country_name
+            visitor.city = visitor.city or city_name
+            visitor.save(update_fields=['country', 'city'])
 
         return JsonResponse({
             'session_key': visitor.session_key or session_key,
@@ -344,6 +450,9 @@ def widget_track_pageview(request):
     org = _get_org_from_request(request)
     if not org:
         return JsonResponse({'error': 'org not found'}, status=404)
+    parent_domain = _extract_parent_domain(request, data)
+    if not _domain_allowed(org, parent_domain):
+        return JsonResponse({'error': 'Widget blocked on this domain.', 'blocked': True}, status=403)
 
     from tracker.visitors.middleware import (
         get_client_ip, parse_user_agent, get_referrer_source,
@@ -355,6 +464,9 @@ def widget_track_pageview(request):
     session_key = (body_session or request.session.session_key or '').strip()
 
     ip = get_client_ip(request)
+    country_name, country_code, city_name = _resolve_country_for_request(request, ip)
+    if _country_blocked(org, country_name, country_code):
+        return JsonResponse({'error': 'Widget is blocked in your country.', 'blocked': True}, status=403)
     ua = request.META.get('HTTP_USER_AGENT', '')
     browser, os_name, device_type = parse_user_agent(ua)
 
@@ -364,8 +476,16 @@ def widget_track_pageview(request):
             'browser': browser, 'os': os_name, 'device_type': device_type,
             'referrer': referrer, 'referrer_source': get_referrer_source(referrer),
             'is_online': True, 'landing_page': url,
+            'country': country_name, 'city': city_name,
         },
     )
+    if (country_name and not visitor.country) or (city_name and not visitor.city):
+        Visitor.objects.filter(pk=visitor.pk).update(
+            country=visitor.country or country_name,
+            city=visitor.city or city_name,
+        )
+        visitor.country = visitor.country or country_name
+        visitor.city = visitor.city or city_name
 
     now = timezone.now()
     page_count = (visitor.total_visits or 0) + (1 if not created else 1)
@@ -443,6 +563,12 @@ def widget_script(request):
     # Load org customization
     from tracker.core.models import Organization
     org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else None
+    script_domain = _extract_parent_domain(request, {})
+    if org and not _domain_allowed(org, script_domain):
+        blocked_js = (
+            "(function(){console.warn('LiveVisitorHub widget blocked on this domain.');})();"
+        )
+        return HttpResponse(blocked_js, content_type='application/javascript; charset=utf-8')
     widget_color = org.widget_color if org else '#7c3aed'
     widget_title = org.widget_title if org else 'LiveVisitorHub Support'
     widget_position = org.widget_position if org else 'bottom-right'
@@ -475,8 +601,9 @@ def widget_script(request):
     lastTrackedUrl = url;
     var payload = {
       key: WIDGET_KEY,
-      session_key: getSessionKey(),
-      url: url,
+	      session_key: getSessionKey(),
+	      parent_domain: location.hostname || "",
+	      url: url,
       title: document.title || "",
       referrer: document.referrer || ""
     };
@@ -516,7 +643,8 @@ def widget_script(request):
   frame.className = "ltw-frame";
   // Pass current session_key into iframe so chat & tracking share the same visitor
   var _sk = encodeURIComponent(getSessionKey() || "");
-  frame.src = BASE + "/api/widget/embed/?key=" + WIDGET_KEY + (_sk ? "&sk=" + _sk : "");
+	  var _pd = encodeURIComponent(location.hostname || "");
+	  frame.src = BASE + "/api/widget/embed/?key=" + WIDGET_KEY + (_sk ? "&sk=" + _sk : "") + (_pd ? "&pd=" + _pd : "");
   frame.allow = "microphone;camera;display-capture";
 
   document.body.appendChild(btn);
@@ -621,6 +749,9 @@ def widget_start_chat(request):
 
         # Resolve org from widget key
         org = _get_org_from_request(request)
+        parent_domain = _extract_parent_domain(request, data)
+        if not _domain_allowed(org, parent_domain):
+            return JsonResponse({'error': 'Widget blocked on this domain.', 'blocked': True}, status=403)
 
         from tracker.visitors.models import Visitor
         from tracker.chat.models import ChatRoom
@@ -629,6 +760,9 @@ def widget_start_chat(request):
         # Find or create visitor (with smart dedup by IP+UA so we don't create duplicates)
         from tracker.visitors.middleware import get_client_ip, parse_user_agent
         ip = get_client_ip(request)
+        country_name, country_code, city_name = _resolve_country_for_request(request, ip)
+        if _country_blocked(org, country_name, country_code):
+            return JsonResponse({'error': 'Widget is blocked in your country.', 'blocked': True}, status=403)
         ua = request.META.get('HTTP_USER_AGENT', '')
         browser, os_name, device_type = parse_user_agent(ua)
         visitor, _ = _resolve_or_create_visitor(
@@ -636,8 +770,16 @@ def widget_start_chat(request):
             defaults={
                 'browser': browser, 'os': os_name, 'device_type': device_type,
                 'is_online': True,
+                'country': country_name, 'city': city_name,
             },
         )
+        if (country_name and not visitor.country) or (city_name and not visitor.city):
+            Visitor.objects.filter(pk=visitor.pk).update(
+                country=visitor.country or country_name,
+                city=visitor.city or city_name,
+            )
+            visitor.country = visitor.country or country_name
+            visitor.city = visitor.city or city_name
         # Use the canonical session_key going forward (the one stored on the visitor)
         if visitor.session_key:
             session_key = visitor.session_key
@@ -723,12 +865,12 @@ def widget_start_chat(request):
                 send_mail(
                     f'New chat from {visitor_name} - {org.name}',
                     f'New chat started by {visitor_name}.\nSubject: {data.get("subject", "-")}\nRoom: {room_id}\n\nLogin to respond: {request.build_absolute_uri("/dashboard/")}',
-                    'noreply@livetrack.app',
+                    settings.DEFAULT_FROM_EMAIL,
                     [org.notify_email],
-                    fail_silently=True,
+                    fail_silently=False,
                 )
             except Exception:
-                pass
+                logger.exception('Failed to send new-chat notification email for room=%s', room_id)
 
         # Save the visitor's initial message (subject/query) as their first chat message
         subject_text = data.get('subject', '').strip()
@@ -969,6 +1111,7 @@ def widget_embed_page(request):
     widget_key = request.GET.get('key', '')
     from tracker.core.models import Organization
     org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else Organization.objects.first()
+    parent_domain = _extract_parent_domain(request, {})
 
     # Show a clear setup error when the key is invalid (instead of a blank panel).
     if widget_key and not org:
@@ -994,6 +1137,25 @@ def widget_embed_page(request):
         from django.http import HttpResponse
         return HttpResponse(html, content_type='text/html; charset=utf-8')
 
+    if org and not _domain_allowed(org, parent_domain):
+        return HttpResponse(
+            "<!DOCTYPE html><html><body style='font-family:Inter,Arial,sans-serif;padding:16px;color:#6b7280;'>"
+            "Widget is blocked on this domain.</body></html>",
+            content_type='text/html; charset=utf-8',
+            status=403,
+        )
+
+    if org:
+        ip = _client_ip(request)
+        country_name, country_code, _city_name = _resolve_country_for_request(request, ip)
+        if _country_blocked(org, country_name, country_code):
+            return HttpResponse(
+                "<!DOCTYPE html><html><body style='font-family:Inter,Arial,sans-serif;padding:16px;color:#6b7280;'>"
+                "Widget is unavailable in your country.</body></html>",
+                content_type='text/html; charset=utf-8',
+                status=403,
+            )
+
     # Prefer session_key passed by parent script (for cross-origin where cookies are blocked).
     # Fall back to Django session cookie, then create one as a last resort.
     parent_sk = (request.GET.get('sk') or '').strip()[:64]
@@ -1007,6 +1169,7 @@ def widget_embed_page(request):
         'org': org,
         'widget_key': widget_key,
         'session_key': session_key,
+        'parent_domain': parent_domain,
     })
 
 
@@ -1030,4 +1193,3 @@ def home_redirect(request):
     if request.user.is_authenticated:
         return redirect('dashboard:home')
     return redirect('core:login')
-

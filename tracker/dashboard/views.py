@@ -8,7 +8,7 @@ from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.db.models import Count, Q, Avg, Sum, F, Max, Subquery, OuterRef
 from django.views.decorators.csrf import csrf_exempt
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 import json
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -173,6 +173,13 @@ def chat_list(request):
     priority_filter = request.GET.get('priority', 'all').strip()
     date_from = request.GET.get('from', '').strip()
     date_to = request.GET.get('to', '').strip()
+    selected_room_id = request.GET.get('room', '').strip()
+    agent_filter = request.GET.get('agent', 'all').strip()
+    rating_filter = request.GET.get('rating', 'all').strip()
+    unread_only = request.GET.get('unread', '').strip() == '1'
+    min_messages = request.GET.get('min_messages', '').strip()
+    visitor_name_filter = request.GET.get('visitor_name', '').strip()
+    visitor_email_filter = request.GET.get('visitor_email', '').strip()
 
     from django.db.models import Exists, OuterRef, Subquery
     profile = getattr(request.user, 'agent_profile', None)
@@ -183,6 +190,7 @@ def chat_list(request):
         base_chats = base_chats.filter(Q(agent=request.user) | Q(agent__isnull=True))
     chats = base_chats.select_related('visitor', 'agent').annotate(
         unread_count=Count('messages', filter=Q(messages__sender_type='visitor', messages__is_read=False)),
+        message_count_db=Count('messages'),
         notes_count=Count('internal_notes'),
         was_transferred=Exists(
             Message.objects.filter(room=OuterRef('pk'), sender_type='system', content__startswith='Chat transferred from')
@@ -207,6 +215,26 @@ def chat_list(request):
         chats = chats.filter(created_at__date__gte=date_from)
     if date_to:
         chats = chats.filter(created_at__date__lte=date_to)
+    if unread_only:
+        chats = chats.filter(unread_count__gt=0)
+    if rating_filter == 'good':
+        chats = chats.filter(rating__gte=4)
+    elif rating_filter == 'bad':
+        chats = chats.filter(rating__lte=2)
+    elif rating_filter == 'rated':
+        chats = chats.filter(rating__isnull=False)
+    elif rating_filter == 'unrated':
+        chats = chats.filter(rating__isnull=True)
+    if visitor_name_filter:
+        chats = chats.filter(visitor_name__icontains=visitor_name_filter)
+    if visitor_email_filter:
+        chats = chats.filter(visitor_email__icontains=visitor_email_filter)
+    if agent_filter == 'unassigned':
+        chats = chats.filter(agent__isnull=True)
+    elif agent_filter.isdigit():
+        chats = chats.filter(agent_id=int(agent_filter))
+    if min_messages.isdigit():
+        chats = chats.filter(message_count_db__gte=int(min_messages))
 
     chats = chats.order_by('-updated_at')
 
@@ -223,7 +251,34 @@ def chat_list(request):
         ChatParticipant.objects.filter(user=request.user, room__in=chats).values_list('room__room_id', flat=True)
     )
 
-    return render(request, 'dashboard/chat_list.html', {
+    selected_chat = None
+    if selected_room_id:
+        selected_chat = chats.filter(room_id=selected_room_id).first()
+    if not selected_chat:
+        selected_chat = chats.first()
+
+    selected_messages = []
+    selected_pageviews = []
+    selected_previous_chats = []
+    if selected_chat:
+        selected_messages = selected_chat.messages.order_by('timestamp')[:300]
+        selected_pageviews = selected_chat.visitor.page_views.order_by('-timestamp')[:15]
+        selected_previous_chats = selected_chat.visitor.chat_rooms.exclude(pk=selected_chat.pk).order_by('-created_at')[:10]
+
+    tab_counts = {
+        'all': base_chats.count(),
+        'waiting': base_chats.filter(status='waiting').count(),
+        'active': base_chats.filter(status='active').count(),
+        'closed': base_chats.filter(status='closed').count(),
+    }
+    agent_options = User.objects.filter(agent_profile__organization=org).order_by('first_name', 'username').distinct()
+    query_without_room = request.GET.copy()
+    if 'room' in query_without_room:
+        del query_without_room['room']
+    base_query = query_without_room.urlencode()
+
+    template_name = 'dashboard/chat_history.html' if status_filter == 'closed' else 'dashboard/chat_list.html'
+    return render(request, template_name, {
         'chats': chats,
         'my_room_ids': my_room_ids,
         'current_filter': status_filter,
@@ -232,6 +287,19 @@ def chat_list(request):
         'priority_filter': priority_filter,
         'date_from': date_from,
         'date_to': date_to,
+        'agent_filter': agent_filter,
+        'rating_filter': rating_filter,
+        'unread_only': unread_only,
+        'min_messages': min_messages,
+        'visitor_name_filter': visitor_name_filter,
+        'visitor_email_filter': visitor_email_filter,
+        'selected_chat': selected_chat,
+        'selected_messages': selected_messages,
+        'selected_pageviews': selected_pageviews,
+        'selected_previous_chats': selected_previous_chats,
+        'tab_counts': tab_counts,
+        'agent_options': agent_options,
+        'base_query': base_query,
         'sla_cutoff': sla_cutoff,
         'sla_minutes': sla_minutes,
     })
@@ -964,6 +1032,13 @@ def website_settings_view(request):
             org.auto_responder_message = request.POST.get('auto_responder_message', '').strip() or 'Thanks for waiting!'
             # Assignment rule
             org.chat_assign_rule = request.POST.get('chat_assign_rule', 'least_busy')
+            # Access control
+            org.blocked_countries_enabled = request.POST.get('blocked_countries_enabled') == 'on'
+            blocked_countries = request.POST.get('blocked_countries', '')
+            org.blocked_countries = '\n'.join([x.strip() for x in blocked_countries.replace(',', '\n').splitlines() if x.strip()])
+            org.allowed_domains_enabled = request.POST.get('allowed_domains_enabled') == 'on'
+            allowed_domains = request.POST.get('allowed_domains', '')
+            org.allowed_domains = '\n'.join([x.strip().lower() for x in allowed_domains.replace(',', '\n').splitlines() if x.strip()])
             org.save()
             saved = True
 
@@ -2683,13 +2758,13 @@ def _send_scheduled_report(report, org):
     try:
         send_mail(
             f"[LiveVisitorHub] {report.name} - {now.strftime('%b %d')}",
-            '\n'.join(lines), 'noreply@livetrack.app', [report.email],
-            fail_silently=True,
+            '\n'.join(lines), settings.DEFAULT_FROM_EMAIL, [report.email],
+            fail_silently=False,
         )
         report.last_sent = now
         report.save(update_fields=['last_sent'])
     except Exception:
-        pass
+        logger.exception('Failed to send scheduled report id=%s to %s', report.id, report.email)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -3120,8 +3195,8 @@ def billing_view(request):
     if sub.current_period_end and sub.plan != 'free' and not sub.cancel_at_period_end:
         next_payment = sub.current_period_end
     elif sub.plan != 'free' and last_payment:
-        import datetime
-        next_payment = last_payment.created_at + timedelta(days=30)
+        fallback_days = 365 if sub.billing_interval == 'year' else 30
+        next_payment = last_payment.created_at + timedelta(days=fallback_days)
 
     # Plan price
     plan_price = {'free': 0, 'pro': 19, 'enterprise': 79}.get(sub.plan, 0)
@@ -3411,6 +3486,25 @@ def billing_success(request):
                 # Save subscription ID (it's a string)
                 if session.subscription:
                     sub.stripe_subscription_id = str(session.subscription)
+                    try:
+                        stripe_sub = stripe.Subscription.retrieve(str(session.subscription))
+                        sub.cancel_at_period_end = bool(getattr(stripe_sub, 'cancel_at_period_end', False))
+                        try:
+                            interval_from_stripe = stripe_sub['items']['data'][0]['price']['recurring']['interval']
+                            if interval_from_stripe in ('month', 'year'):
+                                sub.billing_interval = interval_from_stripe
+                                interval = interval_from_stripe
+                        except Exception:
+                            pass
+
+                        period_start = getattr(stripe_sub, 'current_period_start', None)
+                        period_end = getattr(stripe_sub, 'current_period_end', None)
+                        if period_start:
+                            sub.current_period_start = datetime.fromtimestamp(period_start, tz=dt_timezone.utc)
+                        if period_end:
+                            sub.current_period_end = datetime.fromtimestamp(period_end, tz=dt_timezone.utc)
+                    except Exception as e:
+                        log.warning(f'Could not load Stripe subscription period dates: {e}')
 
                 sub.save()
                 log.info(f'Subscription updated: plan={plan}, interval={interval}')
@@ -3579,14 +3673,26 @@ def stripe_webhook(request):
 
     from tracker.core.models import Subscription, PaymentHistory
 
-    if event.type == 'customer.subscription.updated':
+    if event.type in ('customer.subscription.created', 'customer.subscription.updated'):
         sub_data = event.data.object
         sub = Subscription.objects.filter(stripe_subscription_id=sub_data.id).first()
+        if not sub:
+            sub = Subscription.objects.filter(stripe_customer_id=getattr(sub_data, 'customer', '')).first()
         if sub:
             status_map = {'active': 'active', 'past_due': 'past_due', 'canceled': 'cancelled', 'trialing': 'trialing'}
             sub.status = status_map.get(sub_data.status, sub.status)
-            if sub_data.cancel_at_period_end:
-                sub.cancel_at_period_end = True
+            sub.stripe_subscription_id = str(sub_data.id or sub.stripe_subscription_id)
+            sub.cancel_at_period_end = bool(getattr(sub_data, 'cancel_at_period_end', False))
+            if getattr(sub_data, 'current_period_start', None):
+                sub.current_period_start = datetime.fromtimestamp(sub_data.current_period_start, tz=dt_timezone.utc)
+            if getattr(sub_data, 'current_period_end', None):
+                sub.current_period_end = datetime.fromtimestamp(sub_data.current_period_end, tz=dt_timezone.utc)
+            try:
+                interval = sub_data['items']['data'][0]['price']['recurring']['interval']
+                if interval in ('month', 'year'):
+                    sub.billing_interval = interval
+            except Exception:
+                pass
             sub.save()
 
     elif event.type == 'customer.subscription.deleted':

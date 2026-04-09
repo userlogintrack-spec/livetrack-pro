@@ -26,7 +26,7 @@
             <p style="margin-bottom:8px;color:var(--text-muted);font-size:13px;">Copy this code and paste it before the closing <code>&lt;/body&gt;</code> tag on your website:</p>
             <div style="position:relative;">
                 <textarea id="embedCode" class="form-control" rows="2" readonly style="font-family:monospace;font-size:12px;background:var(--bg-primary);resize:none;">{{ embed_code }}</textarea>
-                <button type="button" onclick="copyEmbed()" style="position:absolute;top:8px;right:8px;border:none;background:var(--primary);color:white;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+                <button type="button" onclick="copyEmbed(this)" style="position:absolute;top:8px;right:8px;border:none;background:var(--primary);color:white;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
                     <i class="fas fa-copy"></i> Copy
                 </button>
             </div>
@@ -184,6 +184,27 @@
                     </div>
                 </div>
 
+                <!-- Access Controls -->
+                <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px;">
+                    <h4 style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px;"><i class="fas fa-shield-alt" style="color:var(--danger);margin-right:6px;"></i> Access Controls</h4>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div class="form-group">
+                            <label style="display:flex;align-items:center;gap:8px;">
+                                <input type="checkbox" name="blocked_countries_enabled" {% if org.blocked_countries_enabled %}checked{% endif %}> Enable blocked countries
+                            </label>
+                            <textarea class="form-control" name="blocked_countries" rows="3" placeholder="IN&#10;US&#10;Pakistan">{{ org.blocked_countries }}</textarea>
+                            <small style="color:var(--text-muted);font-size:11px;">One country per line (name or code).</small>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:flex;align-items:center;gap:8px;">
+                                <input type="checkbox" name="allowed_domains_enabled" {% if org.allowed_domains_enabled %}checked{% endif %}> Enable allowed domains
+                            </label>
+                            <textarea class="form-control" name="allowed_domains" rows="3" placeholder="example.com&#10;sub.domain.com">{{ org.allowed_domains }}</textarea>
+                            <small style="color:var(--text-muted);font-size:11px;">One domain per line. Subdomains are allowed automatically.</small>
+                        </div>
+                    </div>
+                </div>
+
                 <button class="btn btn-primary" type="submit" style="width:100%;margin-top:12px;"><i class="fas fa-save"></i> Save Settings</button>
             </form>
         </div>
@@ -262,14 +283,54 @@
 
 </div>
 
+<div id="copyToast" style="position:fixed;right:18px;bottom:18px;background:#111827;color:#fff;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:600;opacity:0;transform:translateY(8px);pointer-events:none;transition:all .22s;z-index:9999;">
+    Copied to clipboard
+</div>
+
 <script>
-function copyEmbed() {
+function showCopyToast(message, isError) {
+    const toast = document.getElementById('copyToast');
+    toast.textContent = message;
+    toast.style.background = isError ? '#b91c1c' : '#111827';
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+    clearTimeout(window.__copyToastTimer);
+    window.__copyToastTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+    }, 1800);
+}
+
+function copyEmbed(btn) {
     const box = document.getElementById('embedCode');
-    navigator.clipboard.writeText(box.value).then(() => {
-        const btn = event.target.closest('button');
+    const text = box.value || '';
+    const onSuccess = () => {
         btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-        setTimeout(() => btn.innerHTML = '<i class="fas fa-copy"></i> Copy', 2000);
-    });
+        showCopyToast('Copied to clipboard', false);
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+        }, 2000);
+    };
+    const onError = () => {
+        showCopyToast('Copy failed. Copy manually.', true);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(onSuccess).catch(onError);
+        return;
+    }
+
+    box.select();
+    box.setSelectionRange(0, text.length);
+    try {
+        const ok = document.execCommand('copy');
+        if (ok) onSuccess();
+        else onError();
+    } catch (e) {
+        onError();
+    } finally {
+        box.blur();
+    }
 }
 
 // ═══════ LIVE PREVIEW — All fields update preview in real-time ═══════

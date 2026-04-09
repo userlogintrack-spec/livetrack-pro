@@ -247,6 +247,7 @@
 <script>
 var BASE = window.location.origin;
 var KEY = '{{ widget_key }}';
+var PARENT_DOMAIN = '{{ parent_domain|default:"" }}';
 var SK_STORAGE = 'ltw_sk_' + KEY;
 var ROOM_STORAGE = 'ltw_room_' + KEY;
 var NAME_STORAGE = 'ltw_name_' + KEY;
@@ -303,7 +304,7 @@ function toggleEmoji() {
 function insertEmoji(e) { document.getElementById('msgInput').value += e; document.getElementById('msgInput').focus(); document.getElementById('emojiPopup').classList.remove('show'); }
 
 function post(path, data) {
-    data = data || {}; data.key = KEY; data.session_key = SESSION;
+    data = data || {}; data.key = KEY; data.session_key = SESSION; data.parent_domain = PARENT_DOMAIN;
     return fetch(BASE + path, {method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(data)})
         .then(function(r){return r.json();})
         .then(function(j){

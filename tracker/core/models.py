@@ -45,6 +45,19 @@ class Organization(models.Model):
     proactive_enabled = models.BooleanField(default=False)
     proactive_delay = models.PositiveIntegerField(default=30, help_text='Seconds before showing proactive message')
     proactive_message = models.CharField(max_length=200, default='Need help? Chat with us!')
+    # Access control
+    blocked_countries_enabled = models.BooleanField(default=False)
+    blocked_countries = models.TextField(
+        blank=True,
+        default='',
+        help_text='Comma or newline separated country names/codes (e.g. IN,US)',
+    )
+    allowed_domains_enabled = models.BooleanField(default=False)
+    allowed_domains = models.TextField(
+        blank=True,
+        default='',
+        help_text='Comma or newline separated domains (e.g. example.com)',
+    )
 
     def save(self, *args, **kwargs):
         if not self.widget_key:
