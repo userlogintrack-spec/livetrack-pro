@@ -400,7 +400,7 @@
             background: var(--gradient); color: white;
             box-shadow: 0 4px 14px rgba(124, 58, 237, 0.32);
         }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(124, 58, 237, 0.42); }
+        .btn-primary:hover { box-shadow: 0 8px 22px rgba(124, 58, 237, 0.42); }
 
         .btn-secondary {
             background: var(--bg-hover); color: var(--text-primary);
@@ -435,8 +435,8 @@
             pointer-events: none;
             transition: opacity .3s;
         }
-        .card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
-        .card:hover::before { opacity: 1; }
+        .card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-lg); }
+        .card:hover::before { opacity: 0; }
 
         .card-header {
             padding: 18px 22px;
@@ -488,8 +488,8 @@
         .stat-card.blue::after   { background: #3b82f6; }
         .stat-card.orange::after { background: #f59e0b; }
 
-        .stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--border-hover); }
-        .stat-card:hover::after { transform: scale(1.1); opacity: 0.12; }
+        .stat-card:hover { box-shadow: var(--shadow-lg); border-color: var(--border-hover); }
+        .stat-card:hover::after { opacity: 0.07; }
 
         .stat-card .stat-icon {
             width: 52px; height: 52px;
@@ -499,7 +499,7 @@
             position: relative; z-index: 1;
             transition: transform .3s ease;
         }
-        .stat-card:hover .stat-icon { transform: scale(1.05) rotate(-3deg); }
+        .stat-card:hover .stat-icon { transform: none; }
 
         .stat-card.purple .stat-icon { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #7c3aed; box-shadow: 0 4px 12px rgba(124,58,237,0.18); }
         .stat-card.green  .stat-icon { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #059669; box-shadow: 0 4px 12px rgba(16,185,129,0.18); }
@@ -569,7 +569,7 @@
             display: inline-flex; align-items: center; gap: 6px;
         }
 
-        .filter-tab:hover { border-color: var(--border-hover); color: var(--text-primary); transform: translateY(-1px); }
+        .filter-tab:hover { border-color: var(--border-hover); color: var(--text-primary); }
         .filter-tab.active {
             background: var(--gradient);
             color: white; border-color: transparent;
@@ -742,6 +742,25 @@
             </a>
             {% endif %}
 
+            <!-- Website Selector -->
+            <div style="padding:4px 12px 10px;margin-bottom:6px;border-bottom:1px solid var(--border);">
+                <select id="websiteSelector" onchange="switchWebsite(this.value)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-primary);color:var(--text-primary);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;">
+                    <option value="all">All Websites</option>
+                    {% for ws in user_websites %}
+                    <option value="{{ ws.id }}" {% if ws.id == selected_website_id %}selected{% endif %}>{{ ws.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <script>
+            function switchWebsite(val) {
+                fetch('{% url "dashboard:set_website" %}', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+                    body: JSON.stringify({website_id: val === 'all' ? 'all' : parseInt(val)}),
+                }).then(function() { location.reload(); });
+            }
+            </script>
+
             <!-- Primary — always visible -->
             <a href="{% url 'dashboard:home' %}" class="nav-link {% block nav_dashboard %}{% endblock %}">
                 <i class="fas fa-th-large"></i> <span>Dashboard</span>
@@ -790,6 +809,7 @@
             <div class="nav-toggle" onclick="toggleMenu('menuAdmin')"><i class="fas fa-tools"></i><span class="nav-toggle-text">Admin</span><i class="fas fa-chevron-right nav-chevron"></i></div>
             <div id="menuAdmin" class="nav-submenu">
                 <a href="{% url 'dashboard:manage_coupons' %}" class="nav-link"><i class="fas fa-tags"></i> <span>Coupons</span></a>
+                <a href="{% url 'dashboard:website_manage' %}" class="nav-link"><i class="fas fa-globe"></i> <span>Websites</span></a>
                 <a href="{% url 'dashboard:website_settings' %}" class="nav-link"><i class="fas fa-palette"></i> <span>Widget</span></a>
                 <a href="{% url 'dashboard:add_agent' %}" class="nav-link"><i class="fas fa-user-plus"></i> <span>Agents</span></a>
                 <a href="{% url 'dashboard:offline_messages' %}" class="nav-link"><i class="fas fa-envelope"></i> <span>Offline Msgs</span></a>
@@ -830,6 +850,7 @@
             <div class="nav-toggle" onclick="toggleMenu('menuSettings')"><i class="fas fa-cog"></i><span class="nav-toggle-text">Settings</span><i class="fas fa-chevron-right nav-chevron"></i></div>
             <div id="menuSettings" class="nav-submenu">
                 <a href="{% url 'dashboard:billing' %}" class="nav-link"><i class="fas fa-credit-card"></i> <span>Billing & Plan</span></a>
+                <a href="{% url 'dashboard:website_manage' %}" class="nav-link"><i class="fas fa-globe"></i> <span>Websites</span></a>
                 <a href="{% url 'dashboard:website_settings' %}" class="nav-link"><i class="fas fa-palette"></i> <span>Widget</span></a>
                 <a href="{% url 'dashboard:add_agent' %}" class="nav-link"><i class="fas fa-user-plus"></i> <span>Agents</span></a>
                 <a href="{% url 'dashboard:offline_messages' %}" class="nav-link {% block nav_offline %}{% endblock %}"><i class="fas fa-envelope"></i> <span>Offline Msgs</span></a>

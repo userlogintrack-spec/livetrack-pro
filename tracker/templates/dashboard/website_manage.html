@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Websites{% endblock %}
+{% block page_title %}Websites{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block top_actions %}
+<button onclick="document.getElementById('addModal').style.display='flex'" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> Add website</button>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <table style="width:100%;">
+            <thead>
+                <tr>
+                    <th style="padding:12px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Name</th>
+                    <th style="padding:12px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Domain</th>
+                    <th style="padding:12px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Tracking Code</th>
+                    <th style="padding:12px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);width:100px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ws in websites %}
+                <tr id="ws-row-{{ ws.id }}">
+                    <td style="padding:14px 20px;border-bottom:1px solid var(--border);">
+                        <div style="font-weight:600;font-size:14px;color:var(--text-primary);">{{ ws.name }}</div>
+                    </td>
+                    <td style="padding:14px 20px;border-bottom:1px solid var(--border);color:var(--text-muted);font-size:13px;">{{ ws.domain }}</td>
+                    <td style="padding:14px 20px;border-bottom:1px solid var(--border);">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <code style="font-size:11px;background:var(--bg-hover);padding:6px 10px;border-radius:6px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">&lt;script defer src="{{ base_url }}/api/widget/script.js?key={{ ws.tracking_key }}"&gt;&lt;/script&gt;</code>
+                            <button onclick="copyCode('{{ ws.tracking_key }}')" title="Copy" style="background:none;border:1px solid var(--border);padding:6px 8px;border-radius:6px;cursor:pointer;color:var(--text-muted);font-size:11px;"><i class="fas fa-copy"></i></button>
+                        </div>
+                    </td>
+                    <td style="padding:14px 20px;border-bottom:1px solid var(--border);">
+                        <div style="display:flex;gap:6px;">
+                            <button onclick="editWebsite({{ ws.id }},'{{ ws.name|escapejs }}','{{ ws.domain|escapejs }}')" class="btn btn-sm btn-secondary" title="Edit"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteWebsite({{ ws.id }},'{{ ws.name|escapejs }}')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text-muted);">No websites added yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="addModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:28px;width:420px;max-width:90vw;">
+        <h3 id="modalTitle" style="font-size:18px;font-weight:700;margin-bottom:20px;">Add website</h3>
+        <input type="hidden" id="editId" value="">
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Name</label>
+            <input type="text" id="wsName" class="form-control" placeholder="My Website">
+        </div>
+        <div style="margin-bottom:20px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Domain</label>
+            <input type="text" id="wsDomain" class="form-control" placeholder="example.com">
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button onclick="closeModal()" class="btn btn-sm btn-secondary">Cancel</button>
+            <button onclick="saveWebsite()" class="btn btn-sm btn-primary">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyCode(key) {
+    const code = '<script defer src="{{ base_url }}/api/widget/script.js?key=' + key + '"><\/script>';
+    navigator.clipboard.writeText(code);
+}
+function closeModal() {
+    document.getElementById('addModal').style.display = 'none';
+    document.getElementById('editId').value = '';
+    document.getElementById('wsName').value = '';
+    document.getElementById('wsDomain').value = '';
+    document.getElementById('modalTitle').textContent = 'Add website';
+}
+function editWebsite(id, name, domain) {
+    document.getElementById('editId').value = id;
+    document.getElementById('wsName').value = name;
+    document.getElementById('wsDomain').value = domain;
+    document.getElementById('modalTitle').textContent = 'Edit website';
+    document.getElementById('addModal').style.display = 'flex';
+}
+function saveWebsite() {
+    const editId = document.getElementById('editId').value;
+    const name = document.getElementById('wsName').value.trim();
+    const domain = document.getElementById('wsDomain').value.trim();
+    if (!name || !domain) return alert('Name and domain are required');
+    const body = editId
+        ? {action: 'edit', id: parseInt(editId), name, domain}
+        : {action: 'add', name, domain};
+    fetch('{% url "dashboard:website_manage" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    }).then(r => r.json()).then(data => {
+        if (data.error) return alert(data.error);
+        location.reload();
+    });
+}
+function deleteWebsite(id, name) {
+    if (!confirm('Delete website "' + name + '"? Visitor data will be unlinked.')) return;
+    fetch('/dashboard/settings/websites/' + id + '/delete/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'},
+    }).then(r => r.json()).then(data => {
+        if (data.error) return alert(data.error);
+        location.reload();
+    });
+}
+</script>
+{% endblock %}

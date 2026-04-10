@@ -141,7 +141,7 @@ def _spam_score(text):
     return score
 
 
-def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None, visitor_fingerprint=''):
+def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None, visitor_fingerprint='', website=None):
     """Centralised dedup: returns the canonical Visitor row for this device.
 
     Match priority:
@@ -189,6 +189,7 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None, visitor_
     # 3. Create new
     create_kwargs = {
         'organization': org,
+        'website': website,
         'session_key': session_key,
         'visitor_fingerprint': (visitor_fingerprint or '')[:100],
         'ip_address': ip,
@@ -513,14 +514,26 @@ def logout_view(request):
 def _get_org_from_request(request):
     """Get Organization from widget_key in request body or query params."""
     from tracker.core.models import Organization
+    org, _ = _get_website_from_request(request)
+    return org
+
+
+def _get_website_from_request(request):
+    """Get (Organization, Website) from tracking_key in request body or query params."""
+    from tracker.core.models import Organization, Website
     data = _parse_json_body(request) if request.body else {}
     key = (data or {}).get('key') or request.GET.get('key') or ''
     if key:
+        website = Website.objects.select_related('organization').filter(tracking_key=key).first()
+        if website:
+            return website.organization, website
+        # Backward compat: try org widget_key
         org = Organization.objects.filter(widget_key=key).first()
         if org:
-            return org
-    # Fallback to first org (for backward compatibility / landing page without key)
-    return Organization.objects.first()
+            return org, org.websites.first()
+    # Fallback
+    org = Organization.objects.first()
+    return org, org.websites.first() if org else None
 
 
 @csrf_exempt
@@ -530,7 +543,7 @@ def widget_init(request):
         if not request.session.session_key:
             request.session.create()
 
-        org = _get_org_from_request(request)
+        org, website = _get_website_from_request(request)
 
         from tracker.visitors.middleware import get_client_ip, parse_user_agent
 
@@ -561,6 +574,7 @@ def widget_init(request):
 
         visitor, _ = _resolve_or_create_visitor(
             org=org, ip=ip, ua=ua, session_key=session_key, visitor_fingerprint=visitor_fingerprint,
+            website=website,
             defaults={
                 'browser': browser, 'os': os_name, 'device_type': device_type,
                 'country': country_name, 'city': city_name,
@@ -596,7 +610,7 @@ def widget_track_pageview(request):
     if not url:
         return JsonResponse({'error': 'url required'}, status=400)
 
-    org = _get_org_from_request(request)
+    org, website = _get_website_from_request(request)
     if not org:
         return JsonResponse({'error': 'org not found'}, status=404)
     parent_domain = _extract_parent_domain(request, data)
@@ -632,6 +646,7 @@ def widget_track_pageview(request):
 
     visitor, created = _resolve_or_create_visitor(
         org=org, ip=ip, ua=ua, session_key=session_key, visitor_fingerprint=visitor_fingerprint,
+        website=website,
         defaults={
             'browser': browser, 'os': os_name, 'device_type': device_type,
             'referrer': referrer, 'referrer_source': get_referrer_source(referrer),
@@ -720,9 +735,10 @@ def widget_script(request):
         base_url = 'https://' + base_url[len('http://'):]
     widget_key = request.GET.get('key', '')
 
-    # Load org customization
-    from tracker.core.models import Organization
-    org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else None
+    # Load org customization via Website
+    from tracker.core.models import Organization, Website
+    website = Website.objects.select_related('organization').filter(tracking_key=widget_key).first() if widget_key else None
+    org = website.organization if website else (Organization.objects.filter(widget_key=widget_key).first() if widget_key else None)
     script_domain = _extract_parent_domain(request, {})
     if org and not _domain_allowed(org, script_domain):
         blocked_js = (
@@ -922,8 +938,8 @@ def widget_start_chat(request):
         if body_session:
             session_key = body_session
 
-        # Resolve org from widget key
-        org = _get_org_from_request(request)
+        # Resolve org + website from widget key
+        org, website = _get_website_from_request(request)
         limit_state = _monthly_visitor_limit_state(org, session_key=session_key, visitor_fingerprint=visitor_fingerprint)
         if not limit_state.get('allowed', True):
             return JsonResponse({
@@ -968,6 +984,7 @@ def widget_start_chat(request):
         browser, os_name, device_type = parse_user_agent(ua)
         visitor, _ = _resolve_or_create_visitor(
             org=org, ip=ip, ua=ua, session_key=session_key, visitor_fingerprint=visitor_fingerprint,
+            website=website,
             defaults={
                 'browser': browser, 'os': os_name, 'device_type': device_type,
                 'is_online': True,
@@ -1028,6 +1045,7 @@ def widget_start_chat(request):
         visitor_name = data.get('name', 'Visitor') or 'Visitor'
         room = ChatRoom.objects.create(
             organization=org,
+            website=website,
             room_id=room_id,
             visitor=visitor,
             visitor_name=visitor_name,

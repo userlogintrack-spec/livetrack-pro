@@ -23,13 +23,55 @@ from tracker.chat.models import (
     Survey, SurveyQuestion, SurveyResponse, SurveyAnswer,
     AIBotConfig, AIBotKnowledge, ChatbotFlow,
     KBCategory, KBArticle, WhatsAppConfig, WhatsAppMessage, VisitorSegment,
+    AgentWebsiteAccess,
 )
 from tracker.chat.security import create_ws_token
 from tracker.chat.utils import close_stale_chats
-from tracker.core.models import WebsiteSettings, Organization
+from tracker.core.models import WebsiteSettings, Organization, Website
 from tracker.core.views import get_user_org
 
 logger = logging.getLogger(__name__)
+
+
+# ═══════ Website Filter Helper ═══════
+def get_website_filter(request, org):
+    """Return a dict filter for website-scoping dashboard queries.
+    Owner/admin: selected website or all. Agent: only accessible websites."""
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+
+    selected_id = request.session.get('selected_website_id')
+    if selected_id:
+        try:
+            selected_id = int(selected_id)
+        except (ValueError, TypeError):
+            selected_id = None
+
+    if is_owner:
+        if selected_id:
+            ws = Website.objects.filter(id=selected_id, organization=org).first()
+            if ws:
+                return {'website_id': ws.id}
+        return {}  # All websites
+    else:
+        # Agent: only accessible websites
+        accessible_ids = list(
+            AgentWebsiteAccess.objects.filter(agent=profile).values_list('website_id', flat=True)
+        )
+        if not accessible_ids:
+            # Backward compat: agent with no access rows sees all (legacy agents)
+            return {}
+        if selected_id and selected_id in accessible_ids:
+            return {'website_id': selected_id}
+        return {'website_id__in': accessible_ids}
+
+
+def get_selected_website(request, org):
+    """Return the currently selected Website object or None (all)."""
+    selected_id = request.session.get('selected_website_id')
+    if selected_id:
+        return Website.objects.filter(id=selected_id, organization=org).first()
+    return None
 
 
 @login_required
@@ -46,36 +88,84 @@ def dashboard_home(request):
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     last_30_min = now - timedelta(minutes=30)
 
-    # Role-based visibility — agents only see their own work; owners/admins see everything.
+    # Date range filter
+    range_key = request.GET.get('range', '7d')
+    range_map = {'24h': 1, '7d': 7, '30d': 30, '90d': 90}
+    range_days = range_map.get(range_key, 7)
+    period_start = now - timedelta(days=range_days)
+    prev_period_start = period_start - timedelta(days=range_days)
+
     profile = getattr(request.user, 'agent_profile', None)
     is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
 
-    visitors_qs = Visitor.objects.filter(organization=org)
-    pageviews_qs = PageView.objects.filter(visitor__organization=org)
-    if is_owner:
-        chats_qs = ChatRoom.objects.filter(organization=org)
-    else:
-        # Agent sees: chats they handle + the unassigned/waiting queue (so they can pick).
-        chats_qs = ChatRoom.objects.filter(organization=org).filter(
-            Q(agent=request.user) | Q(agent__isnull=True)
-        )
+    ws_filter = get_website_filter(request, org)
+    visitors_qs = Visitor.objects.filter(organization=org, **ws_filter)
+    pageviews_qs = PageView.objects.filter(visitor__organization=org, **{k.replace('website_id', 'visitor__website_id'): v for k, v in ws_filter.items()})
+    chats_qs = ChatRoom.objects.filter(organization=org, **ws_filter)
+
+    # Current period stats
+    period_visitors = visitors_qs.filter(first_visit__gte=period_start)
+    period_pageviews = pageviews_qs.filter(timestamp__gte=period_start)
+    period_chats = chats_qs.filter(created_at__gte=period_start)
 
     total_visitors = visitors_qs.count()
     online_visitors = visitors_qs.filter(last_seen__gte=last_30_min).count()
+    period_visitor_count = period_visitors.count()
+    period_pageview_count = period_pageviews.count()
     total_chats = chats_qs.count()
     active_chats = chats_qs.filter(status__in=['waiting', 'active']).count()
     today_visitors = visitors_qs.filter(first_visit__gte=today_start).count()
     today_chats = chats_qs.filter(created_at__gte=today_start).count()
     today_page_views = pageviews_qs.filter(timestamp__gte=today_start).count()
-    unread_offline = OfflineMessage.objects.filter(organization=org, is_read=False).count()
+    unread_offline = OfflineMessage.objects.filter(organization=org, is_read=False, **ws_filter).count()
+
+    # Bounce rate & avg duration for period
+    bounced_count = period_visitors.filter(is_bounced=True).count()
+    bounce_rate = round((bounced_count / period_visitor_count * 100)) if period_visitor_count > 0 else 0
+    avg_duration = period_visitors.filter(session_duration__gt=0).aggregate(avg=Avg('session_duration'))['avg'] or 0
+    avg_dur_min = int(avg_duration) // 60
+    avg_dur_sec = int(avg_duration) % 60
+
+    # Previous period for comparison
+    prev_visitors = visitors_qs.filter(first_visit__gte=prev_period_start, first_visit__lt=period_start).count()
+    prev_pageviews = pageviews_qs.filter(timestamp__gte=prev_period_start, timestamp__lt=period_start).count()
+    prev_bounced = visitors_qs.filter(first_visit__gte=prev_period_start, first_visit__lt=period_start, is_bounced=True).count()
+    prev_bounce_rate = round((prev_bounced / prev_visitors * 100)) if prev_visitors > 0 else 0
+    prev_chats_count = chats_qs.filter(created_at__gte=prev_period_start, created_at__lt=period_start).count()
+
+    def _pct_change(current, previous):
+        if previous == 0:
+            return 100 if current > 0 else 0
+        return round(((current - previous) / previous) * 100)
+
+    visitor_change = _pct_change(period_visitor_count, prev_visitors)
+    pageview_change = _pct_change(period_pageview_count, prev_pageviews)
+    bounce_change = _pct_change(bounce_rate, prev_bounce_rate)
+    chat_change = _pct_change(period_chats.count(), prev_chats_count)
 
     waiting_chats = chats_qs.filter(status='waiting').select_related('visitor')
     recent_visitors = visitors_qs.filter(last_seen__gte=last_30_min)[:10]
 
-    browser_stats = visitors_qs.values('browser').annotate(count=Count('id')).order_by('-count')[:5]
-    device_stats = visitors_qs.values('device_type').annotate(count=Count('id')).order_by('-count')
-    referrer_stats = visitors_qs.values('referrer_source').annotate(count=Count('id')).order_by('-count')[:5]
+    browser_stats = period_visitors.exclude(browser='').values('browser').annotate(count=Count('id')).order_by('-count')[:10]
+    device_stats = period_visitors.values('device_type').annotate(count=Count('id')).order_by('-count')
+    os_stats = period_visitors.exclude(os='').values('os').annotate(count=Count('id')).order_by('-count')[:10]
+    referrer_stats = period_visitors.values('referrer_source').annotate(count=Count('id')).order_by('-count')[:10]
+    country_stats = period_visitors.exclude(country='').values('country').annotate(count=Count('id')).order_by('-count')[:10]
+    city_stats = period_visitors.exclude(city='').values('city').annotate(count=Count('id')).order_by('-count')[:10]
+    top_pages = period_pageviews.values('url').annotate(count=Count('visitor', distinct=True)).order_by('-count')[:10]
+    entry_pages = period_pageviews.filter(is_entry=True).values('url').annotate(count=Count('visitor', distinct=True)).order_by('-count')[:10]
+    exit_pages = period_pageviews.filter(is_exit=True).values('url').annotate(count=Count('visitor', distinct=True)).order_by('-count')[:10]
 
+    # Daily chart data for the period
+    daily_data = []
+    for i in range(min(range_days, 30)):
+        day_start = (now - timedelta(days=range_days - 1 - i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        v_count = visitors_qs.filter(first_visit__gte=day_start, first_visit__lt=day_end).count()
+        pv_count = pageviews_qs.filter(timestamp__gte=day_start, timestamp__lt=day_end).count()
+        daily_data.append({'date': day_start.strftime('%b %d'), 'visitors': v_count, 'views': pv_count})
+
+    # Hourly data for today
     hourly_data = []
     for hour in range(24):
         hour_start = today_start.replace(hour=hour)
@@ -123,6 +213,17 @@ def dashboard_home(request):
     context = {
         'total_visitors': total_visitors,
         'online_visitors': online_visitors,
+        'period_visitor_count': period_visitor_count,
+        'period_pageview_count': period_pageview_count,
+        'bounce_rate': bounce_rate,
+        'avg_dur_min': avg_dur_min,
+        'avg_dur_sec': avg_dur_sec,
+        'visitor_change': visitor_change,
+        'pageview_change': pageview_change,
+        'bounce_change': bounce_change,
+        'chat_change': chat_change,
+        'range_key': range_key,
+        'daily_data': daily_data,
         'total_chats': total_chats,
         'active_chats': active_chats,
         'today_visitors': today_visitors,
@@ -133,7 +234,13 @@ def dashboard_home(request):
         'recent_visitors': recent_visitors,
         'browser_stats': list(browser_stats),
         'device_stats': list(device_stats),
+        'os_stats': list(os_stats),
         'referrer_stats': list(referrer_stats),
+        'country_stats': list(country_stats),
+        'city_stats': list(city_stats),
+        'top_pages': list(top_pages),
+        'entry_pages': list(entry_pages),
+        'exit_pages': list(exit_pages),
         'hourly_data': hourly_data,
         'recent_chats': recent_chats,
         'avg_rating': avg_rating,
@@ -184,10 +291,8 @@ def chat_list(request):
     from django.db.models import Exists, OuterRef, Subquery
     profile = getattr(request.user, 'agent_profile', None)
     is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
-    base_chats = ChatRoom.objects.filter(organization=org)
-    if not is_owner:
-        # Agent sees only their own chats + the unassigned waiting queue
-        base_chats = base_chats.filter(Q(agent=request.user) | Q(agent__isnull=True))
+    ws_filter = get_website_filter(request, org)
+    base_chats = ChatRoom.objects.filter(organization=org, **ws_filter)
     chats = base_chats.select_related('visitor', 'agent').annotate(
         unread_count=Count('messages', filter=Q(messages__sender_type='visitor', messages__is_read=False)),
         message_count_db=Count('messages'),
@@ -324,6 +429,15 @@ def chat_list(request):
 def chat_room_view(request, room_id):
     org = get_user_org(request.user)
     room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
+    # Check agent has access to this website
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner and room.website:
+        has_access = AgentWebsiteAccess.objects.filter(agent=profile, website=room.website).exists()
+        if not has_access:
+            # Check if agent has ANY access rows (if none, legacy agent = allow)
+            if AgentWebsiteAccess.objects.filter(agent=profile).exists():
+                return HttpResponse("You don't have access to this website's chats.", status=403)
     visitor = room.visitor
     visitor_pages = visitor.page_views.order_by('-timestamp')[:20]
     visitor_notes = visitor.agent_notes.order_by('-created_at')[:10]
@@ -450,10 +564,11 @@ def visitor_list(request):
     if group_by not in allowed_group_by:
         group_by = 'activity'
 
+    ws_filter = get_website_filter(request, org)
     latest_pageviews = PageView.objects.filter(visitor_id=OuterRef('pk')).order_by('-timestamp')
     latest_chats = ChatRoom.objects.filter(visitor_id=OuterRef('pk')).order_by('-created_at')
 
-    visitors = Visitor.objects.filter(organization=org).annotate(
+    visitors = Visitor.objects.filter(organization=org, **ws_filter).annotate(
         page_count=Count('page_views'),
         chat_count=Count('chat_rooms'),
         latest_page_title=Subquery(latest_pageviews.values('page_title')[:1]),
@@ -551,14 +666,35 @@ def visitor_list(request):
 def visitor_detail(request, visitor_id):
     org = get_user_org(request.user)
     visitor = get_object_or_404(Visitor, id=visitor_id, organization=org)
-    page_views = visitor.page_views.order_by('-timestamp')[:50]
+    # Check agent has access to this visitor's website
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner and visitor.website:
+        has_access = AgentWebsiteAccess.objects.filter(agent=profile, website=visitor.website).exists()
+        if not has_access and AgentWebsiteAccess.objects.filter(agent=profile).exists():
+            return HttpResponse("You don't have access to this website's visitors.", status=403)
+    page_views_qs = visitor.page_views.order_by('-timestamp')
+    total_page_views = page_views_qs.count()
+    page_views = page_views_qs[:50]
     chat_rooms = visitor.chat_rooms.order_by('-created_at')
     notes = visitor.agent_notes.order_by('-created_at')
+    events_count = visitor.events.count()
+    # Format visit duration
+    dur = visitor.session_duration or 0
+    if dur >= 3600:
+        visit_duration = f"{dur // 3600}h {(dur % 3600) // 60}m"
+    elif dur >= 60:
+        visit_duration = f"{dur // 60}m {dur % 60}s"
+    else:
+        visit_duration = f"{dur}s"
     return render(request, 'dashboard/visitor_detail.html', {
         'visitor': visitor,
         'page_views': page_views,
+        'total_page_views': total_page_views,
         'chat_rooms': chat_rooms,
         'notes': notes,
+        'events_count': events_count,
+        'visit_duration': visit_duration,
     })
 
 
@@ -574,18 +710,19 @@ def api_stats(request):
     last_30_min = now - timedelta(minutes=30)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
+    ws_filter = get_website_filter(request, org)
     return JsonResponse({
-        'online_visitors': Visitor.objects.filter(organization=org, last_seen__gte=last_30_min).count(),
-        'active_chats': ChatRoom.objects.filter(organization=org, status__in=['waiting', 'active']).count(),
-        'active_only_chats': ChatRoom.objects.filter(organization=org, status='active').count(),
-        'waiting_chats': ChatRoom.objects.filter(organization=org, status='waiting').count(),
+        'online_visitors': Visitor.objects.filter(organization=org, last_seen__gte=last_30_min, **ws_filter).count(),
+        'active_chats': ChatRoom.objects.filter(organization=org, status__in=['waiting', 'active'], **ws_filter).count(),
+        'active_only_chats': ChatRoom.objects.filter(organization=org, status='active', **ws_filter).count(),
+        'waiting_chats': ChatRoom.objects.filter(organization=org, status='waiting', **ws_filter).count(),
         'unread_messages': Message.objects.filter(
             room__organization=org,
             room__status__in=['waiting', 'active'],
             sender_type='visitor',
             is_read=False,
         ).count(),
-        'today_visitors': Visitor.objects.filter(organization=org, first_visit__gte=today_start).count(),
+        'today_visitors': Visitor.objects.filter(organization=org, first_visit__gte=today_start, **ws_filter).count(),
         'today_page_views': PageView.objects.filter(visitor__organization=org, timestamp__gte=today_start).count(),
     })
 
@@ -1235,21 +1372,41 @@ def add_agent_view(request):
                 first_name=first_name,
                 last_name=last_name,
             )
-            AgentProfile.objects.create(
+            agent_profile = AgentProfile.objects.create(
                 user=user,
                 max_chats=max(1, max_chats),
                 is_available=is_available,
                 organization=org,
                 role='agent',
             )
+            # Grant website access
+            website_ids = request.POST.getlist('websites')
+            if website_ids:
+                for ws_id in website_ids:
+                    try:
+                        ws = Website.objects.get(id=int(ws_id), organization=org)
+                        AgentWebsiteAccess.objects.get_or_create(agent=agent_profile, website=ws)
+                    except (Website.DoesNotExist, ValueError):
+                        pass
+            else:
+                # Grant access to all websites by default
+                for ws in Website.objects.filter(organization=org):
+                    AgentWebsiteAccess.objects.get_or_create(agent=agent_profile, website=ws)
             created = True
 
     agents = User.objects.filter(agent_profile__isnull=False, agent_profile__organization=org).select_related('agent_profile').order_by('username')
+    websites = Website.objects.filter(organization=org)
+    # Add website access info per agent
+    for agent in agents:
+        agent.accessible_websites = list(
+            AgentWebsiteAccess.objects.filter(agent=agent.agent_profile).select_related('website').values_list('website__name', flat=True)
+        )
     return render(request, 'dashboard/add_agent.html', {
         'created': created,
         'error': error,
         'agents': agents,
         'org': org,
+        'websites': websites,
     })
 
 
@@ -1697,8 +1854,9 @@ def live_visitors_api(request):
     """API: Real-time visitor activity with current pages."""
     org = get_user_org(request.user)
     last_5_min = timezone.now() - timedelta(minutes=5)
+    ws_filter = get_website_filter(request, org)
     visitors = Visitor.objects.filter(
-        organization=org, last_seen__gte=last_5_min
+        organization=org, last_seen__gte=last_5_min, **ws_filter
     ).order_by('-last_seen')[:20]
 
     data = []
@@ -3943,4 +4101,96 @@ def super_admin_view(request):
         'total_messages': total_messages,
         'total_offline': total_offline,
     })
+
+
+# ═══════ Website Management ═══════
+
+@login_required
+def set_active_website(request):
+    """Set the active website filter in session (AJAX)."""
+    if request.method == 'POST':
+        data = json.loads(request.body) if request.body else {}
+        website_id = data.get('website_id')
+        if website_id == 'all' or website_id is None:
+            request.session.pop('selected_website_id', None)
+        else:
+            request.session['selected_website_id'] = int(website_id)
+        return JsonResponse({'status': 'ok'})
+    return JsonResponse({'error': 'POST required'}, status=405)
+
+
+@login_required
+def website_manage_view(request):
+    """CRUD for websites - owner/admin only."""
+    org = get_user_org(request.user)
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner:
+        return redirect('dashboard:home')
+
+    if request.method == 'POST':
+        data = json.loads(request.body) if request.body else {}
+        action = data.get('action', 'add')
+
+        if action == 'add':
+            name = (data.get('name') or '').strip()
+            domain = (data.get('domain') or '').strip().lower()
+            if not name or not domain:
+                return JsonResponse({'error': 'Name and domain are required'}, status=400)
+            # Normalize domain
+            domain = domain.replace('https://', '').replace('http://', '').split('/')[0].lstrip('www.')
+            if Website.objects.filter(organization=org, domain=domain).exists():
+                return JsonResponse({'error': 'This domain already exists'}, status=400)
+            ws = Website.objects.create(organization=org, name=name, domain=domain)
+            # Grant all existing agents access to new website
+            for agent in AgentProfile.objects.filter(organization=org):
+                AgentWebsiteAccess.objects.get_or_create(agent=agent, website=ws)
+            return JsonResponse({
+                'status': 'ok', 'id': ws.id, 'name': ws.name,
+                'domain': ws.domain, 'tracking_key': ws.tracking_key,
+            })
+
+        elif action == 'edit':
+            ws_id = data.get('id')
+            ws = get_object_or_404(Website, id=ws_id, organization=org)
+            ws.name = (data.get('name') or ws.name).strip()
+            new_domain = (data.get('domain') or '').strip().lower()
+            if new_domain:
+                new_domain = new_domain.replace('https://', '').replace('http://', '').split('/')[0].lstrip('www.')
+                if Website.objects.filter(organization=org, domain=new_domain).exclude(id=ws.id).exists():
+                    return JsonResponse({'error': 'This domain already exists'}, status=400)
+                ws.domain = new_domain
+            ws.save()
+            return JsonResponse({'status': 'ok'})
+
+        return JsonResponse({'error': 'Invalid action'}, status=400)
+
+    websites = Website.objects.filter(organization=org)
+    base_url = request.build_absolute_uri('/').rstrip('/')
+    host = request.get_host().split(':')[0]
+    if host not in ('localhost', '127.0.0.1') and base_url.startswith('http://'):
+        base_url = 'https://' + base_url[len('http://'):]
+
+    return render(request, 'dashboard/website_manage.html', {
+        'websites': websites,
+        'base_url': base_url,
+    })
+
+
+@login_required
+def website_delete(request, website_id):
+    """Delete a website - owner/admin only."""
+    org = get_user_org(request.user)
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    if request.method == 'POST':
+        ws = get_object_or_404(Website, id=website_id, organization=org)
+        # Don't allow deleting last website
+        if Website.objects.filter(organization=org).count() <= 1:
+            return JsonResponse({'error': 'Cannot delete the last website'}, status=400)
+        ws.delete()
+        return JsonResponse({'status': 'ok'})
+    return JsonResponse({'error': 'POST required'}, status=405)
 

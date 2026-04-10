@@ -72,6 +72,28 @@ class Organization(models.Model):
         return self.name
 
 
+class Website(models.Model):
+    """A trackable website/domain belonging to an organization."""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='websites')
+    name = models.CharField(max_length=200)
+    domain = models.CharField(max_length=253, help_text='Primary domain, e.g. example.com')
+    tracking_key = models.CharField(max_length=32, unique=True, db_index=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('organization', 'domain')]
+        ordering = ['name']
+
+    def save(self, *args, **kwargs):
+        if not self.tracking_key:
+            self.tracking_key = uuid.uuid4().hex
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.domain})"
+
+
 class Subscription(models.Model):
     """Tracks organization's active plan and billing."""
     PLAN_CHOICES = [

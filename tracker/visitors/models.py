@@ -4,6 +4,7 @@ from django.utils import timezone
 
 class Visitor(models.Model):
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='visitors', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='visitors')
     session_key = models.CharField(max_length=100, db_index=True)
     visitor_fingerprint = models.CharField(max_length=100, blank=True, default='', db_index=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
@@ -101,6 +102,7 @@ class PageView(models.Model):
 class CustomEvent(models.Model):
     """Track custom events like button clicks, form submits, etc."""
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='custom_events', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='custom_events')
     visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE, related_name='events')
     event_name = models.CharField(max_length=200, db_index=True)
     event_category = models.CharField(max_length=200, blank=True, default='')
@@ -210,6 +212,7 @@ class ScheduledReport(models.Model):
 class SessionRecording(models.Model):
     """Records visitor session for replay."""
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='session_recordings', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='session_recordings')
     visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE, related_name='recordings')
     session_id = models.CharField(max_length=64, unique=True, db_index=True)
     events_data = models.JSONField(default=list, help_text='Array of recorded DOM events')
@@ -245,6 +248,7 @@ class ClickData(models.Model):
         ('dead', 'Dead Click'),
     ]
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='click_data', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='click_data')
     visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE, related_name='clicks')
     recording = models.ForeignKey(SessionRecording, on_delete=models.SET_NULL, null=True, blank=True, related_name='clicks')
     page_url = models.URLField(max_length=500)
@@ -276,6 +280,7 @@ class ClickData(models.Model):
 class ScrollData(models.Model):
     """Scroll depth tracking per page per visitor."""
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='scroll_data', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='scroll_data')
     visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE, related_name='scrolls')
     page_url = models.URLField(max_length=500)
     page_path = models.CharField(max_length=500, blank=True, default='')
@@ -298,6 +303,7 @@ class ScrollData(models.Model):
 class JSError(models.Model):
     """JavaScript errors caught from visitor browsers."""
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='js_errors', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='js_errors')
     visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE, related_name='js_errors')
     recording = models.ForeignKey(SessionRecording, on_delete=models.SET_NULL, null=True, blank=True, related_name='errors')
     error_message = models.TextField()
@@ -329,6 +335,7 @@ class FrustrationSignal(models.Model):
         ('error_click', 'Click After Error'),
     ]
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='frustration_signals', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='frustration_signals')
     visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE, related_name='frustration_signals')
     recording = models.ForeignKey(SessionRecording, on_delete=models.SET_NULL, null=True, blank=True, related_name='frustration_signals')
     signal_type = models.CharField(max_length=20, choices=SIGNAL_TYPES)
@@ -352,6 +359,7 @@ class FrustrationSignal(models.Model):
 class PageInsight(models.Model):
     """Per-page aggregated insights — engagement, frustration, scroll depth."""
     organization = models.ForeignKey('core.Organization', on_delete=models.CASCADE, related_name='page_insights')
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='page_insights')
     page_path = models.CharField(max_length=500, db_index=True)
     total_views = models.PositiveIntegerField(default=0)
     unique_visitors = models.PositiveIntegerField(default=0)

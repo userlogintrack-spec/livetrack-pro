@@ -42,6 +42,10 @@ urlpatterns = [
     path('settings/webhooks/<int:webhook_id>/toggle/', views.webhook_toggle, name='webhook_toggle'),
     path('settings/labels/', views.chat_labels_view, name='chat_labels'),
     path('settings/labels/<int:label_id>/delete/', views.delete_label, name='delete_label'),
+    # Website Management
+    path('settings/websites/', views.website_manage_view, name='website_manage'),
+    path('settings/websites/<int:website_id>/delete/', views.website_delete, name='website_delete'),
+    path('set-website/', views.set_active_website, name='set_website'),
     # Activity Log & Analytics
     path('activity-log/', views.activity_log_view, name='activity_log'),
     path('analytics/', views.analytics_view, name='analytics'),

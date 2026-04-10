@@ -22,9 +22,12 @@
     <div class="card-body" style="padding:24px;">
         <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
             <!-- Avatar -->
-            <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-light));display:flex;align-items:center;justify-content:center;color:white;font-size:24px;font-weight:700;flex-shrink:0;">
-                {{ visitor.ip_address|truncatechars:2 }}
-            </div>
+            <img
+                style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;object-fit:cover;"
+                src="https://api.dicebear.com/9.x/notionists-neutral/svg?seed={{ visitor.visitor_fingerprint|default:visitor.session_key|urlencode }}"
+                alt="avatar"
+                loading="lazy"
+            >
             <!-- Name + Status -->
             <div style="flex:1;min-width:200px;">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
@@ -46,37 +49,113 @@
                     {% endif %}
                 </div>
                 <div style="font-size:13px;color:var(--text-muted);">
-                    {{ visitor.browser }} · {{ visitor.os }} · {{ visitor.device_type|title }}
-                    {% if visitor.country %} · {{ visitor.city }}{{ visitor.city|yesno:", ,," }}{{ visitor.country }}{% endif %}
-                    · {{ visitor.referrer_source }}
+                    {{ visitor.browser }} · {{ visitor.os }} · {{ visitor.device_type|title }} · {{ visitor.referrer_source }}
                 </div>
             </div>
-            <!-- Quick Stats -->
-            <div style="display:flex;gap:20px;flex-shrink:0;">
-                <div style="text-align:center;">
-                    <div style="font-size:22px;font-weight:800;color:var(--primary);">{{ visitor.total_visits }}</div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Visits</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:22px;font-weight:800;color:var(--warning);">{{ page_views.count }}</div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Pages</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:22px;font-weight:800;color:var(--success);">{{ chat_rooms.count }}</div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Chats</div>
-                </div>
-            </div>
-        </div>
-        <!-- Meta Info -->
-        <div style="display:flex;gap:16px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;">
-            <div style="font-size:11px;color:var(--text-muted);"><i class="fas fa-calendar" style="margin-right:4px;"></i> First: {{ visitor.first_visit|date:"M d, Y H:i" }}</div>
-            <div style="font-size:11px;color:var(--text-muted);"><i class="fas fa-clock" style="margin-right:4px;"></i> Last: {{ visitor.last_seen|timesince }} ago</div>
-            <div style="font-size:11px;color:var(--text-muted);font-family:monospace;"><i class="fas fa-key" style="margin-right:4px;"></i> {{ visitor.session_key|truncatechars:24 }}</div>
-            {% if visitor.referrer %}<div style="font-size:11px;color:var(--primary-light);"><i class="fas fa-link" style="margin-right:4px;"></i> {{ visitor.referrer|truncatechars:50 }}</div>{% endif %}
         </div>
     </div>
 </div>
 
+<!-- PostHog-style Stat Cards -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Visits</div>
+        <div style="font-size:32px;font-weight:800;color:var(--text-primary);line-height:1;">{{ visitor.total_visits }}</div>
+    </div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Views</div>
+        <div style="font-size:32px;font-weight:800;color:var(--text-primary);line-height:1;">{{ total_page_views }}</div>
+    </div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Events</div>
+        <div style="font-size:32px;font-weight:800;color:var(--text-primary);line-height:1;">{{ events_count }}</div>
+    </div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Visit duration</div>
+        <div style="font-size:32px;font-weight:800;color:var(--text-primary);line-height:1;">{{ visit_duration }}</div>
+    </div>
+</div>
+
+<!-- Properties Grid -->
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-body" style="padding:20px 24px;">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:18px 24px;">
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Distinct ID</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-key" style="font-size:11px;color:var(--text-muted);"></i>
+                    <span style="font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ visitor.visitor_fingerprint|default:"—" }}</span>
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Last seen</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-clock" style="font-size:11px;color:var(--text-muted);"></i>
+                    {{ visitor.last_seen|timesince }} ago
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">First seen</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-calendar" style="font-size:11px;color:var(--text-muted);"></i>
+                    {{ visitor.first_visit|timesince }} ago
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Country</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-flag" style="font-size:11px;color:var(--text-muted);"></i>
+                    {{ visitor.country|default:"Unknown" }}
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Region</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-map-marker-alt" style="font-size:11px;color:var(--text-muted);"></i>
+                    {{ visitor.city|default:"Unknown" }}
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">City</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-building" style="font-size:11px;color:var(--text-muted);"></i>
+                    {{ visitor.city|default:"Unknown" }}
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Browser</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-globe" style="font-size:11px;color:var(--text-muted);"></i>
+                    {{ visitor.browser|default:"Unknown" }}
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">OS</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-desktop" style="font-size:11px;color:var(--text-muted);"></i>
+                    {{ visitor.os|default:"Unknown" }}
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Device</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-{% if visitor.device_type == 'mobile' %}mobile-alt{% elif visitor.device_type == 'tablet' %}tablet-alt{% else %}laptop{% endif %}" style="font-size:11px;color:var(--text-muted);"></i>
+                    {{ visitor.device_type|title }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity / Properties / Replays Tabs -->
+<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+    <button class="detail-tab active" data-tab="activity" onclick="switchTab(this,'activity')" style="padding:10px 20px;font-size:13px;font-weight:600;color:var(--text-muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">Activity</button>
+    <button class="detail-tab" data-tab="properties" onclick="switchTab(this,'properties')" style="padding:10px 20px;font-size:13px;font-weight:600;color:var(--text-muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">Properties</button>
+    <button class="detail-tab" data-tab="replays" onclick="switchTab(this,'replays')" style="padding:10px 20px;font-size:13px;font-weight:600;color:var(--text-muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">Replays</button>
+</div>
+
+<!-- Tab: Activity (Chat + Notes) -->
+<div id="tab-activity">
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
     <!-- Chat History -->
     <div class="card">
@@ -156,8 +235,99 @@
         </div>
     </div>
 </div>
+</div><!-- /tab-activity -->
+
+<!-- Tab: Properties -->
+<div id="tab-properties" style="display:none;">
+<div class="card">
+    <div class="card-body" style="padding:24px;">
+        <h3 style="font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text-primary);"><i class="fas fa-id-card" style="margin-right:8px;color:var(--primary);"></i>Visitor Properties</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">IP Address</span>
+                <span style="font-size:12px;color:var(--text-primary);font-family:monospace;">{{ visitor.ip_address }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Session Key</span>
+                <span style="font-size:12px;color:var(--text-primary);font-family:monospace;">{{ visitor.session_key|truncatechars:24 }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Fingerprint</span>
+                <span style="font-size:12px;color:var(--text-primary);font-family:monospace;">{{ visitor.visitor_fingerprint|default:"—"|truncatechars:24 }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Browser</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.browser|default:"Unknown" }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Operating System</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.os|default:"Unknown" }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Device Type</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.device_type|title }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Country</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.country|default:"Unknown" }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">City</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.city|default:"Unknown" }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Language</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.language|default:"—" }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Referrer Source</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.referrer_source }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Landing Page</span>
+                <span style="font-size:12px;color:var(--primary-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">{{ visitor.landing_page|default:"—"|truncatechars:40 }}</span>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">Pages/Session</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.pages_per_session }}</span>
+            </div>
+            {% if visitor.utm_source %}
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">UTM Source</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.utm_source }}</span>
+            </div>
+            {% endif %}
+            {% if visitor.utm_medium %}
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">UTM Medium</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.utm_medium }}</span>
+            </div>
+            {% endif %}
+            {% if visitor.utm_campaign %}
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                <span style="font-size:12px;font-weight:600;color:var(--text-muted);">UTM Campaign</span>
+                <span style="font-size:12px;color:var(--text-primary);">{{ visitor.utm_campaign }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+</div><!-- /tab-properties -->
+
+<!-- Tab: Replays -->
+<div id="tab-replays" style="display:none;">
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:48px 20px;color:var(--text-muted);">
+        <i class="fas fa-video" style="font-size:36px;opacity:0.15;display:block;margin-bottom:12px;"></i>
+        <p style="font-size:14px;font-weight:600;">Session Replays</p>
+        <p style="font-size:12px;margin-top:4px;">Replays for this visitor will appear here when available.</p>
+    </div>
+</div>
+</div><!-- /tab-replays -->
 
 <style>
+.detail-tab.active{color:var(--primary) !important;border-bottom-color:var(--primary) !important;}
+.detail-tab:hover{color:var(--text-primary);}
 @keyframes livePulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
 @keyframes flashRow{0%{background:rgba(16,185,129,0.15);}100%{background:transparent;}}
 .pv-new{animation:flashRow 1.2s ease;}
@@ -219,6 +389,14 @@
 </style>
 
 <script>
+// Tab switching
+function switchTab(btn, tabName) {
+    document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+    document.getElementById('tab-' + tabName).style.display = '';
+}
+
 // Add note
 function addNote() {
     const input = document.getElementById('noteInput');

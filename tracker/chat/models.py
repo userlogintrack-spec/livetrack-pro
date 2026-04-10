@@ -13,6 +13,7 @@ class ChatRoom(models.Model):
     ]
 
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='chat_rooms', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='chat_rooms')
     room_id = models.CharField(max_length=100, unique=True, db_index=True)
     visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE, related_name='chat_rooms')
     agent = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='chat_rooms')
@@ -143,8 +144,22 @@ class AgentProfile(models.Model):
         return self.user.chat_rooms.filter(status='active').count()
 
 
+class AgentWebsiteAccess(models.Model):
+    """Controls which websites an agent can access."""
+    agent = models.ForeignKey(AgentProfile, on_delete=models.CASCADE, related_name='website_access')
+    website = models.ForeignKey('core.Website', on_delete=models.CASCADE, related_name='agent_access')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('agent', 'website')]
+
+    def __str__(self):
+        return f"{self.agent.user.username} → {self.website.name}"
+
+
 class OfflineMessage(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='offline_messages', null=True, blank=True)
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='offline_messages')
     name = models.CharField(max_length=100)
     email = models.EmailField()
     message = models.TextField()
