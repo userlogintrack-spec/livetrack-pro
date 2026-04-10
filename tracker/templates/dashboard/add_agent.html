@@ -143,14 +143,15 @@ function toggleAvail(agentId) {
     }).then(r => r.json()).then(() => location.reload());
 }
 function removeAgent(agentId, name) {
-    if (!confirm('Remove agent "' + name + '"? This cannot be undone.')) return;
-    fetch('/dashboard/settings/agents/' + agentId + '/remove/', {
-        method: 'POST',
-        headers: {'X-CSRFToken': '{{ csrf_token }}'},
-    }).then(r => r.json()).then(data => {
-        if (data.status === 'ok') location.reload();
-        else alert(data.error || 'Failed');
-    });
+    showConfirm('Remove agent "' + name + '"? This cannot be undone.', function() {
+        fetch('/dashboard/settings/agents/' + agentId + '/remove/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'},
+        }).then(r => r.json()).then(data => {
+            if (data.status === 'ok') location.reload();
+            else showToast(data.error || 'Failed', 'error');
+        });
+    }, 'Remove Agent');
 }
 </script>
 {% endblock %}

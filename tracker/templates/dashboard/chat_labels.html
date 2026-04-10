@@ -19,7 +19,7 @@
                 <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:{{ label.color }}15;border:1px solid {{ label.color }}30;font-size:13px;font-weight:600;">
                     <span style="width:10px;height:10px;border-radius:50%;background:{{ label.color }};"></span>
                     {{ label.name }}
-                    <button onclick="if(confirm('Delete?'))fetch('/dashboard/settings/labels/{{ label.id }}/delete/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload())" style="border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0 2px;">
+                    <button onclick="showConfirm('Delete?', function() { fetch('/dashboard/settings/labels/{{ label.id }}/delete/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload()); }, 'Delete Label')" style="border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0 2px;">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>

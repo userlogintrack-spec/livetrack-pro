@@ -4141,7 +4141,13 @@ def website_manage_view(request):
             domain = domain.replace('https://', '').replace('http://', '').split('/')[0].lstrip('www.')
             if Website.objects.filter(organization=org, domain=domain).exists():
                 return JsonResponse({'error': 'This domain already exists'}, status=400)
-            ws = Website.objects.create(organization=org, name=name, domain=domain)
+            ws = Website.objects.create(
+                organization=org, name=name, domain=domain,
+                widget_title=(data.get('widget_title') or '').strip(),
+                widget_color=(data.get('widget_color') or '').strip(),
+                widget_position=(data.get('widget_position') or '').strip(),
+                welcome_message=(data.get('welcome_message') or '').strip(),
+            )
             # Grant all existing agents access to new website
             for agent in AgentProfile.objects.filter(organization=org):
                 AgentWebsiteAccess.objects.get_or_create(agent=agent, website=ws)
@@ -4160,6 +4166,15 @@ def website_manage_view(request):
                 if Website.objects.filter(organization=org, domain=new_domain).exclude(id=ws.id).exists():
                     return JsonResponse({'error': 'This domain already exists'}, status=400)
                 ws.domain = new_domain
+            # Widget customization
+            if 'widget_title' in data:
+                ws.widget_title = (data['widget_title'] or '').strip()
+            if 'widget_color' in data:
+                ws.widget_color = (data['widget_color'] or '').strip()
+            if 'widget_position' in data:
+                ws.widget_position = (data['widget_position'] or '').strip()
+            if 'welcome_message' in data:
+                ws.welcome_message = (data['welcome_message'] or '').strip()
             ws.save()
             return JsonResponse({'status': 'ok'})
 

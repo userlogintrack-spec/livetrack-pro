@@ -3082,16 +3082,17 @@
 
     // ===== CLOSE CHAT =====
     function closeChat() {
-        if (!confirm('End this chat session?')) return;
-        fetch('/dashboard/chats/' + roomId + '/close/', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
-        }).then(() => {
-            if (chatSocket) {
-                chatSocket.send(JSON.stringify({ type: 'close_chat' }));
-            }
-            location.reload();
-        });
+        showConfirm('End this chat session?', function() {
+            fetch('/dashboard/chats/' + roomId + '/close/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            }).then(function() {
+                if (chatSocket) {
+                    chatSocket.send(JSON.stringify({ type: 'close_chat' }));
+                }
+                location.reload();
+            });
+        }, 'Close Chat');
     }
 
     function copyVisitorIp() {

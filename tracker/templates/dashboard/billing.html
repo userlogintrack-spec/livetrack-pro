@@ -182,7 +182,7 @@
                 {% if sub.plan == 'free' %}
                 <div style="margin-top:18px;padding:12px;background:var(--success-soft);border-radius:12px;color:var(--success);font-weight:700;font-size:13px;"><i class="fas fa-check-circle"></i> Current Plan</div>
                 {% else %}
-                <button onclick="if(confirm('Downgrade to Free?')) cancelPlan()" class="btn btn-secondary" style="width:100%;margin-top:18px;justify-content:center;border-radius:12px;">Downgrade</button>
+                <button onclick="showConfirm('Downgrade to Free?', function() { cancelPlan(); }, 'Downgrade Plan')" class="btn btn-secondary" style="width:100%;margin-top:18px;justify-content:center;border-radius:12px;">Downgrade</button>
                 {% endif %}
             </div>
 

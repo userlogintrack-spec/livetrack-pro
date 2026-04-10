@@ -98,7 +98,7 @@ function createResponse() {
     const title = document.getElementById('crTitle').value.trim();
     const shortcut = document.getElementById('crShortcut').value.trim();
     const message = document.getElementById('crMessage').value.trim();
-    if (!title || !message) { alert('Title and message required'); return; }
+    if (!title || !message) { showToast('Title and message required', 'error'); return; }
 
     fetch('/dashboard/canned-responses/', {
         method: 'POST',
@@ -108,17 +108,18 @@ function createResponse() {
 }
 
 function deleteResponse(id) {
-    if (!confirm('Delete this response?')) return;
-    fetch('/dashboard/canned-responses/', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-        body: JSON.stringify({action: 'delete', id}),
-    }).then(() => location.reload());
+    showConfirm('Delete this response?', function() {
+        fetch('/dashboard/canned-responses/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({action: 'delete', id: id}),
+        }).then(function() { location.reload(); });
+    }, 'Delete Response');
 }
 
 function copyResponse(text) {
     navigator.clipboard.writeText(text);
-    alert('Copied to clipboard!');
+    showToast('Copied to clipboard!', 'success');
 }
 </script>
 {% endblock %}

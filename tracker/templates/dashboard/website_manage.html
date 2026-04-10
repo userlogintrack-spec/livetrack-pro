@@ -34,7 +34,7 @@
                     </td>
                     <td style="padding:14px 20px;border-bottom:1px solid var(--border);">
                         <div style="display:flex;gap:6px;">
-                            <button onclick="editWebsite({{ ws.id }},'{{ ws.name|escapejs }}','{{ ws.domain|escapejs }}')" class="btn btn-sm btn-secondary" title="Edit"><i class="fas fa-edit"></i></button>
+                            <button onclick="editWebsite({{ ws.id }},'{{ ws.name|escapejs }}','{{ ws.domain|escapejs }}','{{ ws.widget_title|escapejs }}','{{ ws.widget_color|escapejs }}','{{ ws.widget_position|escapejs }}','{{ ws.welcome_message|escapejs }}')" class="btn btn-sm btn-secondary" title="Edit"><i class="fas fa-edit"></i></button>
                             <button onclick="deleteWebsite({{ ws.id }},'{{ ws.name|escapejs }}')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
                         </div>
                     </td>
@@ -56,9 +56,36 @@
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Name</label>
             <input type="text" id="wsName" class="form-control" placeholder="My Website">
         </div>
-        <div style="margin-bottom:20px;">
+        <div style="margin-bottom:14px;">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Domain</label>
             <input type="text" id="wsDomain" class="form-control" placeholder="example.com">
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Widget Customization (optional)</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div>
+                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Title</label>
+                <input type="text" id="wsWidgetTitle" class="form-control" placeholder="Leave empty for default" style="font-size:12px;">
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Color</label>
+                <input type="color" id="wsWidgetColor" value="#7c3aed" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-primary);">
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div>
+                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Position</label>
+                <select id="wsWidgetPosition" class="form-control" style="font-size:12px;">
+                    <option value="">Use Default</option>
+                    <option value="bottom-right">Bottom Right</option>
+                    <option value="bottom-left">Bottom Left</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Welcome Message</label>
+                <input type="text" id="wsWelcomeMsg" class="form-control" placeholder="Leave empty for default" style="font-size:12px;">
+            </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:8px;">
             <button onclick="closeModal()" class="btn btn-sm btn-secondary">Cancel</button>
@@ -77,12 +104,20 @@ function closeModal() {
     document.getElementById('editId').value = '';
     document.getElementById('wsName').value = '';
     document.getElementById('wsDomain').value = '';
+    document.getElementById('wsWidgetTitle').value = '';
+    document.getElementById('wsWidgetColor').value = '#7c3aed';
+    document.getElementById('wsWidgetPosition').value = '';
+    document.getElementById('wsWelcomeMsg').value = '';
     document.getElementById('modalTitle').textContent = 'Add website';
 }
-function editWebsite(id, name, domain) {
+function editWebsite(id, name, domain, wTitle, wColor, wPos, wMsg) {
     document.getElementById('editId').value = id;
     document.getElementById('wsName').value = name;
     document.getElementById('wsDomain').value = domain;
+    document.getElementById('wsWidgetTitle').value = wTitle || '';
+    document.getElementById('wsWidgetColor').value = wColor || '#7c3aed';
+    document.getElementById('wsWidgetPosition').value = wPos || '';
+    document.getElementById('wsWelcomeMsg').value = wMsg || '';
     document.getElementById('modalTitle').textContent = 'Edit website';
     document.getElementById('addModal').style.display = 'flex';
 }
@@ -90,28 +125,33 @@ function saveWebsite() {
     const editId = document.getElementById('editId').value;
     const name = document.getElementById('wsName').value.trim();
     const domain = document.getElementById('wsDomain').value.trim();
-    if (!name || !domain) return alert('Name and domain are required');
+    if (!name || !domain) return showToast('Name and domain are required', 'error');
+    const wTitle = document.getElementById('wsWidgetTitle').value.trim();
+    const wColor = document.getElementById('wsWidgetColor').value;
+    const wPos = document.getElementById('wsWidgetPosition').value;
+    const wMsg = document.getElementById('wsWelcomeMsg').value.trim();
     const body = editId
-        ? {action: 'edit', id: parseInt(editId), name, domain}
-        : {action: 'add', name, domain};
+        ? {action: 'edit', id: parseInt(editId), name, domain, widget_title: wTitle, widget_color: wColor === '#7c3aed' ? '' : wColor, widget_position: wPos, welcome_message: wMsg}
+        : {action: 'add', name, domain, widget_title: wTitle, widget_color: wColor === '#7c3aed' ? '' : wColor, widget_position: wPos, welcome_message: wMsg};
     fetch('{% url "dashboard:website_manage" %}', {
         method: 'POST',
         headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
         body: JSON.stringify(body),
     }).then(r => r.json()).then(data => {
-        if (data.error) return alert(data.error);
+        if (data.error) return showToast(data.error, 'error');
         location.reload();
     });
 }
 function deleteWebsite(id, name) {
-    if (!confirm('Delete website "' + name + '"? Visitor data will be unlinked.')) return;
-    fetch('/dashboard/settings/websites/' + id + '/delete/', {
-        method: 'POST',
-        headers: {'X-CSRFToken': '{{ csrf_token }}'},
-    }).then(r => r.json()).then(data => {
-        if (data.error) return alert(data.error);
-        location.reload();
-    });
+    showConfirm('Delete website "' + name + '"? Visitor data will be unlinked.', function() {
+        fetch('/dashboard/settings/websites/' + id + '/delete/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'},
+        }).then(r => r.json()).then(data => {
+            if (data.error) return showToast(data.error, 'error');
+            location.reload();
+        });
+    }, 'Delete Website');
 }
 </script>
 {% endblock %}

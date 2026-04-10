@@ -124,7 +124,7 @@ function createPreset(name, color, conditions) {
     postJSON('', {action:'create', name:name, color:color, conditions:conditions}).then(()=>location.reload());
 }
 
-function deleteSegment(id) { if(confirm('Delete this segment?')) postJSON('', {action:'delete', segment_id:id}).then(()=>location.reload()); }
+function deleteSegment(id) { showConfirm('Delete this segment?', function() { postJSON('', {action:'delete', segment_id:id}).then(()=>location.reload()); }, 'Delete Segment'); }
 
 function previewSegment(id) {
     postJSON('', {action:'preview', segment_id:id}).then(function(d) {

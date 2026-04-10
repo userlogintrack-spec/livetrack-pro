@@ -82,9 +82,9 @@ function createCoupon() {
         applicable_intervals:document.getElementById('cIntervals').value,
         max_uses:document.getElementById('cMax').value,
         valid_until:document.getElementById('cUntil').value,
-    }).then(d => { if(d.status==='ok') location.reload(); else alert(d.error); });
+    }).then(d => { if(d.status==='ok') location.reload(); else showToast(d.error, 'error'); });
 }
-function deleteCoupon(id) { if(confirm('Delete this coupon?')) postJSON('', {action:'delete', coupon_id:id}).then(()=>location.reload()); }
+function deleteCoupon(id) { showConfirm('Delete this coupon?', function() { postJSON('', {action:'delete', coupon_id:id}).then(()=>location.reload()); }, 'Delete Coupon'); }
 function toggleCoupon(id) { postJSON('', {action:'toggle', coupon_id:id}).then(()=>location.reload()); }
 </script>
 {% endblock %}

@@ -79,6 +79,13 @@ class Website(models.Model):
     domain = models.CharField(max_length=253, help_text='Primary domain, e.g. example.com')
     tracking_key = models.CharField(max_length=32, unique=True, db_index=True)
     is_active = models.BooleanField(default=True)
+    # Per-website widget customization (overrides org defaults if set)
+    widget_title = models.CharField(max_length=100, blank=True, default='')
+    widget_color = models.CharField(max_length=7, blank=True, default='')
+    widget_position = models.CharField(max_length=20, blank=True, default='',
+        choices=[('', 'Use Default'), ('bottom-right', 'Bottom Right'), ('bottom-left', 'Bottom Left')])
+    welcome_message = models.TextField(blank=True, default='')
+    offline_message = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

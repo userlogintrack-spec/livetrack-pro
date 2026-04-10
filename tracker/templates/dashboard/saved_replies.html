@@ -28,7 +28,7 @@
                     <div style="font-size:13px;font-weight:700;color:var(--text-primary);">{{ r.title }}</div>
                     <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;line-height:1.5;">{{ r.message|truncatechars:150 }}</div>
                 </div>
-                <button onclick="if(confirm('Delete?'))fetch('/dashboard/saved-replies/{{ r.id }}/delete/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload())" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                <button onclick="showConfirm('Delete?', function() { fetch('/dashboard/saved-replies/{{ r.id }}/delete/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(function(){location.reload()}); }, 'Delete Reply')" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
             </div>
             {% empty %}
             <div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px;">No saved replies yet</div>
@@ -41,14 +41,14 @@
 function addReply() {
     const title = document.getElementById('replyTitle').value.trim();
     const message = document.getElementById('replyMessage').value.trim();
-    if (!title || !message) { alert('Fill both fields'); return; }
+    if (!title || !message) { showToast('Fill both fields', 'error'); return; }
     fetch('/dashboard/saved-replies/', {
         method: 'POST',
         headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
         body: JSON.stringify({title, message}),
     }).then(r => r.json()).then(data => {
         if (data.status === 'ok') location.reload();
-        else alert(data.error);
+        else showToast(data.error, 'error');
     });
 }
 </script>

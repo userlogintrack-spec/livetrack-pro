@@ -131,7 +131,7 @@ function postJSON(url, data) {
 function createPolicy() {
     postJSON('', {action:'create', name:document.getElementById('slaName').value, priority:document.getElementById('slaPriority').value, first_response_minutes:document.getElementById('slaResponse').value, resolution_minutes:document.getElementById('slaResolution').value}).then(()=>location.reload());
 }
-function deletePolicy(id) { if(confirm('Delete this policy?')) postJSON('', {action:'delete', policy_id:id}).then(()=>location.reload()); }
+function deletePolicy(id) { showConfirm('Delete this policy?', function() { postJSON('', {action:'delete', policy_id:id}).then(()=>location.reload()); }, 'Delete Policy'); }
 function togglePolicy(id) { postJSON('', {action:'toggle', policy_id:id}).then(()=>location.reload()); }
 </script>
 {% endblock %}

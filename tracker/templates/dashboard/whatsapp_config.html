@@ -99,7 +99,7 @@ function saveWAConfig() {
             access_token: document.getElementById('waToken').value,
             verify_token: document.getElementById('waVerify').value,
         })
-    }).then(r=>r.json()).then(d => { if(d.status==='ok') alert('WhatsApp configuration saved!'); });
+    }).then(r=>r.json()).then(d => { if(d.status==='ok') showToast('WhatsApp configuration saved!', 'success'); });
 }
 </script>
 {% endblock %}

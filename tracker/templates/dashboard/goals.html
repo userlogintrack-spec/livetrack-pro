@@ -111,7 +111,7 @@ function postJSON(url, data) { return fetch(url, {method:'POST', headers:{'Conte
 function createGoal() {
     postJSON('', {action:'create', name:document.getElementById('goalName').value, description:document.getElementById('goalDesc').value, goal_type:document.getElementById('goalType').value, target_url:document.getElementById('goalURL').value, target_event:document.getElementById('goalEvent').value, target_value:document.getElementById('goalThreshold').value, monetary_value:document.getElementById('goalMoney').value}).then(()=>location.reload());
 }
-function deleteGoal(id) { if(confirm('Delete?')) postJSON('', {action:'delete', goal_id:id}).then(()=>location.reload()); }
+function deleteGoal(id) { showConfirm('Delete?', function() { postJSON('', {action:'delete', goal_id:id}).then(()=>location.reload()); }, 'Delete Goal'); }
 function toggleGoal(id) { postJSON('', {action:'toggle', goal_id:id}).then(()=>location.reload()); }
 </script>
 {% endblock %}

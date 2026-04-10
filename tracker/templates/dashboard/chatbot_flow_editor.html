@@ -134,7 +134,7 @@ function saveFlow() {
             flow_data: flowData,
         })
     }).then(r=>r.json()).then(d => {
-        if (d.status === 'ok') alert('Flow saved successfully!');
+        if (d.status === 'ok') showToast('Flow saved successfully!', 'success');
     });
 }
 

@@ -63,8 +63,8 @@ function postJSON(url, data) { return fetch(url, {method:'POST', headers:{'Conte
 function createReport() {
     postJSON('', {action:'create', name:document.getElementById('reportName').value, email:document.getElementById('reportEmail').value, frequency:document.getElementById('reportFreq').value, include_visitors:document.getElementById('incVisitors').checked, include_chats:document.getElementById('incChats').checked, include_goals:document.getElementById('incGoals').checked}).then(()=>location.reload());
 }
-function deleteReport(id) { if(confirm('Delete?')) postJSON('', {action:'delete', report_id:id}).then(()=>location.reload()); }
+function deleteReport(id) { showConfirm('Delete?', function() { postJSON('', {action:'delete', report_id:id}).then(()=>location.reload()); }, 'Delete Report'); }
 function toggleReport(id) { postJSON('', {action:'toggle', report_id:id}).then(()=>location.reload()); }
-function sendNow(id) { postJSON('', {action:'send_now', report_id:id}).then(d => { if(d.status==='ok') alert('Report sent!'); }); }
+function sendNow(id) { postJSON('', {action:'send_now', report_id:id}).then(d => { if(d.status==='ok') showToast('Report sent!', 'success'); }); }
 </script>
 {% endblock %}

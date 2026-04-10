@@ -112,7 +112,7 @@ function createSurvey() {
     }).then(()=>location.reload());
 }
 
-function deleteSurvey(id) { if(confirm('Delete this survey?')) postJSON('', {action:'delete', survey_id:id}).then(()=>location.reload()); }
+function deleteSurvey(id) { showConfirm('Delete this survey?', function() { postJSON('', {action:'delete', survey_id:id}).then(()=>location.reload()); }, 'Delete Survey'); }
 function toggleSurvey(id) { postJSON('', {action:'toggle', survey_id:id}).then(()=>location.reload()); }
 </script>
 {% endblock %}

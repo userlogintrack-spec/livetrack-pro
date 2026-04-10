@@ -588,8 +588,8 @@ def widget_init(request):
         return JsonResponse({
             'session_key': visitor.session_key or session_key,
             'visitor_id': visitor.id,
-            'welcome_message': org.welcome_message if org else 'Hi! How can we help you?',
-            'widget_color': org.widget_color if org else '#7c3aed',
+            'welcome_message': (website.welcome_message if website and website.welcome_message else None) or (org.welcome_message if org else 'Hi! How can we help you?'),
+            'widget_color': (website.widget_color if website and website.widget_color else None) or (org.widget_color if org else '#7c3aed'),
         })
     return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -745,9 +745,10 @@ def widget_script(request):
             "(function(){console.warn('LiveVisitorHub widget blocked on this domain.');})();"
         )
         return HttpResponse(blocked_js, content_type='application/javascript; charset=utf-8')
-    widget_color = org.widget_color if org else '#7c3aed'
-    widget_title = org.widget_title if org else 'LiveVisitorHub Support'
-    widget_position = org.widget_position if org else 'bottom-right'
+    # Website-level settings override org defaults
+    widget_color = (website.widget_color if website and website.widget_color else None) or (org.widget_color if org else '#7c3aed')
+    widget_title = (website.widget_title if website and website.widget_title else None) or (org.widget_title if org else 'LiveVisitorHub Support')
+    widget_position = (website.widget_position if website and website.widget_position else None) or (org.widget_position if org else 'bottom-right')
     pos_css = 'left:24px' if widget_position == 'bottom-left' else 'right:24px'
     panel_pos_css = 'left:24px' if widget_position == 'bottom-left' else 'right:24px'
 

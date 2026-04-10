@@ -72,7 +72,7 @@ function postJSON(url, data) {
 function createDept() {
     postJSON('', {action:'create', name:document.getElementById('deptName').value, description:document.getElementById('deptDesc').value, color:document.getElementById('deptColor').value}).then(()=>location.reload());
 }
-function deleteDept(id) { if(confirm('Delete this department?')) postJSON('', {action:'delete', department_id:id}).then(()=>location.reload()); }
+function deleteDept(id) { showConfirm('Delete this department?', function() { postJSON('', {action:'delete', department_id:id}).then(()=>location.reload()); }, 'Delete Department'); }
 function toggleDept(id) { postJSON('', {action:'toggle', department_id:id}).then(()=>location.reload()); }
 function addMember(deptId) {
     var sel = document.getElementById('addAgent-'+deptId);

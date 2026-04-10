@@ -48,7 +48,7 @@
                         {% if wh.is_active %}Active{% else %}Paused{% endif %}
                     </span>
                     <button onclick="fetch('/dashboard/settings/webhooks/{{ wh.id }}/toggle/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload())" class="btn btn-sm btn-secondary" title="Toggle"><i class="fas fa-power-off"></i></button>
-                    <button onclick="if(confirm('Delete this webhook?'))fetch('/dashboard/settings/webhooks/{{ wh.id }}/delete/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload())" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                    <button onclick="showConfirm('Delete this webhook?', function() { fetch('/dashboard/settings/webhooks/{{ wh.id }}/delete/',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>location.reload()); }, 'Delete Webhook')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
                 </div>
                 {% empty %}
                 <div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px;">

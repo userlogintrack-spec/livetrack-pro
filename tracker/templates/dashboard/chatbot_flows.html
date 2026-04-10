@@ -63,7 +63,7 @@ function createFlow() {
         else location.reload();
     });
 }
-function deleteFlow(id) { if(confirm('Delete this flow?')) postJSON('', {action:'delete', flow_id:id}).then(()=>location.reload()); }
+function deleteFlow(id) { showConfirm('Delete this flow?', function() { postJSON('', {action:'delete', flow_id:id}).then(()=>location.reload()); }, 'Delete Flow'); }
 function toggleFlow(id) { postJSON('', {action:'toggle', flow_id:id}).then(()=>location.reload()); }
 </script>
 {% endblock %}

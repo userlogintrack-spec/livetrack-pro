@@ -108,7 +108,7 @@ function saveConfig() {
         handoff_keywords: document.getElementById('botHandoff').value,
         max_auto_replies: document.getElementById('botMaxReplies').value,
         response_delay_seconds: document.getElementById('botDelay').value,
-    }).then(d => { if(d.status==='ok') alert('Configuration saved!'); });
+    }).then(d => { if(d.status==='ok') showToast('Configuration saved!', 'success'); });
 }
 function addKnowledge() {
     postJSON('', {
@@ -119,6 +119,6 @@ function addKnowledge() {
         priority: document.getElementById('kbPriority').value,
     }).then(()=>location.reload());
 }
-function deleteKnowledge(id) { if(confirm('Delete this entry?')) postJSON('', {action:'delete_knowledge', knowledge_id:id}).then(()=>location.reload()); }
+function deleteKnowledge(id) { showConfirm('Delete this entry?', function() { postJSON('', {action:'delete_knowledge', knowledge_id:id}).then(()=>location.reload()); }, 'Delete Entry'); }
 </script>
 {% endblock %}

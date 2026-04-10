@@ -129,19 +129,19 @@ function postJSON(url, data) {
 }
 function createCategory() {
     var name = document.getElementById('catName').value.trim();
-    if (!name) { alert('Category name required'); return; }
+    if (!name) { showToast('Category name required', 'error'); return; }
     postJSON('', {action:'create_category', name:name, description:document.getElementById('catDesc').value}).then(()=>location.reload());
 }
-function deleteCategory(id) { if(confirm('Delete category and all articles?')) postJSON('', {action:'delete_category', category_id:id}).then(()=>location.reload()); }
+function deleteCategory(id) { showConfirm('Delete category and all articles?', function() { postJSON('', {action:'delete_category', category_id:id}).then(()=>location.reload()); }, 'Delete Category'); }
 function createArticle() {
     var title = document.getElementById('articleTitle').value.trim();
     var content = document.getElementById('articleContent').value.trim();
     var catEl = document.getElementById('articleCat');
-    if (!catEl.value) { alert('Please create a category first'); return; }
-    if (!title || !content) { alert('Title and content required'); return; }
+    if (!catEl.value) { showToast('Please create a category first', 'error'); return; }
+    if (!title || !content) { showToast('Title and content required', 'error'); return; }
     postJSON('', {action:'create_article', category_id:parseInt(catEl.value), title:title, content:content}).then(()=>location.reload());
 }
-function deleteArticle(id) { if(confirm('Delete this article?')) postJSON('', {action:'delete_article', article_id:id}).then(()=>location.reload()); }
+function deleteArticle(id) { showConfirm('Delete this article?', function() { postJSON('', {action:'delete_article', article_id:id}).then(()=>location.reload()); }, 'Delete Article'); }
 function toggleArticle(id, pub) { postJSON('', {action:'update_article', article_id:id, is_published:pub}).then(()=>location.reload()); }
 
 function openEditFromRow(btn) {
@@ -168,10 +168,10 @@ function saveEdit() {
     if (!_editingId) return;
     var title = document.getElementById('editTitle').value.trim();
     var content = document.getElementById('editContent').value;
-    if (!title) { alert('Title required'); return; }
+    if (!title) { showToast('Title required', 'error'); return; }
     postJSON('', {action:'update_article', article_id:_editingId, title:title, content:content}).then(function(r) {
         if (r && r.status === 'ok') location.reload();
-        else alert('Save failed');
+        else showToast('Save failed', 'error');
     });
 }
 // Close on Escape
