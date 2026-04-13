@@ -508,21 +508,85 @@ def _get_org_from_request(request):
 
 
 def _get_website_from_request(request):
-    """Get (Organization, Website) from tracking_key in request body or query params."""
+    """Get (Organization, Website) from tracking_key in request body or query params.
+
+    Auto-detection: When a key matches an org-level widget_key and the requesting
+    domain doesn't have a Website record yet, one is created automatically so the
+    user never needs to manually add each domain.
+    """
     from tracker.core.models import Organization, Website
+    from tracker.chat.models import AgentProfile, AgentWebsiteAccess
+
     data = _parse_json_body(request) if request.body else {}
     key = (data or {}).get('key') or request.GET.get('key') or ''
+    parent_domain = _extract_parent_domain(request, data or {})
+
     if key:
+        # 1. Direct website match by tracking_key
         website = Website.objects.select_related('organization').filter(tracking_key=key).first()
         if website:
             return website.organization, website
-        # Backward compat: try org widget_key
+
+        # 2. Org-level widget_key — auto-detect domain
         org = Organization.objects.filter(widget_key=key).first()
         if org:
+            # Try to find existing website for this domain
+            if parent_domain:
+                normalized = _normalize_domain(parent_domain)
+                if normalized:
+                    existing_ws = Website.objects.filter(organization=org, domain=normalized).first()
+                    if existing_ws:
+                        return org, existing_ws
+                    # Auto-create website for this domain
+                    ws = _auto_register_website(org, normalized)
+                    if ws:
+                        return org, ws
+            # Fallback to first website
             return org, org.websites.first()
+
     # Fallback
     org = Organization.objects.first()
     return org, org.websites.first() if org else None
+
+
+def _auto_register_website(org, domain):
+    """Auto-register a new website for the org when script detects a new domain.
+
+    Returns the new Website or None if creation is skipped (rate-limited, blocked, etc).
+    """
+    from tracker.core.models import Website
+    from tracker.chat.models import AgentProfile, AgentWebsiteAccess
+
+    if not org or not domain:
+        return None
+
+    # Skip localhost/IP-like domains in production-like environments
+    skip_domains = {'localhost', '127.0.0.1', '0.0.0.0', ''}
+    if domain in skip_domains:
+        return None
+
+    # Rate-limit: max 20 auto-registered websites per org
+    existing_count = Website.objects.filter(organization=org).count()
+    if existing_count >= 20:
+        return None
+
+    # Don't auto-register if domain is explicitly blocked
+    if org.allowed_domains_enabled and not _domain_allowed(org, domain):
+        return None
+
+    # Create website
+    name = domain.split('.')[0].capitalize() if '.' in domain else domain.capitalize()
+    ws = Website.objects.create(
+        organization=org,
+        name=name,
+        domain=domain,
+    )
+
+    # Grant all existing agents access
+    for agent in AgentProfile.objects.filter(organization=org):
+        AgentWebsiteAccess.objects.get_or_create(agent=agent, website=ws)
+
+    return ws
 
 
 @csrf_exempt

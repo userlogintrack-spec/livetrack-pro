@@ -4,100 +4,287 @@
 {% block nav_settings %}active{% endblock %}
 
 {% block top_actions %}
-<button onclick="document.getElementById('addModal').style.display='flex'" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> Add website</button>
+<div style="display:flex;align-items:center;gap:10px;">
+    <span style="color:var(--text-muted);font-size:12px;font-weight:600;">{{ total_websites }} site{{ total_websites|pluralize }}</span>
+    <button onclick="document.getElementById('addModal').style.display='flex'" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> Add Website</button>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
+.ws-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; transition: all .2s;
+}
+.ws-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+.ws-card-header {
+    padding: 20px 22px 16px; display: flex; align-items: flex-start; gap: 14px;
+    border-bottom: 1px solid var(--border);
+}
+.ws-favicon {
+    width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center;
+    justify-content: center; font-size: 18px; font-weight: 800; flex-shrink: 0;
+    background: var(--gradient); color: #fff;
+}
+.ws-info { flex: 1; min-width: 0; }
+.ws-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }
+.ws-domain { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.ws-domain a { color: var(--primary); text-decoration: none; }
+.ws-domain a:hover { text-decoration: underline; }
+.ws-status {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700;
+    padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: .03em;
+}
+.ws-status.active { background: var(--success-soft); color: var(--success); }
+.ws-status.inactive { background: var(--danger-soft); color: var(--danger); }
+.ws-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.ws-actions button {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border);
+    background: none; cursor: pointer; color: var(--text-muted); font-size: 12px;
+    display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.ws-actions button:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-hover); }
+.ws-actions button.danger:hover { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
+
+.ws-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+}
+.ws-stat {
+    padding: 14px 16px; text-align: center;
+    border-right: 1px solid var(--border);
+}
+.ws-stat:last-child { border-right: none; }
+.ws-stat:nth-child(n+4) { border-top: 1px solid var(--border); }
+.ws-stat-value { font-size: 20px; font-weight: 800; color: var(--text-primary); line-height: 1; }
+.ws-stat-label { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+.ws-stat-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+.ws-tracking {
+    padding: 14px 22px; border-top: 1px solid var(--border);
+}
+.ws-tracking-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.ws-code-box {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px;
+}
+.ws-code-box code {
+    flex: 1; font-size: 11px; color: var(--text-secondary); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.ws-code-box button {
+    background: var(--primary); color: #fff; border: none; padding: 5px 12px;
+    border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: all .15s; flex-shrink: 0; font-family: inherit;
+}
+.ws-code-box button:hover { opacity: 0.85; }
+
+/* Filter button */
+.ws-filter-btn {
+    padding: 14px 22px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+}
+.ws-filter-btn button {
+    width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 8px;
+    background: none; cursor: pointer; font-size: 12px; font-weight: 600;
+    color: var(--primary); transition: all .15s; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.ws-filter-btn button:hover { background: var(--primary-soft); border-color: var(--primary); }
+
+/* Empty state */
+.ws-empty {
+    text-align: center; padding: 80px 40px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+}
+.ws-empty-icon {
+    width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 20px;
+    background: var(--gradient-soft); display: flex; align-items: center; justify-content: center;
+    font-size: 32px; color: var(--primary);
+}
+
+@media (max-width: 700px) {
+    .ws-grid { grid-template-columns: 1fr; }
+    .ws-stats { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-body" style="padding:0;">
-        <table style="width:100%;">
-            <thead>
-                <tr>
-                    <th style="padding:12px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Name</th>
-                    <th style="padding:12px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Domain</th>
-                    <th style="padding:12px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);">Tracking Code</th>
-                    <th style="padding:12px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border-bottom:1px solid var(--border);width:100px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ws in websites %}
-                <tr id="ws-row-{{ ws.id }}">
-                    <td style="padding:14px 20px;border-bottom:1px solid var(--border);">
-                        <div style="font-weight:600;font-size:14px;color:var(--text-primary);">{{ ws.name }}</div>
-                    </td>
-                    <td style="padding:14px 20px;border-bottom:1px solid var(--border);color:var(--text-muted);font-size:13px;">{{ ws.domain }}</td>
-                    <td style="padding:14px 20px;border-bottom:1px solid var(--border);">
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <code style="font-size:11px;background:var(--bg-hover);padding:6px 10px;border-radius:6px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">&lt;script defer src="{{ base_url }}/api/widget/script.js?key={{ ws.tracking_key }}"&gt;&lt;/script&gt;</code>
-                            <button onclick="copyCode('{{ ws.tracking_key }}')" title="Copy" style="background:none;border:1px solid var(--border);padding:6px 8px;border-radius:6px;cursor:pointer;color:var(--text-muted);font-size:11px;"><i class="fas fa-copy"></i></button>
-                        </div>
-                    </td>
-                    <td style="padding:14px 20px;border-bottom:1px solid var(--border);">
-                        <div style="display:flex;gap:6px;">
-                            <button onclick="editWebsite({{ ws.id }},'{{ ws.name|escapejs }}','{{ ws.domain|escapejs }}','{{ ws.widget_title|escapejs }}','{{ ws.widget_color|escapejs }}','{{ ws.widget_position|escapejs }}','{{ ws.welcome_message|escapejs }}')" class="btn btn-sm btn-secondary" title="Edit"><i class="fas fa-edit"></i></button>
-                            <button onclick="deleteWebsite({{ ws.id }},'{{ ws.name|escapejs }}')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text-muted);">No websites added yet</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+<!-- ═══ Universal Auto-Detect Script ═══ -->
+{% if org_widget_key %}
+<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:22px 24px;margin-bottom:24px;">
+    <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+        <div style="flex-shrink:0;">
+            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--primary),#a78bfa);display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-magic" style="color:#fff;font-size:18px;"></i>
+            </div>
+        </div>
+        <div style="flex:1;min-width:240px;">
+            <div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">Universal Tracking Script <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;background:var(--success-soft);color:var(--success);margin-left:6px;vertical-align:middle;">AUTO-DETECT</span></div>
+            <div style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:12px;">
+                Use this <strong>one script on any website</strong> — domains are automatically detected and added here. No need to manually add each website.
+            </div>
+            <div class="ws-code-box">
+                <code id="universalCode">&lt;script defer src="{{ base_url }}/api/widget/script.js?key={{ org_widget_key }}"&gt;&lt;/script&gt;</code>
+                <button onclick="copyUniversalCode()"><i class="fas fa-copy"></i> Copy</button>
+            </div>
+        </div>
     </div>
 </div>
+{% endif %}
+
+{% if websites %}
+<div class="ws-grid">
+    {% for ws in websites %}
+    <div class="ws-card" id="ws-card-{{ ws.id }}">
+        <!-- Header -->
+        <div class="ws-card-header">
+            <div class="ws-favicon">{{ ws.name|first|upper }}</div>
+            <div class="ws-info">
+                <div class="ws-name">{{ ws.name }}</div>
+                <div class="ws-domain">
+                    <a href="https://{{ ws.domain }}" target="_blank" rel="noopener">{{ ws.domain }}</a>
+                    <span class="ws-status {% if ws.is_active %}active{% else %}inactive{% endif %}">
+                        <i class="fas fa-circle" style="font-size:5px;"></i>
+                        {% if ws.is_active %}Active{% else %}Paused{% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="ws-actions">
+                <button onclick="editWebsite({{ ws.id }},'{{ ws.name|escapejs }}','{{ ws.domain|escapejs }}','{{ ws.widget_title|escapejs }}','{{ ws.widget_color|escapejs }}','{{ ws.widget_position|escapejs }}','{{ ws.welcome_message|escapejs }}')" title="Edit"><i class="fas fa-edit"></i></button>
+                <button onclick="toggleWebsiteActive({{ ws.id }}, {{ ws.is_active|yesno:'true,false' }})" title="{% if ws.is_active %}Pause{% else %}Activate{% endif %}"><i class="fas fa-{% if ws.is_active %}pause{% else %}play{% endif %}"></i></button>
+                <button class="danger" onclick="deleteWebsite({{ ws.id }},'{{ ws.name|escapejs }}')" title="Delete"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="ws-stats">
+            <div class="ws-stat">
+                <div class="ws-stat-value">{{ ws.stat_visitors_total }}</div>
+                <div class="ws-stat-label">Total Visitors</div>
+            </div>
+            <div class="ws-stat">
+                <div class="ws-stat-value" style="color:var(--success);">{{ ws.stat_visitors_online }}</div>
+                <div class="ws-stat-label">Online Now</div>
+            </div>
+            <div class="ws-stat">
+                <div class="ws-stat-value">{{ ws.stat_visitors_today }}</div>
+                <div class="ws-stat-label">Today</div>
+            </div>
+            <div class="ws-stat">
+                <div class="ws-stat-value">{{ ws.stat_pageviews_7d }}</div>
+                <div class="ws-stat-label">Views (7d)</div>
+            </div>
+            <div class="ws-stat">
+                <div class="ws-stat-value">{{ ws.stat_chats_total }}</div>
+                <div class="ws-stat-label">Total Chats</div>
+            </div>
+            <div class="ws-stat">
+                <div class="ws-stat-value" style="color:var(--warning);">{{ ws.stat_chats_active }}</div>
+                <div class="ws-stat-label">Active Chats</div>
+            </div>
+        </div>
+
+        <!-- Tracking Code -->
+        <div class="ws-tracking">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div class="ws-tracking-label" style="margin-bottom:0;">Site-Specific Code</div>
+                <span style="font-size:10px;color:var(--text-muted);">or use the universal code above</span>
+            </div>
+            <div class="ws-code-box">
+                <code id="code-{{ ws.tracking_key }}">&lt;script defer src="{{ base_url }}/api/widget/script.js?key={{ ws.tracking_key }}"&gt;&lt;/script&gt;</code>
+                <button onclick="copyTrackingCode('{{ ws.tracking_key }}')"><i class="fas fa-copy"></i> Copy</button>
+            </div>
+        </div>
+
+        <!-- View Data Button -->
+        <div class="ws-filter-btn">
+            <button onclick="switchToWebsite({{ ws.id }})">
+                <i class="fas fa-filter"></i> View {{ ws.name }} Data in Dashboard
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="ws-empty">
+    <div class="ws-empty-icon"><i class="fas fa-globe"></i></div>
+    <h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin-bottom:8px;">No websites yet</h2>
+    <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px;">Add your first website to start tracking visitors.</p>
+    <button onclick="document.getElementById('addModal').style.display='flex'" class="btn btn-primary"><i class="fas fa-plus"></i> Add Website</button>
+</div>
+{% endif %}
 
 <!-- Add/Edit Modal -->
-<div id="addModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:28px;width:420px;max-width:90vw;">
-        <h3 id="modalTitle" style="font-size:18px;font-weight:700;margin-bottom:20px;">Add website</h3>
+<div id="addModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;" onclick="if(event.target===this)closeModal()">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:28px;width:460px;max-width:90vw;box-shadow:var(--shadow-lg);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <h3 id="modalTitle" style="font-size:18px;font-weight:700;">Add Website</h3>
+            <button onclick="closeModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:4px;"><i class="fas fa-times"></i></button>
+        </div>
         <input type="hidden" id="editId" value="">
         <div style="margin-bottom:14px;">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Name</label>
-            <input type="text" id="wsName" class="form-control" placeholder="My Website">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Website Name</label>
+            <input type="text" id="wsName" class="form-control" placeholder="e.g. My Website">
         </div>
         <div style="margin-bottom:14px;">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Domain</label>
-            <input type="text" id="wsDomain" class="form-control" placeholder="example.com">
+            <input type="text" id="wsDomain" class="form-control" placeholder="e.g. example.com">
+            <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Enter without https:// or www</div>
         </div>
         <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:8px;">
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Widget Customization (optional)</div>
+            <button type="button" onclick="document.getElementById('widgetOpts').style.display=document.getElementById('widgetOpts').style.display==='none'?'block':'none'" style="background:none;border:none;color:var(--primary);font-size:12px;font-weight:600;cursor:pointer;padding:0;display:flex;align-items:center;gap:6px;">
+                <i class="fas fa-cog"></i> Widget Customization (optional)
+            </button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-            <div>
-                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Title</label>
-                <input type="text" id="wsWidgetTitle" class="form-control" placeholder="Leave empty for default" style="font-size:12px;">
+        <div id="widgetOpts" style="display:none;margin-bottom:14px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Title</label>
+                    <input type="text" id="wsWidgetTitle" class="form-control" placeholder="Leave empty for default" style="font-size:12px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Color</label>
+                    <input type="color" id="wsWidgetColor" value="#7c3aed" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-primary);">
+                </div>
             </div>
-            <div>
-                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Color</label>
-                <input type="color" id="wsWidgetColor" value="#7c3aed" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-primary);">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                    <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Position</label>
+                    <select id="wsWidgetPosition" class="form-control" style="font-size:12px;">
+                        <option value="">Use Default</option>
+                        <option value="bottom-right">Bottom Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Welcome Message</label>
+                    <input type="text" id="wsWelcomeMsg" class="form-control" placeholder="Leave empty for default" style="font-size:12px;">
+                </div>
             </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-            <div>
-                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Position</label>
-                <select id="wsWidgetPosition" class="form-control" style="font-size:12px;">
-                    <option value="">Use Default</option>
-                    <option value="bottom-right">Bottom Right</option>
-                    <option value="bottom-left">Bottom Left</option>
-                </select>
-            </div>
-            <div>
-                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Welcome Message</label>
-                <input type="text" id="wsWelcomeMsg" class="form-control" placeholder="Leave empty for default" style="font-size:12px;">
-            </div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:8px;border-top:1px solid var(--border);">
             <button onclick="closeModal()" class="btn btn-sm btn-secondary">Cancel</button>
-            <button onclick="saveWebsite()" class="btn btn-sm btn-primary">Save</button>
+            <button onclick="saveWebsite()" class="btn btn-sm btn-primary"><i class="fas fa-check"></i> Save</button>
         </div>
     </div>
 </div>
 
 <script>
-function copyCode(key) {
-    const code = '<script defer src="{{ base_url }}/api/widget/script.js?key=' + key + '"><\/script>';
-    navigator.clipboard.writeText(code);
+function copyUniversalCode() {
+    var code = '<script defer src="{{ base_url }}/api/widget/script.js?key={{ org_widget_key }}"><\/script>';
+    navigator.clipboard.writeText(code).then(function() {
+        showToast('Universal tracking code copied!', 'success');
+    });
+}
+function copyTrackingCode(key) {
+    var code = '<script defer src="{{ base_url }}/api/widget/script.js?key=' + key + '"><\/script>';
+    navigator.clipboard.writeText(code).then(function() {
+        showToast('Tracking code copied!', 'success');
+    });
 }
 function closeModal() {
     document.getElementById('addModal').style.display = 'none';
@@ -108,7 +295,8 @@ function closeModal() {
     document.getElementById('wsWidgetColor').value = '#7c3aed';
     document.getElementById('wsWidgetPosition').value = '';
     document.getElementById('wsWelcomeMsg').value = '';
-    document.getElementById('modalTitle').textContent = 'Add website';
+    document.getElementById('widgetOpts').style.display = 'none';
+    document.getElementById('modalTitle').textContent = 'Add Website';
 }
 function editWebsite(id, name, domain, wTitle, wColor, wPos, wMsg) {
     document.getElementById('editId').value = id;
@@ -118,40 +306,67 @@ function editWebsite(id, name, domain, wTitle, wColor, wPos, wMsg) {
     document.getElementById('wsWidgetColor').value = wColor || '#7c3aed';
     document.getElementById('wsWidgetPosition').value = wPos || '';
     document.getElementById('wsWelcomeMsg').value = wMsg || '';
-    document.getElementById('modalTitle').textContent = 'Edit website';
+    if (wTitle || (wColor && wColor !== '#7c3aed') || wPos || wMsg) {
+        document.getElementById('widgetOpts').style.display = 'block';
+    }
+    document.getElementById('modalTitle').textContent = 'Edit Website';
     document.getElementById('addModal').style.display = 'flex';
 }
 function saveWebsite() {
-    const editId = document.getElementById('editId').value;
-    const name = document.getElementById('wsName').value.trim();
-    const domain = document.getElementById('wsDomain').value.trim();
+    var editId = document.getElementById('editId').value;
+    var name = document.getElementById('wsName').value.trim();
+    var domain = document.getElementById('wsDomain').value.trim();
     if (!name || !domain) return showToast('Name and domain are required', 'error');
-    const wTitle = document.getElementById('wsWidgetTitle').value.trim();
-    const wColor = document.getElementById('wsWidgetColor').value;
-    const wPos = document.getElementById('wsWidgetPosition').value;
-    const wMsg = document.getElementById('wsWelcomeMsg').value.trim();
-    const body = editId
-        ? {action: 'edit', id: parseInt(editId), name, domain, widget_title: wTitle, widget_color: wColor === '#7c3aed' ? '' : wColor, widget_position: wPos, welcome_message: wMsg}
-        : {action: 'add', name, domain, widget_title: wTitle, widget_color: wColor === '#7c3aed' ? '' : wColor, widget_position: wPos, welcome_message: wMsg};
+    var wTitle = document.getElementById('wsWidgetTitle').value.trim();
+    var wColor = document.getElementById('wsWidgetColor').value;
+    var wPos = document.getElementById('wsWidgetPosition').value;
+    var wMsg = document.getElementById('wsWelcomeMsg').value.trim();
+    var body = editId
+        ? {action: 'edit', id: parseInt(editId), name: name, domain: domain, widget_title: wTitle, widget_color: wColor === '#7c3aed' ? '' : wColor, widget_position: wPos, welcome_message: wMsg}
+        : {action: 'add', name: name, domain: domain, widget_title: wTitle, widget_color: wColor === '#7c3aed' ? '' : wColor, widget_position: wPos, welcome_message: wMsg};
     fetch('{% url "dashboard:website_manage" %}', {
         method: 'POST',
         headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
         body: JSON.stringify(body),
-    }).then(r => r.json()).then(data => {
+    }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.error) return showToast(data.error, 'error');
+        showToast(editId ? 'Website updated!' : 'Website added!', 'success');
         location.reload();
     });
 }
 function deleteWebsite(id, name) {
-    showConfirm('Delete website "' + name + '"? Visitor data will be unlinked.', function() {
+    showConfirm('Delete website "' + name + '"? All linked visitor data will be unlinked.', function() {
         fetch('/dashboard/settings/websites/' + id + '/delete/', {
             method: 'POST',
             headers: {'X-CSRFToken': '{{ csrf_token }}'},
-        }).then(r => r.json()).then(data => {
+        }).then(function(r) { return r.json(); }).then(function(data) {
             if (data.error) return showToast(data.error, 'error');
+            showToast('Website deleted', 'success');
             location.reload();
         });
     }, 'Delete Website');
+}
+function toggleWebsiteActive(id, currentlyActive) {
+    var action = currentlyActive ? 'pause' : 'activate';
+    var body = {action: 'edit', id: id, is_active: !currentlyActive};
+    fetch('{% url "dashboard:website_manage" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) return showToast(data.error, 'error');
+        showToast('Website ' + (currentlyActive ? 'paused' : 'activated'), 'success');
+        location.reload();
+    });
+}
+function switchToWebsite(id) {
+    fetch('{% url "dashboard:set_website" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify({website_id: id}),
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.status === 'ok') window.location.href = '{% url "dashboard:home" %}';
+    });
 }
 </script>
 {% endblock %}

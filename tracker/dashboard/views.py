@@ -972,7 +972,8 @@ def export_visitors_csv(request):
     writer = csv.writer(response)
     writer.writerow(['ID', 'IP Address', 'Browser', 'OS', 'Device', 'Source', 'First Visit', 'Last Seen', 'Total Visits', 'Online'])
 
-    visitors_qs = Visitor.objects.filter(organization=org)
+    ws_filter = get_website_filter(request, org)
+    visitors_qs = Visitor.objects.filter(organization=org, **ws_filter)
     if date_from:
         visitors_qs = visitors_qs.filter(first_visit__date__gte=date_from)
     if date_to:
@@ -1008,7 +1009,8 @@ def export_chats_csv(request):
 
     profile = getattr(request.user, 'agent_profile', None)
     is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
-    chats_qs = ChatRoom.objects.filter(organization=org).select_related('agent').annotate(
+    ws_filter = get_website_filter(request, org)
+    chats_qs = ChatRoom.objects.filter(organization=org, **ws_filter).select_related('agent').annotate(
         unread_count=Count('messages', filter=Q(messages__sender_type='visitor', messages__is_read=False)),
         message_count_db=Count('messages'),
     )
@@ -1122,7 +1124,8 @@ def offline_messages_view(request):
     if not request.user.is_superuser and (not profile or profile.role not in ('owner', 'admin')):
         return HttpResponse("Forbidden — owners only.", status=403)
     org = get_user_org(request.user)
-    messages_list = OfflineMessage.objects.filter(organization=org)
+    ws_filter = get_website_filter(request, org)
+    messages_list = OfflineMessage.objects.filter(organization=org, **ws_filter)
     return render(request, 'dashboard/offline_messages.html', {
         'messages': messages_list,
     })
@@ -1772,7 +1775,9 @@ def analytics_view(request):
     org = get_user_org(request.user)
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    chats_qs = ChatRoom.objects.filter(organization=org)
+    ws_filter = get_website_filter(request, org)
+    chats_qs = ChatRoom.objects.filter(organization=org, **ws_filter)
+    visitors_qs = Visitor.objects.filter(organization=org, **ws_filter)
 
     # Last 7 days chat volume
     daily_chats = []
@@ -1798,7 +1803,7 @@ def analytics_view(request):
     }
 
     # Top visitor countries
-    country_stats = list(Visitor.objects.filter(organization=org).exclude(country='').values('country').annotate(count=Count('id')).order_by('-count')[:10])
+    country_stats = list(visitors_qs.exclude(country='').values('country').annotate(count=Count('id')).order_by('-count')[:10])
 
     # Busiest hours
     from django.db.models.functions import ExtractHour
@@ -1806,8 +1811,8 @@ def analytics_view(request):
 
     total_chats = chats_qs.count()
     avg_rating = chats_qs.filter(rating__isnull=False).aggregate(a=Avg('rating'))['a']
-    total_messages = Message.objects.filter(room__organization=org).count()
-    total_visitors = Visitor.objects.filter(organization=org).count()
+    total_messages = Message.objects.filter(room__organization=org, **{k.replace('website_id', 'room__website_id'): v for k, v in ws_filter.items()}).count()
+    total_visitors = visitors_qs.count()
     closed_chats = status_counts['closed']
     completion_rate = round((closed_chats / total_chats * 100), 1) if total_chats > 0 else 0
 
@@ -1815,16 +1820,16 @@ def analytics_view(request):
     top_agents = User.objects.filter(
         agent_profile__organization=org
     ).annotate(
-        chats_count=Count('chat_rooms', filter=Q(chat_rooms__organization=org)),
+        chats_count=Count('chat_rooms', filter=Q(chat_rooms__organization=org, **{f'chat_rooms__{k}': v for k, v in ws_filter.items()})),
         avg_agent_rating=Avg('chat_rooms__rating', filter=Q(chat_rooms__rating__isnull=False)),
     ).order_by('-chats_count')[:5]
 
     # Browser breakdown
-    browser_stats = list(Visitor.objects.filter(organization=org).values('browser').annotate(count=Count('id')).order_by('-count')[:6])
+    browser_stats = list(visitors_qs.values('browser').annotate(count=Count('id')).order_by('-count')[:6])
     total_browser = sum(b['count'] for b in browser_stats) or 1
 
     # Device breakdown
-    device_stats = list(Visitor.objects.filter(organization=org).values('device_type').annotate(count=Count('id')).order_by('-count'))
+    device_stats = list(visitors_qs.values('device_type').annotate(count=Count('id')).order_by('-count'))
     total_device = sum(d['count'] for d in device_stats) or 1
 
     # Rating distribution
@@ -2651,9 +2656,10 @@ def advanced_analytics_view(request):
     start, end, date_from, date_to, period = _parse_date_range(request)
     prev_start, prev_end = _get_prev_period(start, end)
 
-    visitors_qs = Visitor.objects.filter(organization=org)
-    pageviews_qs = PageView.objects.filter(visitor__organization=org)
-    chats_qs = ChatRoom.objects.filter(organization=org)
+    ws_filter = get_website_filter(request, org)
+    visitors_qs = Visitor.objects.filter(organization=org, **ws_filter)
+    pageviews_qs = PageView.objects.filter(visitor__organization=org, **{k.replace('website_id', 'visitor__website_id'): v for k, v in ws_filter.items()})
+    chats_qs = ChatRoom.objects.filter(organization=org, **ws_filter)
 
     # Current period
     cur_visitors = visitors_qs.filter(first_visit__gte=start, first_visit__lte=end)
@@ -3298,8 +3304,9 @@ def heatmaps_view(request):
     page_filter = request.GET.get('page', '').strip()
     device_filter = request.GET.get('device', 'all').strip()
 
-    clicks_qs = ClickData.objects.filter(organization=org, timestamp__gte=start, timestamp__lte=end)
-    scroll_qs = ScrollData.objects.filter(organization=org, timestamp__gte=start, timestamp__lte=end)
+    ws_filter = get_website_filter(request, org)
+    clicks_qs = ClickData.objects.filter(organization=org, timestamp__gte=start, timestamp__lte=end, **ws_filter)
+    scroll_qs = ScrollData.objects.filter(organization=org, timestamp__gte=start, timestamp__lte=end, **ws_filter)
 
     if page_filter:
         clicks_qs = clicks_qs.filter(page_path=page_filter)
@@ -3350,7 +3357,8 @@ def heatmaps_view(request):
 def session_recordings_view(request):
     """List session recordings."""
     org = get_user_org(request.user)
-    recordings = SessionRecording.objects.filter(organization=org).select_related('visitor')
+    ws_filter = get_website_filter(request, org)
+    recordings = SessionRecording.objects.filter(organization=org, **ws_filter).select_related('visitor')
 
     # Filters
     device = request.GET.get('device', '').strip()
@@ -3399,7 +3407,8 @@ def js_errors_view(request):
     """JavaScript error tracking dashboard."""
     org = get_user_org(request.user)
     start, end, date_from, date_to, period = _parse_date_range(request)
-    errors = JSError.objects.filter(organization=org, timestamp__gte=start, timestamp__lte=end)
+    ws_filter = get_website_filter(request, org)
+    errors = JSError.objects.filter(organization=org, timestamp__gte=start, timestamp__lte=end, **ws_filter)
 
     # Group by error message
     error_groups = list(errors.values('error_message').annotate(
@@ -3426,7 +3435,8 @@ def frustration_dashboard_view(request):
     """Frustration signals overview — Clarity-style insights."""
     org = get_user_org(request.user)
     start, end, date_from, date_to, period = _parse_date_range(request)
-    signals = FrustrationSignal.objects.filter(organization=org, timestamp__gte=start, timestamp__lte=end)
+    ws_filter = get_website_filter(request, org)
+    signals = FrustrationSignal.objects.filter(organization=org, timestamp__gte=start, timestamp__lte=end, **ws_filter)
 
     # Signal breakdown
     signal_counts = {}
@@ -3444,11 +3454,11 @@ def frustration_dashboard_view(request):
 
     # Frustrated sessions
     frustrated_recordings = SessionRecording.objects.filter(
-        organization=org, frustration_score__gt=0, created_at__gte=start
+        organization=org, frustration_score__gt=0, created_at__gte=start, **ws_filter
     ).order_by('-frustration_score')[:10]
 
     # Per-page insights
-    page_insights = PageInsight.objects.filter(organization=org).order_by('-frustration_score')[:15]
+    page_insights = PageInsight.objects.filter(organization=org, **ws_filter).order_by('-frustration_score')[:15]
 
     return render(request, 'dashboard/frustration_dashboard.html', {
         'signal_counts': signal_counts, 'total_signals': total_signals,
@@ -4174,20 +4184,38 @@ def website_manage_view(request):
                 ws.widget_position = (data['widget_position'] or '').strip()
             if 'welcome_message' in data:
                 ws.welcome_message = (data['welcome_message'] or '').strip()
+            if 'is_active' in data:
+                ws.is_active = bool(data['is_active'])
             ws.save()
             return JsonResponse({'status': 'ok'})
 
         return JsonResponse({'error': 'Invalid action'}, status=400)
 
-    websites = Website.objects.filter(organization=org)
+    websites = list(Website.objects.filter(organization=org))
     base_url = request.build_absolute_uri('/').rstrip('/')
     host = request.get_host().split(':')[0]
     if host not in ('localhost', '127.0.0.1') and base_url.startswith('http://'):
         base_url = 'https://' + base_url[len('http://'):]
 
+    # Per-website stats
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    last_30_min = now - timedelta(minutes=30)
+    last_7d = now - timedelta(days=7)
+
+    for ws in websites:
+        ws.stat_visitors_total = Visitor.objects.filter(website=ws).count()
+        ws.stat_visitors_today = Visitor.objects.filter(website=ws, first_visit__gte=today_start).count()
+        ws.stat_visitors_online = Visitor.objects.filter(website=ws, last_seen__gte=last_30_min).count()
+        ws.stat_pageviews_7d = PageView.objects.filter(visitor__website=ws, timestamp__gte=last_7d).count()
+        ws.stat_chats_total = ChatRoom.objects.filter(website=ws).count()
+        ws.stat_chats_active = ChatRoom.objects.filter(website=ws, status__in=['waiting', 'active']).count()
+
     return render(request, 'dashboard/website_manage.html', {
         'websites': websites,
         'base_url': base_url,
+        'total_websites': len(websites),
+        'org_widget_key': org.widget_key if org else '',
     })
 
 
