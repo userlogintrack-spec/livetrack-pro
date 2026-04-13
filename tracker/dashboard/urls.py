@@ -119,4 +119,15 @@ urlpatterns = [
     path('recordings/<str:session_id>/', views.session_replay_view, name='session_replay'),
     path('js-errors/', views.js_errors_view, name='js_errors'),
     path('frustration/', views.frustration_dashboard_view, name='frustration_dashboard'),
+
+    # Multi-Website Features
+    path('settings/websites/<int:website_id>/verify/', views.website_verify_script, name='website_verify'),
+    path('settings/websites/<int:website_id>/dashboard/', views.website_dashboard, name='website_dashboard'),
+    path('settings/websites/<int:website_id>/approve/', views.website_approve, name='website_approve'),
+    path('settings/websites/<int:website_id>/notifications/', views.website_notifications, name='website_notifications'),
+    path('websites/compare/', views.website_compare, name='website_compare'),
+    path('websites/activity-feed/', views.website_activity_feed, name='website_activity_feed'),
+    path('websites/groups/', views.website_groups, name='website_groups'),
+    path('websites/cross-domain/', views.cross_domain_visitors, name='cross_domain_visitors'),
+    path('websites/badge/', views.visitor_badge, name='visitor_badge'),
 ]

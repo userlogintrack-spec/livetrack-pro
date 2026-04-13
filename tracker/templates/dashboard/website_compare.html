@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Compare Websites{% endblock %}
+{% block page_title %}Compare Websites{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block top_actions %}
+<div style="display:flex;align-items:center;gap:10px;">
+    <a href="{% url 'dashboard:website_manage' %}" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left"></i> Websites</a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.compare-selector {
+    background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:24px;
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.compare-selector select {
+    padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;
+    background:var(--bg-input);color:var(--text-primary);min-width:160px;
+}
+.compare-grid { display:grid;gap:0;overflow:hidden;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);margin-bottom:24px; }
+.compare-header { display:flex;border-bottom:1px solid var(--border);background:var(--bg-hover); }
+.compare-header-cell { flex:1;padding:14px 20px;border-right:1px solid var(--border);text-align:center; }
+.compare-header-cell:first-child { flex:0 0 160px;text-align:left;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase; }
+.compare-header-cell:last-child { border-right:none; }
+.compare-header-cell .ws-name { font-size:14px;font-weight:700;color:var(--text-primary); }
+.compare-header-cell .ws-domain { font-size:11px;color:var(--text-muted); }
+
+.compare-row { display:flex;border-bottom:1px solid var(--border); }
+.compare-row:last-child { border-bottom:none; }
+.compare-cell { flex:1;padding:12px 20px;border-right:1px solid var(--border);text-align:center; }
+.compare-cell:first-child { flex:0 0 160px;text-align:left;font-size:12px;font-weight:600;color:var(--text-muted); }
+.compare-cell:last-child { border-right:none; }
+.compare-val { font-size:20px;font-weight:800;color:var(--text-primary); }
+.compare-sub { font-size:10px;color:var(--text-muted);margin-top:2px; }
+
+.mini-chart { display:flex;align-items:flex-end;gap:2px;height:50px;justify-content:center;margin-top:8px; }
+.mini-bar { width:6px;background:var(--primary);border-radius:2px 2px 0 0;min-height:1px;opacity:0.7; }
+
+@media (max-width:700px) {
+    .compare-header-cell:first-child,.compare-cell:first-child { flex:0 0 100px; }
+    .compare-val { font-size:16px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Website Selector -->
+<div class="compare-selector">
+    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Select websites to compare:</span>
+    <select id="cmpSite1" onchange="updateCompare()">
+        <option value="">-- Website 1 --</option>
+        {% for w in all_websites %}<option value="{{ w.id }}" {% if w.id in selected_ids %}selected{% endif %}>{{ w.name }} ({{ w.domain }})</option>{% endfor %}
+    </select>
+    <select id="cmpSite2" onchange="updateCompare()">
+        <option value="">-- Website 2 --</option>
+        {% for w in all_websites %}<option value="{{ w.id }}" {% if w.id in selected_ids and forloop.counter0 == 1 %}selected{% endif %}>{{ w.name }} ({{ w.domain }})</option>{% endfor %}
+    </select>
+    <select id="cmpSite3" onchange="updateCompare()">
+        <option value="">-- Website 3 (optional) --</option>
+        {% for w in all_websites %}<option value="{{ w.id }}">{{ w.name }} ({{ w.domain }})</option>{% endfor %}
+    </select>
+    <button onclick="updateCompare()" class="btn btn-sm btn-primary"><i class="fas fa-exchange-alt"></i> Compare</button>
+</div>
+
+{% if compare_data %}
+<!-- Comparison Table -->
+<div class="compare-grid">
+    <div class="compare-header">
+        <div class="compare-header-cell">Metric</div>
+        {% for d in compare_data %}
+        <div class="compare-header-cell">
+            <div class="ws-name">{{ d.ws.name }}</div>
+            <div class="ws-domain">{{ d.ws.domain }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Online Now</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val" style="color:var(--success);">{{ d.online_now }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Today Visitors</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val">{{ d.today_visitors }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Week Visitors</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val">{{ d.week_visitors }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Total Visitors</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val">{{ d.total_visitors }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Week Pageviews</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val">{{ d.week_pageviews }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Bounce Rate</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val">{{ d.bounce_rate }}%</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Avg Duration</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val">{{ d.avg_dur_min }}:{{ d.avg_dur_sec|stringformat:"02d" }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Total Chats</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val">{{ d.total_chats }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">Active Chats</div>
+        {% for d in compare_data %}
+        <div class="compare-cell"><div class="compare-val" style="color:var(--warning);">{{ d.active_chats }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="compare-row">
+        <div class="compare-cell">7-Day Trend</div>
+        {% for d in compare_data %}
+        <div class="compare-cell">
+            <div class="mini-chart">
+                {% for day in d.daily %}
+                <div class="mini-bar" style="height:{{ day.visitors|default:1 }}px;max-height:50px;"></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div style="text-align:center;padding:60px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;">
+    <i class="fas fa-exchange-alt" style="font-size:36px;color:var(--text-muted);margin-bottom:16px;display:block;"></i>
+    <h3 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">Select websites to compare</h3>
+    <p style="color:var(--text-muted);font-size:13px;">Choose 2 or 3 websites above to see side-by-side comparison.</p>
+</div>
+{% endif %}
+
+<script>
+// Set selects from URL params
+(function() {
+    var ids = {{ selected_ids|safe }};
+    var sels = [document.getElementById('cmpSite1'), document.getElementById('cmpSite2'), document.getElementById('cmpSite3')];
+    for (var i = 0; i < ids.length && i < 3; i++) {
+        if (sels[i]) {
+            for (var j = 0; j < sels[i].options.length; j++) {
+                if (sels[i].options[j].value == ids[i]) { sels[i].selectedIndex = j; break; }
+            }
+        }
+    }
+    // Scale mini-chart bars
+    document.querySelectorAll('.mini-chart').forEach(function(chart) {
+        var bars = chart.querySelectorAll('.mini-bar');
+        var max = 0;
+        bars.forEach(function(b) { var h = parseInt(b.style.height) || 0; if (h > max) max = h; });
+        if (max > 0) bars.forEach(function(b) { var h = parseInt(b.style.height) || 0; b.style.height = Math.max(1, (h / max) * 50) + 'px'; });
+    });
+})();
+function updateCompare() {
+    var ids = [];
+    ['cmpSite1','cmpSite2','cmpSite3'].forEach(function(id) {
+        var v = document.getElementById(id).value;
+        if (v) ids.push(v);
+    });
+    if (ids.length < 2) return showToast('Select at least 2 websites', 'error');
+    window.location.href = '{% url "dashboard:website_compare" %}?ids=' + ids.join(',');
+}
+</script>
+{% endblock %}

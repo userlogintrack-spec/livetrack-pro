@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Cross-Domain Visitors{% endblock %}
+{% block page_title %}Cross-Domain Visitors{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block top_actions %}
+<div style="display:flex;align-items:center;gap:10px;">
+    <a href="{% url 'dashboard:website_manage' %}" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left"></i> Websites</a>
+    <span style="color:var(--text-muted);font-size:12px;font-weight:600;">{{ total_linked }} linked visitor{{ total_linked|pluralize }}</span>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.linked-card {
+    background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;
+}
+.linked-header {
+    padding:16px 20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--border);cursor:pointer;
+}
+.linked-header:hover { background:var(--bg-hover); }
+.linked-fp { font-family:monospace;font-size:12px;color:var(--primary);background:var(--primary-soft);padding:3px 8px;border-radius:6px; }
+.linked-domains { display:flex;gap:6px;flex-wrap:wrap;flex:1; }
+.linked-domain-tag {
+    font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px;
+    background:var(--info-soft);color:var(--info);
+}
+.linked-count { font-size:12px;color:var(--text-muted);font-weight:600; }
+.linked-body { display:none;padding:0; }
+.linked-card.open .linked-body { display:block; }
+.linked-card.open .linked-chevron { transform:rotate(90deg); }
+
+.visitor-row {
+    display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px 80px;gap:0;border-bottom:1px solid var(--border);
+    font-size:12px;
+}
+.visitor-row:last-child { border-bottom:none; }
+.visitor-row > div { padding:10px 16px;border-right:1px solid var(--border); }
+.visitor-row > div:last-child { border-right:none; }
+.visitor-row.head > div { font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);background:var(--bg-hover); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if linked_visitors %}
+<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+    <div style="font-size:13px;color:var(--text-muted);line-height:1.6;">
+        <i class="fas fa-link" style="color:var(--primary);margin-right:6px;"></i>
+        These visitors have been detected across <strong>multiple domains</strong> using browser fingerprinting. Same device/browser visiting different websites in your organization.
+    </div>
+</div>
+
+{% for item in linked_visitors %}
+<div class="linked-card" onclick="this.classList.toggle('open')">
+    <div class="linked-header">
+        <i class="fas fa-chevron-right linked-chevron" style="color:var(--text-muted);font-size:10px;transition:transform .2s;width:14px;"></i>
+        <span class="linked-fp">{{ item.fingerprint }}</span>
+        <div class="linked-domains">
+            {% for d in item.domains %}
+            <span class="linked-domain-tag">{{ d }}</span>
+            {% endfor %}
+        </div>
+        <span class="linked-count">{{ item.site_count }} sites &middot; {{ item.total_visits }} visits</span>
+    </div>
+    <div class="linked-body">
+        <div class="visitor-row head">
+            <div>Website</div>
+            <div>IP Address</div>
+            <div>Browser / OS</div>
+            <div>Country</div>
+            <div>Visits</div>
+            <div>Device</div>
+        </div>
+        {% for v in item.visitors %}
+        <div class="visitor-row">
+            <div style="font-weight:600;">{{ v.website__name|default:"-" }} <span style="color:var(--text-muted);font-weight:400;">({{ v.website__domain|default:"-" }})</span></div>
+            <div style="font-family:monospace;">{{ v.ip_address }}</div>
+            <div>{{ v.browser }} / {{ v.os }}</div>
+            <div>{{ v.country|default:"-" }}</div>
+            <div style="font-weight:700;">{{ v.total_visits }}</div>
+            <div><i class="fas fa-{% if v.device_type == 'mobile' %}mobile-alt{% elif v.device_type == 'tablet' %}tablet-alt{% else %}desktop{% endif %}" style="color:var(--text-muted);"></i></div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div style="text-align:center;padding:80px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;">
+    <i class="fas fa-link" style="font-size:36px;color:var(--text-muted);margin-bottom:16px;display:block;"></i>
+    <h3 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">No cross-domain visitors yet</h3>
+    <p style="color:var(--text-muted);font-size:13px;max-width:400px;margin:0 auto;">When the same visitor browses multiple websites in your organization, they'll appear here linked by their browser fingerprint.</p>
+</div>
+{% endif %}
+{% endblock %}

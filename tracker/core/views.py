@@ -574,12 +574,14 @@ def _auto_register_website(org, domain):
     if org.allowed_domains_enabled and not _domain_allowed(org, domain):
         return None
 
-    # Create website
+    # Create website with pending approval
     name = domain.split('.')[0].capitalize() if '.' in domain else domain.capitalize()
     ws = Website.objects.create(
         organization=org,
         name=name,
         domain=domain,
+        is_auto_detected=True,
+        approval_status='pending',
     )
 
     # Grant all existing agents access

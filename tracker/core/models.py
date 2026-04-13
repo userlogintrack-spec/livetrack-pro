@@ -72,13 +72,41 @@ class Organization(models.Model):
         return self.name
 
 
+class WebsiteGroup(models.Model):
+    """Group/tag for organizing websites (Production, Staging, Client, etc.)."""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='website_groups')
+    name = models.CharField(max_length=100)
+    color = models.CharField(max_length=7, default='#6366f1', help_text='Hex color for the tag')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('organization', 'name')]
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Website(models.Model):
     """A trackable website/domain belonging to an organization."""
+    APPROVAL_CHOICES = [
+        ('approved', 'Approved'),
+        ('pending', 'Pending'),
+        ('rejected', 'Rejected'),
+    ]
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='websites')
     name = models.CharField(max_length=200)
     domain = models.CharField(max_length=253, help_text='Primary domain, e.g. example.com')
     tracking_key = models.CharField(max_length=32, unique=True, db_index=True)
     is_active = models.BooleanField(default=True)
+    # Auto-detection & approval
+    is_auto_detected = models.BooleanField(default=False, help_text='Was this domain auto-detected?')
+    approval_status = models.CharField(max_length=10, choices=APPROVAL_CHOICES, default='approved')
+    # Script verification
+    script_verified = models.BooleanField(default=False)
+    script_last_checked = models.DateTimeField(null=True, blank=True)
+    # Grouping
+    group = models.ForeignKey(WebsiteGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='websites')
     # Per-website widget customization (overrides org defaults if set)
     widget_title = models.CharField(max_length=100, blank=True, default='')
     widget_color = models.CharField(max_length=7, blank=True, default='')
@@ -86,6 +114,12 @@ class Website(models.Model):
         choices=[('', 'Use Default'), ('bottom-right', 'Bottom Right'), ('bottom-left', 'Bottom Left')])
     welcome_message = models.TextField(blank=True, default='')
     offline_message = models.TextField(blank=True, default='')
+    # Notification settings
+    notify_new_visitor = models.BooleanField(default=False, help_text='Email on new visitor')
+    notify_new_chat = models.BooleanField(default=True, help_text='Email on new chat')
+    notify_offline_msg = models.BooleanField(default=True, help_text='Email on offline message')
+    notify_error = models.BooleanField(default=False, help_text='Email on JS error spike')
+    notify_email_override = models.EmailField(blank=True, default='', help_text='Override org notify email for this site')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -27,7 +27,7 @@ from tracker.chat.models import (
 )
 from tracker.chat.security import create_ws_token
 from tracker.chat.utils import close_stale_chats
-from tracker.core.models import WebsiteSettings, Organization, Website
+from tracker.core.models import WebsiteSettings, Organization, Website, WebsiteGroup
 from tracker.core.views import get_user_org
 
 logger = logging.getLogger(__name__)
@@ -4191,7 +4191,7 @@ def website_manage_view(request):
 
         return JsonResponse({'error': 'Invalid action'}, status=400)
 
-    websites = list(Website.objects.filter(organization=org))
+    websites = list(Website.objects.filter(organization=org).select_related('group'))
     base_url = request.build_absolute_uri('/').rstrip('/')
     host = request.get_host().split(':')[0]
     if host not in ('localhost', '127.0.0.1') and base_url.startswith('http://'):
@@ -4235,4 +4235,488 @@ def website_delete(request, website_id):
         ws.delete()
         return JsonResponse({'status': 'ok'})
     return JsonResponse({'error': 'POST required'}, status=405)
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Script Installation Checker
+# ═══════════════════════════════════════════════════════
+
+@login_required
+def website_verify_script(request, website_id):
+    """Check if tracking script is installed on the website by fetching its homepage."""
+    import urllib.request
+    import ssl
+
+    org = get_user_org(request.user)
+    ws = get_object_or_404(Website, id=website_id, organization=org)
+
+    try:
+        url = f'https://{ws.domain}'
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        req = urllib.request.Request(url, headers={'User-Agent': 'LiveTrackBot/1.0 ScriptChecker'})
+        resp = urllib.request.urlopen(req, timeout=10, context=ctx)
+        html = resp.read(200000).decode('utf-8', errors='ignore')
+
+        # Check for org widget_key or website tracking_key in the HTML
+        found = ws.tracking_key in html or ws.organization.widget_key in html
+        ws.script_verified = found
+        ws.script_last_checked = timezone.now()
+        ws.save(update_fields=['script_verified', 'script_last_checked'])
+
+        return JsonResponse({
+            'status': 'ok',
+            'verified': found,
+            'domain': ws.domain,
+            'checked_at': ws.script_last_checked.isoformat(),
+        })
+    except Exception as e:
+        ws.script_verified = False
+        ws.script_last_checked = timezone.now()
+        ws.save(update_fields=['script_verified', 'script_last_checked'])
+        return JsonResponse({
+            'status': 'ok',
+            'verified': False,
+            'error': str(e)[:200],
+            'domain': ws.domain,
+        })
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Per-Website Mini Dashboard
+# ═══════════════════════════════════════════════════════
+
+@login_required
+def website_dashboard(request, website_id):
+    """Dedicated analytics page for a single website."""
+    org = get_user_org(request.user)
+    ws = get_object_or_404(Website, id=website_id, organization=org)
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    last_30_min = now - timedelta(minutes=30)
+    last_7d = now - timedelta(days=7)
+    last_30d = now - timedelta(days=30)
+
+    visitors_qs = Visitor.objects.filter(website=ws)
+    pageviews_qs = PageView.objects.filter(visitor__website=ws)
+    chats_qs = ChatRoom.objects.filter(website=ws)
+
+    # Key metrics
+    total_visitors = visitors_qs.count()
+    online_now = visitors_qs.filter(last_seen__gte=last_30_min).count()
+    today_visitors = visitors_qs.filter(first_visit__gte=today_start).count()
+    week_visitors = visitors_qs.filter(first_visit__gte=last_7d).count()
+    total_pageviews = pageviews_qs.count()
+    week_pageviews = pageviews_qs.filter(timestamp__gte=last_7d).count()
+    total_chats = chats_qs.count()
+    active_chats = chats_qs.filter(status__in=['waiting', 'active']).count()
+
+    # Bounce rate
+    week_v = visitors_qs.filter(first_visit__gte=last_7d)
+    bounced = week_v.filter(is_bounced=True).count()
+    bounce_rate = round((bounced / week_v.count() * 100)) if week_v.count() > 0 else 0
+
+    # Avg session duration
+    avg_dur = week_v.filter(session_duration__gt=0).aggregate(avg=Avg('session_duration'))['avg'] or 0
+
+    # Daily trend (last 14 days)
+    daily_data = []
+    for i in range(13, -1, -1):
+        day = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day + timedelta(days=1)
+        daily_data.append({
+            'date': day.strftime('%b %d'),
+            'visitors': visitors_qs.filter(first_visit__gte=day, first_visit__lt=day_end).count(),
+            'views': pageviews_qs.filter(timestamp__gte=day, timestamp__lt=day_end).count(),
+        })
+
+    # Top pages
+    top_pages = list(pageviews_qs.filter(timestamp__gte=last_7d).values('url', 'page_title').annotate(
+        count=Count('id'), visitors=Count('visitor', distinct=True)
+    ).order_by('-count')[:10])
+
+    # Live visitors
+    live_visitors = list(visitors_qs.filter(last_seen__gte=last_30_min).values(
+        'id', 'ip_address', 'browser', 'os', 'device_type', 'country', 'last_seen'
+    )[:20])
+
+    # Traffic sources
+    sources = list(visitors_qs.filter(first_visit__gte=last_7d).values('referrer_source').annotate(
+        count=Count('id')).order_by('-count')[:8])
+
+    # Device breakdown
+    devices = list(visitors_qs.filter(first_visit__gte=last_7d).values('device_type').annotate(
+        count=Count('id')).order_by('-count'))
+
+    # Country breakdown
+    countries = list(visitors_qs.filter(first_visit__gte=last_7d).exclude(country='').values('country').annotate(
+        count=Count('id')).order_by('-count')[:10])
+
+    # Browser breakdown
+    browsers = list(visitors_qs.filter(first_visit__gte=last_7d).exclude(browser='').values('browser').annotate(
+        count=Count('id')).order_by('-count')[:8])
+
+    base_url = request.build_absolute_uri('/').rstrip('/')
+    host = request.get_host().split(':')[0]
+    if host not in ('localhost', '127.0.0.1') and base_url.startswith('http://'):
+        base_url = 'https://' + base_url[len('http://'):]
+
+    return render(request, 'dashboard/website_dashboard.html', {
+        'ws': ws,
+        'total_visitors': total_visitors,
+        'online_now': online_now,
+        'today_visitors': today_visitors,
+        'week_visitors': week_visitors,
+        'total_pageviews': total_pageviews,
+        'week_pageviews': week_pageviews,
+        'total_chats': total_chats,
+        'active_chats': active_chats,
+        'bounce_rate': bounce_rate,
+        'avg_dur_min': int(avg_dur) // 60,
+        'avg_dur_sec': int(avg_dur) % 60,
+        'daily_data': daily_data,
+        'top_pages': top_pages,
+        'live_visitors': live_visitors,
+        'sources': sources,
+        'devices': devices,
+        'countries': countries,
+        'browsers': browsers,
+        'base_url': base_url,
+    })
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Domain Comparison View
+# ═══════════════════════════════════════════════════════
+
+@login_required
+def website_compare(request):
+    """Compare 2-3 websites side by side."""
+    org = get_user_org(request.user)
+    ids_raw = request.GET.get('ids', '')
+    ids = [int(x) for x in ids_raw.split(',') if x.strip().isdigit()][:3]
+
+    all_websites = list(Website.objects.filter(organization=org))
+    now = timezone.now()
+    last_7d = now - timedelta(days=7)
+    last_30d = now - timedelta(days=30)
+    last_30_min = now - timedelta(minutes=30)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    compare_data = []
+    for ws in Website.objects.filter(id__in=ids, organization=org):
+        visitors_qs = Visitor.objects.filter(website=ws)
+        pageviews_qs = PageView.objects.filter(visitor__website=ws)
+        chats_qs = ChatRoom.objects.filter(website=ws)
+
+        week_v = visitors_qs.filter(first_visit__gte=last_7d)
+        bounced = week_v.filter(is_bounced=True).count()
+        week_count = week_v.count()
+        avg_dur = week_v.filter(session_duration__gt=0).aggregate(avg=Avg('session_duration'))['avg'] or 0
+
+        # Daily trend (7 days)
+        daily = []
+        for i in range(6, -1, -1):
+            day = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day + timedelta(days=1)
+            daily.append({
+                'date': day.strftime('%b %d'),
+                'visitors': visitors_qs.filter(first_visit__gte=day, first_visit__lt=day_end).count(),
+                'views': pageviews_qs.filter(timestamp__gte=day, timestamp__lt=day_end).count(),
+            })
+
+        compare_data.append({
+            'ws': ws,
+            'total_visitors': visitors_qs.count(),
+            'week_visitors': week_count,
+            'today_visitors': visitors_qs.filter(first_visit__gte=today_start).count(),
+            'online_now': visitors_qs.filter(last_seen__gte=last_30_min).count(),
+            'total_pageviews': pageviews_qs.count(),
+            'week_pageviews': pageviews_qs.filter(timestamp__gte=last_7d).count(),
+            'bounce_rate': round((bounced / week_count * 100)) if week_count > 0 else 0,
+            'avg_dur_min': int(avg_dur) // 60,
+            'avg_dur_sec': int(avg_dur) % 60,
+            'total_chats': chats_qs.count(),
+            'active_chats': chats_qs.filter(status__in=['waiting', 'active']).count(),
+            'daily': daily,
+        })
+
+    return render(request, 'dashboard/website_compare.html', {
+        'compare_data': compare_data,
+        'all_websites': all_websites,
+        'selected_ids': ids,
+    })
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Auto-Detected Domain Approval
+# ═══════════════════════════════════════════════════════
+
+@login_required
+def website_approve(request, website_id):
+    """Approve or reject an auto-detected domain."""
+    org = get_user_org(request.user)
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    if request.method == 'POST':
+        ws = get_object_or_404(Website, id=website_id, organization=org)
+        data = json.loads(request.body) if request.body else {}
+        action = data.get('action', 'approve')
+
+        if action == 'approve':
+            ws.approval_status = 'approved'
+            ws.save(update_fields=['approval_status'])
+            return JsonResponse({'status': 'ok', 'approval_status': 'approved'})
+        elif action == 'reject':
+            ws.approval_status = 'rejected'
+            ws.is_active = False
+            ws.save(update_fields=['approval_status', 'is_active'])
+            return JsonResponse({'status': 'ok', 'approval_status': 'rejected'})
+        elif action == 'delete':
+            ws.delete()
+            return JsonResponse({'status': 'ok', 'deleted': True})
+
+    return JsonResponse({'error': 'POST required'}, status=405)
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Per-Website Notification Settings
+# ═══════════════════════════════════════════════════════
+
+@login_required
+def website_notifications(request, website_id):
+    """Update notification settings for a website."""
+    org = get_user_org(request.user)
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    ws = get_object_or_404(Website, id=website_id, organization=org)
+
+    if request.method == 'POST':
+        data = json.loads(request.body) if request.body else {}
+        if 'notify_new_visitor' in data:
+            ws.notify_new_visitor = bool(data['notify_new_visitor'])
+        if 'notify_new_chat' in data:
+            ws.notify_new_chat = bool(data['notify_new_chat'])
+        if 'notify_offline_msg' in data:
+            ws.notify_offline_msg = bool(data['notify_offline_msg'])
+        if 'notify_error' in data:
+            ws.notify_error = bool(data['notify_error'])
+        if 'notify_email_override' in data:
+            ws.notify_email_override = (data['notify_email_override'] or '').strip()
+        ws.save()
+        return JsonResponse({'status': 'ok'})
+
+    return JsonResponse({
+        'notify_new_visitor': ws.notify_new_visitor,
+        'notify_new_chat': ws.notify_new_chat,
+        'notify_offline_msg': ws.notify_offline_msg,
+        'notify_error': ws.notify_error,
+        'notify_email_override': ws.notify_email_override,
+    })
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Real-Time Domain Activity Feed
+# ═══════════════════════════════════════════════════════
+
+@login_required
+def website_activity_feed(request):
+    """Real-time activity feed showing live traffic per domain."""
+    org = get_user_org(request.user)
+    now = timezone.now()
+    last_5_min = now - timedelta(minutes=5)
+    last_30_min = now - timedelta(minutes=30)
+
+    websites = Website.objects.filter(organization=org, is_active=True)
+    feed = []
+
+    for ws in websites:
+        online = Visitor.objects.filter(website=ws, last_seen__gte=last_30_min).count()
+        recent_visitors = list(
+            Visitor.objects.filter(website=ws, last_seen__gte=last_5_min)
+            .order_by('-last_seen')
+            .values('id', 'ip_address', 'browser', 'country', 'last_seen', 'device_type')[:5]
+        )
+        recent_pages = list(
+            PageView.objects.filter(visitor__website=ws, timestamp__gte=last_5_min)
+            .order_by('-timestamp')
+            .values('url', 'page_title', 'timestamp', 'visitor__ip_address', 'visitor__country')[:10]
+        )
+        # Serialize datetime
+        for v in recent_visitors:
+            v['last_seen'] = v['last_seen'].isoformat()
+        for p in recent_pages:
+            p['timestamp'] = p['timestamp'].isoformat()
+
+        feed.append({
+            'id': ws.id,
+            'name': ws.name,
+            'domain': ws.domain,
+            'online': online,
+            'recent_visitors': recent_visitors,
+            'recent_pages': recent_pages,
+        })
+
+    # Sort by online count descending
+    feed.sort(key=lambda x: x['online'], reverse=True)
+    return JsonResponse({'feed': feed})
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Website Groups/Tags
+# ═══════════════════════════════════════════════════════
+
+@login_required
+def website_groups(request):
+    """CRUD for website groups/tags."""
+    org = get_user_org(request.user)
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    if request.method == 'POST':
+        data = json.loads(request.body) if request.body else {}
+        action = data.get('action', 'create')
+
+        if action == 'create':
+            name = (data.get('name') or '').strip()
+            color = (data.get('color') or '#6366f1').strip()
+            if not name:
+                return JsonResponse({'error': 'Name is required'}, status=400)
+            if WebsiteGroup.objects.filter(organization=org, name=name).exists():
+                return JsonResponse({'error': 'Group already exists'}, status=400)
+            g = WebsiteGroup.objects.create(organization=org, name=name, color=color)
+            return JsonResponse({'status': 'ok', 'id': g.id, 'name': g.name, 'color': g.color})
+
+        elif action == 'delete':
+            gid = data.get('group_id')
+            WebsiteGroup.objects.filter(id=gid, organization=org).delete()
+            return JsonResponse({'status': 'ok'})
+
+        elif action == 'assign':
+            ws_id = data.get('website_id')
+            gid = data.get('group_id')  # None to unassign
+            ws = get_object_or_404(Website, id=ws_id, organization=org)
+            if gid:
+                group = get_object_or_404(WebsiteGroup, id=gid, organization=org)
+                ws.group = group
+            else:
+                ws.group = None
+            ws.save(update_fields=['group'])
+            return JsonResponse({'status': 'ok'})
+
+    groups = list(WebsiteGroup.objects.filter(organization=org).values('id', 'name', 'color'))
+    return JsonResponse({'groups': groups})
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Cross-Domain Visitor Linking
+# ═══════════════════════════════════════════════════════
+
+@login_required
+def cross_domain_visitors(request):
+    """Find visitors that appear across multiple domains (by fingerprint)."""
+    org = get_user_org(request.user)
+
+    # Find fingerprints that appear in multiple websites
+    from django.db.models import Count as DbCount
+    multi_fp = (
+        Visitor.objects.filter(organization=org)
+        .exclude(visitor_fingerprint='')
+        .values('visitor_fingerprint')
+        .annotate(
+            site_count=DbCount('website', distinct=True),
+            total_visits=Sum('total_visits'),
+        )
+        .filter(site_count__gte=2)
+        .order_by('-site_count', '-total_visits')[:50]
+    )
+
+    linked_visitors = []
+    for item in multi_fp:
+        fp = item['visitor_fingerprint']
+        visitors = list(
+            Visitor.objects.filter(organization=org, visitor_fingerprint=fp)
+            .select_related('website')
+            .order_by('-last_seen')
+            .values(
+                'id', 'ip_address', 'browser', 'os', 'device_type', 'country',
+                'first_visit', 'last_seen', 'total_visits',
+                'website__name', 'website__domain', 'website_id',
+            )
+        )
+        for v in visitors:
+            v['first_visit'] = v['first_visit'].isoformat() if v['first_visit'] else ''
+            v['last_seen'] = v['last_seen'].isoformat() if v['last_seen'] else ''
+        domains = list({v['website__domain'] for v in visitors if v['website__domain']})
+        linked_visitors.append({
+            'fingerprint': fp[:16] + '...',
+            'site_count': item['site_count'],
+            'total_visits': item['total_visits'],
+            'domains': domains,
+            'visitors': visitors,
+        })
+
+    return render(request, 'dashboard/cross_domain_visitors.html', {
+        'linked_visitors': linked_visitors,
+        'total_linked': len(linked_visitors),
+    })
+
+
+# ═══════════════════════════════════════════════════════
+# Feature: Embeddable Visitor Counter Badge
+# ═══════════════════════════════════════════════════════
+
+@csrf_exempt
+def visitor_badge(request):
+    """Public endpoint: Returns visitor count badge as SVG or JS snippet."""
+    key = request.GET.get('key', '')
+    fmt = request.GET.get('format', 'svg').lower()
+    label = request.GET.get('label', 'visitors online')
+
+    from tracker.core.models import Organization, Website
+    website = Website.objects.select_related('organization').filter(tracking_key=key).first() if key else None
+    org = website.organization if website else (Organization.objects.filter(widget_key=key).first() if key else None)
+
+    if not org:
+        if fmt == 'json':
+            return JsonResponse({'count': 0, 'label': label})
+        svg = _badge_svg(0, label, '#999')
+        return HttpResponse(svg, content_type='image/svg+xml')
+
+    last_30_min = timezone.now() - timedelta(minutes=30)
+    if website:
+        count = Visitor.objects.filter(website=website, last_seen__gte=last_30_min).count()
+        color = website.widget_color or org.widget_color or '#7c3aed'
+    else:
+        count = Visitor.objects.filter(organization=org, last_seen__gte=last_30_min).count()
+        color = org.widget_color or '#7c3aed'
+
+    if fmt == 'json':
+        return JsonResponse({'count': count, 'label': label})
+    elif fmt == 'js':
+        js = f'(function(){{var e=document.getElementById("livetrack-badge");if(e){{e.innerHTML="{count} {label}";}}else{{document.write("<span id=\\"livetrack-badge\\" style=\\"display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;background:{color}22;color:{color};font-family:sans-serif;\\"><span style=\\"width:6px;height:6px;border-radius:50%;background:{color};\\"></span>{count} {label}</span>");}}}})();'
+        return HttpResponse(js, content_type='application/javascript; charset=utf-8')
+
+    svg = _badge_svg(count, label, color)
+    return HttpResponse(svg, content_type='image/svg+xml')
+
+
+def _badge_svg(count, label, color):
+    """Generate a GitHub-style SVG badge."""
+    text = f'{count} {label}'
+    width = max(len(text) * 7 + 20, 80)
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="24" viewBox="0 0 {width} 24">
+  <rect width="{width}" height="24" rx="5" fill="{color}" opacity="0.15"/>
+  <circle cx="12" cy="12" r="4" fill="{color}"/>
+  <text x="22" y="16" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="600" fill="{color}">{text}</text>
+</svg>'''
 
