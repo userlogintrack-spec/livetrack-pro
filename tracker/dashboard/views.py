@@ -77,6 +77,19 @@ def get_selected_website(request, org):
 @login_required
 def dashboard_home(request):
     org = get_user_org(request.user)
+
+    # Check if org has any websites — if not, show setup screen instead of widgets
+    org_websites = list(Website.objects.filter(organization=org).values('id', 'name', 'domain', 'tracking_key')) if org else []
+    has_websites = len(org_websites) > 0
+    if not has_websites:
+        profile = getattr(request.user, 'agent_profile', None)
+        is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+        return render(request, 'dashboard/home.html', {
+            'has_websites': False,
+            'org': org,
+            'is_owner': is_owner,
+        })
+
     # Close stale chats only once per minute (cached)
     from django.core.cache import cache
     if not cache.get(f'stale_check_{org.id if org else 0}'):
@@ -211,6 +224,7 @@ def dashboard_home(request):
     completion_rate = round((closed_chats / total_chats * 100), 1) if total_chats > 0 else 0
 
     context = {
+        'has_websites': True,
         'total_visitors': total_visitors,
         'online_visitors': online_visitors,
         'period_visitor_count': period_visitor_count,
@@ -1504,19 +1518,9 @@ def email_transcript(request, room_id):
             return JsonResponse({'error': 'No email address provided'}, status=400)
 
         messages_list = room.messages.all()
-        lines = [f'Chat Transcript - {room.visitor_name}', f'Room: {room.room_id}', f'Date: {room.created_at.strftime("%Y-%m-%d %H:%M")}', '']
-        for msg in messages_list:
-            lines.append(f'[{msg.timestamp.strftime("%H:%M")}] {msg.sender_name}: {msg.content}')
-
         try:
-            from django.core.mail import send_mail
-            send_mail(
-                f'Chat Transcript - {room.visitor_name} - {org.name}',
-                '\n'.join(lines),
-                'noreply@livetrack.app',
-                [email],
-                fail_silently=False,
-            )
+            from tracker.core.email_utils import send_chat_transcript
+            send_chat_transcript(org, room, messages_list, email)
             _log_activity(org, request.user, 'transcript.sent', f'Transcript emailed to {email} for chat #{room_id}')
             return JsonResponse({'status': 'ok', 'email': email})
         except Exception as e:
@@ -3036,35 +3040,30 @@ def scheduled_reports_view(request):
 
 def _send_scheduled_report(report, org):
     """Send a scheduled report email."""
-    from django.core.mail import send_mail
+    from tracker.core.email_utils import send_scheduled_report
     now = timezone.now()
     last_7 = now - timedelta(days=7)
-    lines = [f"LiveVisitorHub — {report.name}", f"Period: {last_7.strftime('%b %d')} - {now.strftime('%b %d, %Y')}", ""]
+
+    stats = {
+        'period_label': f"{last_7.strftime('%b %d')} - {now.strftime('%b %d, %Y')}",
+        'dashboard_url': '/dashboard/advanced-analytics/',
+    }
 
     if report.include_visitors:
-        total = Visitor.objects.filter(organization=org, first_visit__gte=last_7).count()
-        online = Visitor.objects.filter(organization=org, last_seen__gte=now - timedelta(minutes=30)).count()
-        lines += [f"VISITORS: {total} new, {online} currently online"]
+        stats['visitors'] = Visitor.objects.filter(organization=org, first_visit__gte=last_7).count()
+        stats['online'] = Visitor.objects.filter(organization=org, last_seen__gte=now - timedelta(minutes=30)).count()
 
     if report.include_chats:
         chats = ChatRoom.objects.filter(organization=org, created_at__gte=last_7)
-        lines += [f"CHATS: {chats.count()} total, {chats.filter(status='closed').count()} closed"]
-        avg_rating = chats.filter(rating__isnull=False).aggregate(a=Avg('rating'))['a']
-        if avg_rating:
-            lines.append(f"AVG RATING: {avg_rating:.1f}/5")
+        stats['chats_total'] = chats.count()
+        stats['chats_closed'] = chats.filter(status='closed').count()
+        stats['avg_rating'] = chats.filter(rating__isnull=False).aggregate(a=Avg('rating'))['a']
 
     if report.include_goals:
-        completions = GoalCompletion.objects.filter(goal__organization=org, completed_at__gte=last_7).count()
-        lines += [f"GOAL COMPLETIONS: {completions}"]
-
-    lines += ["", f"View full analytics: /dashboard/advanced-analytics/", "", "— LiveVisitorHub"]
+        stats['goal_completions'] = GoalCompletion.objects.filter(goal__organization=org, completed_at__gte=last_7).count()
 
     try:
-        send_mail(
-            f"[LiveVisitorHub] {report.name} - {now.strftime('%b %d')}",
-            '\n'.join(lines), settings.DEFAULT_FROM_EMAIL, [report.email],
-            fail_silently=False,
-        )
+        send_scheduled_report(report, org, stats)
         report.last_sent = now
         report.save(update_fields=['last_sent'])
     except Exception:

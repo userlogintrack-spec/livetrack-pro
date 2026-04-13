@@ -481,23 +481,12 @@ def register_view(request):
 
         # Best-effort welcome email. Do not block signup if SMTP is unavailable.
         if user.email:
-            try:
-                from django.core.mail import send_mail
-                send_mail(
-                    'Welcome to LiveVisitorHub',
-                    (
-                        f'Hi {first_name or username},\n\n'
-                        'Welcome to LiveVisitorHub. Your account is ready.\n'
-                        f'Login: {request.build_absolute_uri("/accounts/login/")}\n'
-                        'Dashboard: /dashboard/\n\n'
-                        'Thanks,\nLiveVisitorHub Team'
-                    ),
-                    settings.DEFAULT_FROM_EMAIL,
-                    [user.email],
-                    fail_silently=False,
-                )
-            except Exception:
-                logger.exception('Failed to send welcome email to %s', user.email)
+            from tracker.core.email_utils import send_welcome_email
+            send_welcome_email(
+                user,
+                login_url=request.build_absolute_uri('/accounts/login/'),
+                dashboard_url=request.build_absolute_uri('/dashboard/'),
+            )
         login(request, user)
         # If paid plan selected, redirect to billing to complete payment
         if selected_plan in ('pro', 'enterprise'):
@@ -1080,17 +1069,14 @@ def widget_start_chat(request):
 
         # Send email notification for new chat
         if org and org.notify_on_new_chat and org.notify_email:
-            try:
-                from django.core.mail import send_mail
-                send_mail(
-                    f'New chat from {visitor_name} - {org.name}',
-                    f'New chat started by {visitor_name}.\nSubject: {data.get("subject", "-")}\nRoom: {room_id}\n\nLogin to respond: {request.build_absolute_uri("/dashboard/")}',
-                    settings.DEFAULT_FROM_EMAIL,
-                    [org.notify_email],
-                    fail_silently=False,
-                )
-            except Exception:
-                logger.exception('Failed to send new-chat notification email for room=%s', room_id)
+            from tracker.core.email_utils import send_new_chat_notification
+            send_new_chat_notification(
+                org,
+                visitor_name=visitor_name,
+                subject=data.get('subject', '-'),
+                room_id=room_id,
+                dashboard_url=request.build_absolute_uri('/dashboard/'),
+            )
 
         # Save the visitor's initial message (subject/query) as their first chat message
         subject_text = (data.get('subject') or '').strip()

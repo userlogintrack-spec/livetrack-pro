@@ -196,6 +196,139 @@
 
 {% block content %}
 
+{% if not has_websites %}
+<!-- ═══ Setup Screen: Add Your First Domain ═══ -->
+<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;">
+    <div style="text-align:center;max-width:520px;width:100%;">
+        <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a78bfa);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;">
+            <i class="fas fa-globe" style="font-size:36px;color:#fff;"></i>
+        </div>
+        <h2 style="font-size:24px;font-weight:800;color:var(--text-primary);margin-bottom:8px;">Add your first website</h2>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:32px;line-height:1.6;">
+            To start tracking visitors and using the dashboard, add your website domain below. After adding, you'll get a tracking code to embed on your site.
+        </p>
+
+        <div id="setupForm" style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:28px;text-align:left;">
+            <div style="margin-bottom:16px;">
+                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;color:var(--text-primary);">Website Name</label>
+                <input type="text" id="setupName" class="form-control" placeholder="e.g. My Website" style="width:100%;">
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;color:var(--text-primary);">Domain</label>
+                <input type="text" id="setupDomain" class="form-control" placeholder="e.g. example.com" style="width:100%;">
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Enter without https:// or www</div>
+            </div>
+
+            <div id="setupWidgetToggle" style="margin-bottom:16px;">
+                <button onclick="document.getElementById('setupWidgetOpts').style.display=document.getElementById('setupWidgetOpts').style.display==='none'?'block':'none'" type="button" style="background:none;border:none;color:var(--primary);font-size:12px;font-weight:600;cursor:pointer;padding:0;display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-cog"></i> Widget Customization (optional)
+                </button>
+            </div>
+            <div id="setupWidgetOpts" style="display:none;border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div>
+                        <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Title</label>
+                        <input type="text" id="setupWidgetTitle" class="form-control" placeholder="Leave empty for default" style="font-size:12px;">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Color</label>
+                        <input type="color" id="setupWidgetColor" value="#7c3aed" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-primary);">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Position</label>
+                        <select id="setupWidgetPosition" class="form-control" style="font-size:12px;">
+                            <option value="">Use Default</option>
+                            <option value="bottom-right">Bottom Right</option>
+                            <option value="bottom-left">Bottom Left</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Welcome Message</label>
+                        <input type="text" id="setupWelcomeMsg" class="form-control" placeholder="Leave empty for default" style="font-size:12px;">
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="saveSetupWebsite()" id="setupSaveBtn" class="btn btn-primary" style="width:100%;justify-content:center;display:flex;padding:12px;font-size:14px;font-weight:700;border-radius:10px;">
+                <i class="fas fa-plus" style="margin-right:8px;"></i> Add Website & Start Tracking
+            </button>
+        </div>
+
+        <!-- Success state (hidden by default) -->
+        <div id="setupSuccess" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:28px;text-align:left;">
+            <div style="text-align:center;margin-bottom:20px;">
+                <div style="width:56px;height:56px;border-radius:50%;background:rgba(16,185,129,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+                    <i class="fas fa-check" style="font-size:24px;color:#10b981;"></i>
+                </div>
+                <h3 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">Website added!</h3>
+                <p style="font-size:13px;color:var(--text-muted);">Copy the tracking code below and paste it into your website's <code>&lt;head&gt;</code> tag.</p>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="font-size:11px;font-weight:600;display:block;margin-bottom:6px;color:var(--text-muted);text-transform:uppercase;">Tracking Code</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <code id="setupTrackingCode" style="flex:1;font-size:11px;background:var(--bg-hover);padding:12px;border-radius:8px;word-break:break-all;display:block;border:1px solid var(--border);"></code>
+                    <button onclick="navigator.clipboard.writeText(document.getElementById('setupTrackingCode').textContent);this.innerHTML='<i class=\'fas fa-check\'></i>';setTimeout(()=>this.innerHTML='<i class=\'fas fa-copy\'></i>',1500)" style="background:none;border:1px solid var(--border);padding:10px 12px;border-radius:8px;cursor:pointer;color:var(--text-muted);font-size:13px;flex-shrink:0;"><i class="fas fa-copy"></i></button>
+                </div>
+            </div>
+            <a href="{% url 'dashboard:home' %}" class="btn btn-primary" style="width:100%;justify-content:center;display:flex;padding:12px;font-size:14px;font-weight:700;border-radius:10px;">
+                <i class="fas fa-chart-line" style="margin-right:8px;"></i> Go to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function saveSetupWebsite() {
+    var name = document.getElementById('setupName').value.trim();
+    var domain = document.getElementById('setupDomain').value.trim();
+    if (!name || !domain) return showToast('Name and domain are required', 'error');
+
+    var btn = document.getElementById('setupSaveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i> Adding...';
+
+    var wTitle = document.getElementById('setupWidgetTitle').value.trim();
+    var wColor = document.getElementById('setupWidgetColor').value;
+    var wPos = document.getElementById('setupWidgetPosition').value;
+    var wMsg = document.getElementById('setupWelcomeMsg').value.trim();
+
+    fetch('{% url "dashboard:website_manage" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            action: 'add',
+            name: name,
+            domain: domain,
+            widget_title: wTitle,
+            widget_color: wColor === '#7c3aed' ? '' : wColor,
+            widget_position: wPos,
+            welcome_message: wMsg
+        }),
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-plus" style="margin-right:8px;"></i> Add Website & Start Tracking';
+            return showToast(data.error, 'error');
+        }
+        // Show success with tracking code
+        var baseUrl = location.origin;
+        var code = '<script defer src="' + baseUrl + '/api/widget/script.js?key=' + data.tracking_key + '"><\/script>';
+        document.getElementById('setupTrackingCode').textContent = code;
+        document.getElementById('setupForm').style.display = 'none';
+        document.getElementById('setupWidgetToggle').style.display = 'none';
+        document.getElementById('setupSuccess').style.display = 'block';
+        showToast('Website added successfully!', 'success');
+    }).catch(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-plus" style="margin-right:8px;"></i> Add Website & Start Tracking';
+        showToast('Something went wrong. Please try again.', 'error');
+    });
+}
+</script>
+{% else %}
+
 <!-- ═══ KPI Row (Umami-style) ═══ -->
 <div class="kpi-row">
     <div class="kpi-item">
@@ -584,4 +717,5 @@ window.addEventListener('livetrack:visitor', function(e) {
     count.textContent=body.querySelectorAll('.live-visitor-row').length+' online';
 });
 </script>
+{% endif %}
 {% endblock %}
