@@ -232,6 +232,22 @@
     <!-- Emoji popup -->
     <div class="emoji-popup" id="emojiPopup"></div>
 
+    <!-- Permission prompt overlay -->
+    <div id="permOverlay" style="display:none;position:absolute;inset:0;z-index:22;background:rgba(15,10,42,0.97);flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(10px);padding:24px;text-align:center;">
+        <div style="width:64px;height:64px;border-radius:50%;background:rgba(124,58,237,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+            <i class="fas fa-microphone" id="permIcon" style="font-size:26px;color:{{ org.widget_color|default:'#7c3aed' }};"></i>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:white;margin-bottom:6px;" id="permTitle">Allow Microphone Access</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:20px;line-height:1.5;" id="permDesc">To start a call, we need access to your microphone. Click Allow when your browser asks for permission.</div>
+        <div style="display:flex;gap:10px;">
+            <button onclick="dismissPermPrompt()" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.7);font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+            <button onclick="confirmPermPrompt()" id="permAllowBtn" style="padding:10px 24px;border-radius:10px;border:none;background:{{ org.widget_color|default:'#7c3aed' }};color:white;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(124,58,237,0.4);">Allow & Call</button>
+        </div>
+        <div id="permError" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(239,68,68,0.15);border-radius:8px;font-size:11px;color:#fca5a5;line-height:1.4;">
+            Permission denied. Please allow access in your browser settings and try again.
+        </div>
+    </div>
+
     <!-- Call overlay -->
     <div id="callOverlay" style="display:none;position:absolute;inset:0;z-index:20;background:rgba(15,10,42,0.95);flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(10px);">
         <div id="callAvatar" style="width:70px;height:70px;border-radius:50%;background:{{ org.widget_color|default:'#7c3aed' }};display:flex;align-items:center;justify-content:center;font-size:28px;color:white;margin-bottom:14px;box-shadow:0 0 30px rgba(124,58,237,0.4);"><i class="fas fa-phone" id="callIcon"></i></div>
@@ -675,13 +691,90 @@ post('/api/widget/start-chat/', {name:'',email:'',subject:'',restore_only:true})
     }
 }).catch(function(){});
 
+// ═══════ PERMISSION PROMPT ═══════
+var pendingCallType = null;
+
+async function checkMediaPermission(kind) {
+    // kind: 'microphone' or 'camera'
+    try {
+        var result = await navigator.permissions.query({name: kind});
+        return result.state; // 'granted', 'denied', 'prompt'
+    } catch(e) {
+        return 'prompt'; // Fallback: assume prompt needed
+    }
+}
+
+function showPermPrompt(type) {
+    pendingCallType = type;
+    var overlay = document.getElementById('permOverlay');
+    var icon = document.getElementById('permIcon');
+    var title = document.getElementById('permTitle');
+    var desc = document.getElementById('permDesc');
+    var errEl = document.getElementById('permError');
+    errEl.style.display = 'none';
+    if (type === 'video') {
+        icon.className = 'fas fa-video';
+        title.textContent = 'Allow Camera & Microphone';
+        desc.textContent = 'To start a video call, we need access to your camera and microphone. Click "Allow & Call" and then allow when your browser asks.';
+    } else if (type === 'screen') {
+        icon.className = 'fas fa-desktop';
+        title.textContent = 'Share Your Screen';
+        desc.textContent = 'To share your screen, click "Allow & Share" and then select which screen or window to share.';
+        document.getElementById('permAllowBtn').textContent = 'Allow & Share';
+    } else {
+        icon.className = 'fas fa-microphone';
+        title.textContent = 'Allow Microphone Access';
+        desc.textContent = 'To start an audio call, we need access to your microphone. Click "Allow & Call" and then allow when your browser asks.';
+    }
+    if (type !== 'screen') document.getElementById('permAllowBtn').textContent = 'Allow & Call';
+    overlay.style.display = 'flex';
+}
+
+function dismissPermPrompt() {
+    document.getElementById('permOverlay').style.display = 'none';
+    pendingCallType = null;
+}
+
+async function confirmPermPrompt() {
+    var type = pendingCallType;
+    if (!type) return;
+    document.getElementById('permOverlay').style.display = 'none';
+    pendingCallType = null;
+    if (type === 'screen') {
+        await doStartScreenShare();
+    } else {
+        await doStartCall(type);
+    }
+}
+
 // ═══════ AUDIO/VIDEO CALL + SCREEN SHARE ═══════
 var callPC = null, localStream = null, screenStr = null, callSecs = 0, callTimer = null, isMuted = false, isCamOff = false;
 var rtcCfg = {iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
 
 async function startVisitorCall(type) {
     if (!socket || socket.readyState !== 1) { showToast('Start chat first', 'warning'); return; }
-    try { localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:type==='video'}); } catch(e) { showToast('Allow '+(type==='video'?'camera & microphone':'microphone')+' access', 'error'); return; }
+    // Check if permission is already granted
+    var micState = await checkMediaPermission('microphone');
+    var camState = (type === 'video') ? await checkMediaPermission('camera') : 'granted';
+    if (micState === 'granted' && camState === 'granted') {
+        await doStartCall(type);
+    } else if (micState === 'denied' || camState === 'denied') {
+        showPermPrompt(type);
+        document.getElementById('permError').style.display = 'block';
+    } else {
+        showPermPrompt(type);
+    }
+}
+
+async function doStartCall(type) {
+    if (!socket || socket.readyState !== 1) { showToast('Start chat first', 'warning'); return; }
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:type==='video'});
+    } catch(e) {
+        showPermPrompt(type);
+        document.getElementById('permError').style.display = 'block';
+        return;
+    }
     showCallUI(type);
     if (type==='video') { document.getElementById('videoBox').style.display='block'; document.getElementById('localVid').srcObject=localStream; }
     callPC = new RTCPeerConnection(rtcCfg);
@@ -697,6 +790,12 @@ async function startVisitorCall(type) {
 
 var screenPC = null;
 async function startVisitorScreenShare() {
+    if (!socket || socket.readyState !== 1) { showToast('Please start a chat first', 'warning'); return; }
+    if (screenPC || screenStr) { stopScreenShare(); return; }
+    showPermPrompt('screen');
+}
+
+async function doStartScreenShare() {
     if (!socket || socket.readyState !== 1) { showToast('Please start a chat first', 'warning'); return; }
     if (screenPC || screenStr) { stopScreenShare(); return; }
     try {

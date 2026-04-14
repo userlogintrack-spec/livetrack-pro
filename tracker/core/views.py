@@ -907,7 +907,7 @@ def widget_script(request):
       }).then(function(r){ return r.json(); }).then(function(d){
         if (d && d.session_key) {
           setSessionKey(d.session_key);
-          if (!recSessionId) setTimeout(startSessionRecording, 200);
+          if (!recSessionId) { recCreateAttempts = 0; setTimeout(startSessionRecording, 200); }
         }
       }).catch(function(){});
     } catch(e) {}
@@ -954,8 +954,15 @@ def widget_script(request):
         credentials: "include",
         keepalive: !!keepalive,
         body: JSON.stringify(body)
+      }).then(function(r) {
+        if (!r.ok) {
+          console.warn("[LTW] rec API " + r.status + " on " + path);
+          return r.json().catch(function(){ return {error: r.status}; });
+        }
+        return r.json();
       });
     } catch (e) {
+      console.warn("[LTW] rec fetch error:", e);
       return Promise.resolve(null);
     }
   }
@@ -972,7 +979,9 @@ def widget_script(request):
     if (!sk) {
       if (recCreateAttempts < recCreateMaxAttempts) {
         recCreateAttempts += 1;
-        setTimeout(startSessionRecording, 1200);
+        setTimeout(startSessionRecording, 1500);
+      } else {
+        console.warn("[LTW] Session recording: no session key after retries");
       }
       return;
     }
@@ -981,16 +990,17 @@ def widget_script(request):
       url: location.href,
       screen_w: screen.width || 0,
       screen_h: screen.height || 0
-    }), false).then(function(r){ return r ? r.json() : null; }).then(function(d){
+    }), false).then(function(d){
       if (d && d.session_id) {
         recSessionId = d.session_id;
         return;
       }
+      if (d && d.error) console.warn("[LTW] Session create failed:", d.error);
       if (recCreateAttempts < recCreateMaxAttempts) {
         recCreateAttempts += 1;
-        setTimeout(startSessionRecording, 1200);
+        setTimeout(startSessionRecording, 1500);
       }
-    }).catch(function(){});
+    }).catch(function(e){ console.warn("[LTW] Session create error:", e); });
   }
 
   function flushSessionRecording(force) {

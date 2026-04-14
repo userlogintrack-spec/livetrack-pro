@@ -3088,19 +3088,33 @@ def _send_scheduled_report(report, org):
 # ─── Tracking APIs (called from visitor's browser JS) ───
 
 def _resolve_tracking_visitor(request, data):
-    """Resolve org + visitor for tracking APIs with session_key fallback."""
+    """Resolve org + visitor for tracking APIs with session_key fallback.
+
+    Prefers the body session_key (sent by the widget from localStorage) over
+    the Django session cookie, because cross-origin requests often lack cookies
+    and even same-origin the cookie may belong to a logged-in admin session
+    rather than the widget visitor.
+    """
     from tracker.core.views import _get_org_from_request
 
     org = _get_org_from_request(request)
-    session_key = request.session.session_key or ''
     body_session_key = (data.get('session_key') or '').strip()
-    if not session_key and body_session_key:
-        session_key = body_session_key
+    cookie_session_key = request.session.session_key or ''
+
+    # Prefer body key (widget localStorage), fall back to cookie
+    session_key = body_session_key or cookie_session_key
 
     if not session_key:
         return org, None, ''
 
     visitor = Visitor.objects.filter(session_key=session_key, organization=org).first()
+
+    # If body key didn't match, try cookie key as fallback
+    if not visitor and body_session_key and cookie_session_key and body_session_key != cookie_session_key:
+        visitor = Visitor.objects.filter(session_key=cookie_session_key, organization=org).first()
+        if visitor:
+            session_key = cookie_session_key
+
     return org, visitor, session_key
 
 
