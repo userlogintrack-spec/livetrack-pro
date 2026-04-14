@@ -107,7 +107,6 @@ urlpatterns = [
     path('billing/success/', views.billing_success, name='billing_success'),
     path('billing/cancel/', views.cancel_subscription, name='cancel_subscription'),
     path('billing/validate-coupon/', views.validate_coupon, name='validate_coupon'),
-    path('billing/download-invoice/', views.download_invoice, name='download_invoice'),
     path('billing/coupons/', views.manage_coupons_view, name='manage_coupons'),
 
     # Super Admin

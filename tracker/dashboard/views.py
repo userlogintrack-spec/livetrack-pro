@@ -3529,41 +3529,45 @@ def billing_view(request):
         'next_payment': next_payment,
         'plan_price': plan_price,
         'upgrade_plan': upgrade_plan,
-        'stripe_public_key': settings.STRIPE_PUBLIC_KEY,
-        'stripe_configured': bool(settings.STRIPE_SECRET_KEY),
     })
 
 
 @login_required
 def create_checkout_session(request):
-    """Create a Stripe Checkout session for plan upgrade."""
+    """Process card payment and activate plan (no Stripe — demo checkout)."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
     data = json.loads(request.body) if request.body else {}
     plan = data.get('plan', 'pro')
-    interval = data.get('interval', 'month')  # 'month' or 'year'
+    interval = data.get('interval', 'month')
     coupon_code = data.get('coupon', '').strip()
+    card_number = data.get('card_number', '').replace(' ', '')
+    card_expiry = data.get('card_expiry', '').strip()
+    card_cvc = data.get('card_cvc', '').strip()
+    card_name = data.get('card_name', '').strip()
 
     if interval not in ('month', 'year'):
         interval = 'month'
 
-    stripe_key = settings.STRIPE_SECRET_KEY
-    if not stripe_key:
-        return JsonResponse({'error': 'Payment gateway not configured.'}, status=400)
-
-    # Prices in cents — yearly = 12 months with 2 months free (save ~17%)
     PRICES = {
-        'pro': {'month': 1900, 'year': 19000},       # $19/mo or $190/yr (save $38)
-        'enterprise': {'month': 7900, 'year': 79000}, # $79/mo or $790/yr (save $158)
+        'pro': {'month': 19, 'year': 190},
+        'enterprise': {'month': 79, 'year': 790},
     }
-    PLAN_NAMES = {'pro': 'LiveVisitorHub', 'enterprise': 'LiveVisitorHub Enterprise'}
 
     if plan not in PRICES:
         return JsonResponse({'error': 'Invalid plan'}, status=400)
 
+    # Basic card validation
+    if not card_number or len(card_number) < 13 or not card_number.isdigit():
+        return JsonResponse({'error': 'Invalid card number'}, status=400)
+    if not card_expiry or '/' not in card_expiry:
+        return JsonResponse({'error': 'Invalid expiry date (MM/YY)'}, status=400)
+    if not card_cvc or len(card_cvc) < 3:
+        return JsonResponse({'error': 'Invalid CVC'}, status=400)
+
     amount = PRICES[plan][interval]
-    interval_label = 'Monthly' if interval == 'month' else 'Yearly'
+    interval_label = 'Yearly' if interval == 'year' else 'Monthly'
 
     # Apply coupon
     from tracker.core.models import Coupon
@@ -3577,70 +3581,54 @@ def create_checkout_session(request):
             return JsonResponse({'error': 'Coupon has expired or reached usage limit'}, status=400)
         if not coupon.applies_to(plan, interval):
             return JsonResponse({'error': f'This coupon is not valid for {plan.title()} {interval_label}'}, status=400)
-        discount = int(coupon.calculate_discount(amount / 100) * 100)  # cents
+        discount = coupon.calculate_discount(amount)
         applied_coupon = coupon
 
-    final_amount = max(amount - discount, 0)
+    final_amount = max(round(amount - discount, 2), 0)
 
     org = get_user_org(request.user)
-    from tracker.core.models import Subscription
+    from tracker.core.models import Subscription, PaymentHistory
     sub, _ = Subscription.objects.get_or_create(organization=org, defaults={'plan': 'free'})
 
-    try:
-        import stripe
-        stripe.api_key = stripe_key
+    # Activate plan
+    now = timezone.now()
+    if interval == 'year':
+        period_end = now + timedelta(days=365)
+    else:
+        period_end = now + timedelta(days=30)
 
-        if not sub.stripe_customer_id:
-            customer = stripe.Customer.create(
-                email=request.user.email or '',
-                name=org.name,
-                metadata={'org_id': str(org.id), 'org_name': org.name},
-            )
-            sub.stripe_customer_id = customer.id
-            sub.save(update_fields=['stripe_customer_id'])
+    sub.plan = plan
+    sub.status = 'active'
+    sub.billing_interval = interval
+    sub.current_period_start = now
+    sub.current_period_end = period_end
+    sub.cancel_at_period_end = False
+    sub.pending_plan = ''
+    sub.pending_interval = ''
+    if applied_coupon:
+        sub.coupon_applied = applied_coupon
+        sub.discount_percent = int(applied_coupon.discount_value) if applied_coupon.discount_type == 'percent' else 0
+        applied_coupon.times_used += 1
+        applied_coupon.save(update_fields=['times_used'])
+    sub.save()
 
-        line_items = [{
-            'price_data': {
-                'currency': 'usd',
-                'product_data': {
-                    'name': f'{PLAN_NAMES[plan]} — {interval_label}',
-                    'description': f'{interval_label} {plan.title()} plan for {org.name}' + (f' (Coupon: {coupon_code})' if coupon_code else ''),
-                },
-                'unit_amount': final_amount,
-                'recurring': {'interval': interval},
-            },
-            'quantity': 1,
-        }]
+    # Record payment
+    last4 = card_number[-4:]
+    desc = f'Upgraded to {plan.title()} plan ({interval_label})'
+    if coupon_code and discount > 0:
+        desc += f' — Coupon: {coupon_code} (${discount:.2f} off)'
 
-        checkout = stripe.checkout.Session.create(
-            customer=sub.stripe_customer_id,
-            payment_method_types=['card'],
-            line_items=line_items,
-            mode='subscription',
-            success_url=request.build_absolute_uri('/dashboard/billing/success/') + '?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url=request.build_absolute_uri('/dashboard/billing/'),
-            metadata={'org_id': str(org.id), 'plan': plan, 'interval': interval, 'coupon': coupon_code},
-            subscription_data={'metadata': {'org_id': str(org.id), 'plan': plan, 'interval': interval}},
-        )
+    PaymentHistory.objects.create(
+        organization=org,
+        amount=final_amount,
+        plan=plan,
+        stripe_payment_id=f'card_****{last4}_{now.strftime("%Y%m%d%H%M%S")}',
+        description=desc,
+    )
 
-        # Persist intent so billing_success can recover plan/interval reliably
-        # (Stripe metadata can occasionally be empty when read back)
-        sub.pending_plan = plan
-        sub.pending_interval = interval
-        sub.billing_interval = interval
-        if applied_coupon:
-            sub.coupon_applied = applied_coupon
-            sub.discount_percent = int(applied_coupon.discount_value) if applied_coupon.discount_type == 'percent' else 0
-            applied_coupon.times_used += 1
-            applied_coupon.save(update_fields=['times_used'])
-        sub.save()
+    _log_activity(org, request.user, 'plan.upgraded', f'Upgraded to {plan.title()} plan')
 
-        return JsonResponse({'checkout_url': checkout.url})
-
-    except ImportError:
-        return JsonResponse({'error': 'Stripe library not installed.'}, status=500)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'status': 'ok', 'plan': plan})
 
 
 @login_required
@@ -3731,211 +3719,17 @@ def manage_coupons_view(request):
 
 @login_required
 def billing_success(request):
-    """Handle successful checkout — activate plan."""
-    from urllib.parse import unquote
-    session_id = unquote(request.GET.get('session_id', '')).strip()
+    """Show payment success page."""
     org = get_user_org(request.user)
-    from tracker.core.models import Subscription, PaymentHistory
-    import logging
-    log = logging.getLogger('tracker')
-
-    success = False
-    plan = 'pro'
-    error_msg = ''
-
-    log.info(f'Billing success called. session_id={session_id[:40] if session_id else "empty"}')
-
-    # Try to process with Stripe session
-    if session_id and session_id != '{CHECKOUT_SESSION_ID}' and settings.STRIPE_SECRET_KEY:
-        try:
-            import stripe
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-
-            # Retrieve session WITHOUT expand (safer)
-            session = stripe.checkout.Session.retrieve(session_id)
-            log.info(f'Stripe session: status={session.status}, payment={session.payment_status}, sub={session.subscription}')
-
-            if session.payment_status in ('paid', 'no_payment_required') or session.status == 'complete':
-                # Read metadata safely (Stripe metadata access can be quirky across SDK versions)
-                meta = {}
-                try:
-                    if session.metadata:
-                        # StripeObject supports .get() and is iterable
-                        for k in session.metadata:
-                            meta[k] = session.metadata.get(k)
-                except Exception as e:
-                    log.warning(f'Could not read session metadata: {e}')
-
-                # Source of truth priority: DB pending → metadata → amount-based detection → defaults
-                sub, _ = Subscription.objects.get_or_create(organization=org, defaults={'plan': 'free'})
-                amount_paid = (session.amount_total or 0) / 100
-
-                # 1. DB pending fields (most reliable — set right before checkout)
-                plan = sub.pending_plan or meta.get('plan') or ''
-                interval = sub.pending_interval or meta.get('interval') or ''
-
-                # 2. Amount-based detection if still missing
-                if not plan or not interval:
-                    AMOUNT_MAP = {
-                        19: ('pro', 'month'),    190: ('pro', 'year'),
-                        79: ('enterprise', 'month'), 790: ('enterprise', 'year'),
-                    }
-                    detected = AMOUNT_MAP.get(int(round(amount_paid)))
-                    if detected:
-                        plan, interval = detected
-                        log.info(f'Plan detected from amount ${amount_paid}: {plan}/{interval}')
-
-                # 3. Final fallback
-                plan = plan or 'pro'
-                interval = interval or 'month'
-
-                sub.plan = plan
-                sub.status = 'active'
-                sub.billing_interval = interval
-                # Clear pending intent — checkout consumed
-                sub.pending_plan = ''
-                sub.pending_interval = ''
-
-                # Save subscription ID (it's a string)
-                if session.subscription:
-                    sub.stripe_subscription_id = str(session.subscription)
-                    try:
-                        stripe_sub = stripe.Subscription.retrieve(str(session.subscription))
-                        sub.cancel_at_period_end = bool(getattr(stripe_sub, 'cancel_at_period_end', False))
-                        try:
-                            interval_from_stripe = stripe_sub['items']['data'][0]['price']['recurring']['interval']
-                            if interval_from_stripe in ('month', 'year'):
-                                sub.billing_interval = interval_from_stripe
-                                interval = interval_from_stripe
-                        except Exception:
-                            pass
-
-                        period_start = getattr(stripe_sub, 'current_period_start', None)
-                        period_end = getattr(stripe_sub, 'current_period_end', None)
-                        if period_start:
-                            sub.current_period_start = datetime.fromtimestamp(period_start, tz=dt_timezone.utc)
-                        if period_end:
-                            sub.current_period_end = datetime.fromtimestamp(period_end, tz=dt_timezone.utc)
-                    except Exception as e:
-                        log.warning(f'Could not load Stripe subscription period dates: {e}')
-
-                sub.save()
-                log.info(f'Subscription updated: plan={plan}, interval={interval}')
-
-                coupon_code = meta.get('coupon', '')
-
-                # Calculate original price and discount
-                ORIGINAL_PRICES = {'pro': {'month': 19, 'year': 190}, 'enterprise': {'month': 79, 'year': 790}}
-                original_price = ORIGINAL_PRICES.get(plan, {}).get(interval, amount_paid)
-                discount_amount = round(original_price - amount_paid, 2) if amount_paid < original_price else 0
-
-                # Build description — human readable
-                interval_word = 'Yearly' if interval == 'year' else 'Monthly'
-                desc = f'Upgraded to {plan.title()} plan ({interval_word})'
-                if coupon_code and discount_amount > 0:
-                    desc += f' — Coupon: {coupon_code} (${discount_amount} off)'
-
-                # Record payment
-                payment_id = str(session.payment_intent or session.id)
-                if not PaymentHistory.objects.filter(stripe_payment_id=payment_id).exists():
-                    PaymentHistory.objects.create(
-                        organization=org,
-                        amount=amount_paid if amount_paid > 0 else original_price,
-                        plan=plan,
-                        stripe_payment_id=payment_id,
-                        stripe_invoice_id=str(session.invoice or ''),
-                        description=desc,
-                    )
-                    log.info(f'Payment recorded: ${amount_paid}')
-
-                _log_activity(org, request.user, 'plan.upgraded', f'Upgraded to {plan.title()} plan')
-                success = True
-            else:
-                error_msg = f'Payment not completed. Status: {session.payment_status}'
-                log.warning(error_msg)
-
-        except Exception as e:
-            error_msg = str(e)
-            log.error(f'Billing success error: {e}', exc_info=True)
-
-    # Fallback: check if Stripe subscription was already activated (webhook may have fired first)
-    if not success:
-        sub = Subscription.objects.filter(organization=org).first()
-        if sub and sub.plan != 'free' and sub.status == 'active':
-            success = True
-            plan = sub.plan
-
-    if success:
-        return render(request, 'dashboard/billing_success.html', {'plan': plan})
-
-    # If still not success, show error on billing page
-    if error_msg:
-        from django.contrib import messages as django_messages
-        django_messages.error(request, f'Payment processing issue: {error_msg}. If you were charged, your plan will activate shortly.')
-    return redirect('dashboard:billing')
-
-
-@login_required
-def download_invoice(request):
-    """Get the best PDF/receipt URL for an invoice.
-
-    Priority for PAID invoices:
-        1. Stripe receipt URL (clean — no "Pay online" link, marked as paid)
-        2. Stripe invoice PDF
-        3. Hosted invoice page
-    """
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
-
-    data = json.loads(request.body) if request.body else {}
-    invoice_id = data.get('invoice_id', '')
-
-    if not invoice_id or not settings.STRIPE_SECRET_KEY:
-        return JsonResponse({'error': 'Invoice not available'}, status=400)
-
-    try:
-        import stripe
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-        invoice = stripe.Invoice.retrieve(invoice_id, expand=['payment_intent', 'charge'])
-
-        # 1. Try the receipt URL — for paid invoices this is the cleanest doc (no Pay online link)
-        if getattr(invoice, 'status', '') == 'paid':
-            receipt_url = ''
-            try:
-                # Direct charge expansion
-                charge = getattr(invoice, 'charge', None)
-                if charge and not isinstance(charge, str):
-                    receipt_url = getattr(charge, 'receipt_url', '') or ''
-                # Via payment_intent → charges
-                if not receipt_url:
-                    pi = getattr(invoice, 'payment_intent', None)
-                    if pi and not isinstance(pi, str):
-                        charges = getattr(pi, 'charges', None)
-                        if charges and getattr(charges, 'data', None):
-                            receipt_url = charges.data[0].receipt_url or ''
-            except Exception:
-                pass
-            if receipt_url:
-                return JsonResponse({'pdf_url': receipt_url, 'kind': 'receipt'})
-
-        # 2. Direct invoice PDF (still has "Pay online" link in Stripe's PDF for unpaid invoices)
-        pdf_url = getattr(invoice, 'invoice_pdf', '')
-        if pdf_url:
-            return JsonResponse({'pdf_url': pdf_url, 'kind': 'invoice_pdf'})
-
-        # 3. Hosted invoice page
-        if getattr(invoice, 'hosted_invoice_url', ''):
-            return JsonResponse({'pdf_url': invoice.hosted_invoice_url, 'kind': 'hosted'})
-
-        return JsonResponse({'error': 'PDF not available for this invoice'}, status=400)
-
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    from tracker.core.models import Subscription
+    sub = Subscription.objects.filter(organization=org).first()
+    plan = sub.plan if sub and sub.plan != 'free' else 'pro'
+    return render(request, 'dashboard/billing_success.html', {'plan': plan})
 
 
 @login_required
 def cancel_subscription(request):
-    """Cancel subscription — downgrade to free at period end."""
+    """Cancel subscription — downgrade to free."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -3945,94 +3739,13 @@ def cancel_subscription(request):
     if not sub:
         return JsonResponse({'error': 'No subscription found'}, status=400)
 
-    if sub.stripe_subscription_id and settings.STRIPE_SECRET_KEY:
-        try:
-            import stripe
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            stripe.Subscription.modify(sub.stripe_subscription_id, cancel_at_period_end=True)
-            sub.cancel_at_period_end = True
-            sub.save(update_fields=['cancel_at_period_end'])
-        except Exception:
-            pass
-    else:
-        # No Stripe — just downgrade immediately
-        sub.plan = 'free'
-        sub.cancel_at_period_end = False
-        sub.save(update_fields=['plan', 'cancel_at_period_end'])
+    sub.plan = 'free'
+    sub.status = 'active'
+    sub.cancel_at_period_end = False
+    sub.save(update_fields=['plan', 'status', 'cancel_at_period_end'])
 
     _log_activity(org, request.user, 'plan.cancelled', 'Subscription cancelled')
     return JsonResponse({'status': 'ok'})
-
-
-@csrf_exempt
-def stripe_webhook(request):
-    """Handle Stripe webhook events."""
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-
-    payload = request.body
-    sig = request.META.get('HTTP_STRIPE_SIGNATURE', '')
-    webhook_secret = settings.STRIPE_WEBHOOK_SECRET
-
-    if not webhook_secret:
-        return HttpResponse(status=400)
-
-    try:
-        import stripe
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-        event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
-    except (ImportError, Exception):
-        return HttpResponse(status=400)
-
-    from tracker.core.models import Subscription, PaymentHistory
-
-    if event.type in ('customer.subscription.created', 'customer.subscription.updated'):
-        sub_data = event.data.object
-        sub = Subscription.objects.filter(stripe_subscription_id=sub_data.id).first()
-        if not sub:
-            sub = Subscription.objects.filter(stripe_customer_id=getattr(sub_data, 'customer', '')).first()
-        if sub:
-            status_map = {'active': 'active', 'past_due': 'past_due', 'canceled': 'cancelled', 'trialing': 'trialing'}
-            sub.status = status_map.get(sub_data.status, sub.status)
-            sub.stripe_subscription_id = str(sub_data.id or sub.stripe_subscription_id)
-            sub.cancel_at_period_end = bool(getattr(sub_data, 'cancel_at_period_end', False))
-            if getattr(sub_data, 'current_period_start', None):
-                sub.current_period_start = datetime.fromtimestamp(sub_data.current_period_start, tz=dt_timezone.utc)
-            if getattr(sub_data, 'current_period_end', None):
-                sub.current_period_end = datetime.fromtimestamp(sub_data.current_period_end, tz=dt_timezone.utc)
-            try:
-                interval = sub_data['items']['data'][0]['price']['recurring']['interval']
-                if interval in ('month', 'year'):
-                    sub.billing_interval = interval
-            except Exception:
-                pass
-            sub.save()
-
-    elif event.type == 'customer.subscription.deleted':
-        sub_data = event.data.object
-        sub = Subscription.objects.filter(stripe_subscription_id=sub_data.id).first()
-        if sub:
-            sub.plan = 'free'
-            sub.status = 'cancelled'
-            sub.stripe_subscription_id = ''
-            sub.cancel_at_period_end = False
-            sub.save()
-
-    elif event.type == 'invoice.payment_succeeded':
-        invoice = event.data.object
-        sub = Subscription.objects.filter(stripe_customer_id=invoice.customer).first()
-        if sub:
-            interval_word = 'Yearly' if sub.billing_interval == 'year' else 'Monthly'
-            PaymentHistory.objects.create(
-                organization=sub.organization,
-                amount=invoice.amount_paid / 100,
-                plan=sub.plan,
-                stripe_invoice_id=invoice.id,
-                stripe_payment_id=invoice.payment_intent or '',
-                description=f'{interval_word} {sub.plan.title()} plan renewal',
-            )
-
-    return HttpResponse(status=200)
 
 
 # ═══════════════════════════════════════════════════════════

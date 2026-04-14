@@ -36,13 +36,7 @@ services:
       # - key: REDIS_URL
       #   sync: false
 
-      # Stripe (set in dashboard, sync:false keeps them out of git)
-      - key: STRIPE_PUBLIC_KEY
-        sync: false
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
+      # Stripe removed — using built-in card checkout
 
       # Behind Render's proxy
       - key: TRUST_X_FORWARDED_FOR

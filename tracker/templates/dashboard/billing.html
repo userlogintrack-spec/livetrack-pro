@@ -43,6 +43,18 @@
     .billing-info .bi-label { font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
     .billing-info .bi-value { font-size:20px; font-weight:800; color:var(--text-primary); }
     .billing-info .bi-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    /* Card form styles */
+    .card-form-input {
+        width:100%; padding:12px 14px; border:2px solid var(--border); border-radius:10px;
+        font-size:14px; font-family:inherit; background:var(--bg-card); color:var(--text-primary);
+        transition:border-color .2s; outline:none; box-sizing:border-box;
+    }
+    .card-form-input:focus { border-color:var(--primary); }
+    .card-form-input::placeholder { color:var(--text-muted); }
+    .card-form-label { font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; display:block; }
+    .card-icons { display:flex; gap:6px; align-items:center; }
+    .card-icons i { font-size:24px; opacity:0.3; transition:opacity .2s; }
+    .card-icons i.active { opacity:1; }
 </style>
 {% endblock %}
 
@@ -61,7 +73,7 @@
 </div>
 {% endif %}
 
-<!-- ═══════ BILLING OVERVIEW ═══════ -->
+<!-- BILLING OVERVIEW -->
 <div class="billing-info-grid">
     <div class="billing-info">
         <div class="bi-label">Current Plan</div>
@@ -91,14 +103,13 @@
     </div>
 </div>
 
-<!-- ═══════ USAGE THIS MONTH ═══════ -->
+<!-- USAGE THIS MONTH -->
 <div class="card" style="margin-bottom:20px;">
     <div class="card-header"><h3><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Usage This Month</h3>
         <span style="font-size:11px;color:var(--text-muted);">Resets on 1st of every month</span>
     </div>
     <div class="card-body">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;">
-            <!-- Visitors -->
             <div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;">
                     <span style="font-size:13px;font-weight:600;"><i class="fas fa-users" style="color:var(--primary);margin-right:4px;"></i> Visitors</span>
@@ -111,8 +122,6 @@
                 <div style="font-size:11px;color:var(--danger);margin-top:4px;font-weight:600;"><i class="fas fa-exclamation-circle"></i> Limit reached — new visitors won't be tracked</div>
                 {% endif %}
             </div>
-
-            <!-- Agents -->
             <div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;">
                     <span style="font-size:13px;font-weight:600;"><i class="fas fa-user-plus" style="color:var(--info);margin-right:4px;"></i> Agents</span>
@@ -122,8 +131,6 @@
                     <div class="usage-fill" style="width:{% if limits.max_agents >= 999 %}5{% else %}{% widthratio agent_count limits.max_agents 100 %}{% endif %}%;background:var(--info);"></div>
                 </div>
             </div>
-
-            <!-- Chats -->
             <div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;">
                     <span style="font-size:13px;font-weight:600;"><i class="fas fa-comments" style="color:var(--success);margin-right:4px;"></i> Chats This Month</span>
@@ -138,11 +145,10 @@
     </div>
 </div>
 
-<!-- ═══════ PLAN SELECTION ═══════ -->
+<!-- PLAN SELECTION -->
 <div class="card" style="margin-bottom:20px;">
     <div class="card-header">
         <h3><i class="fas fa-crown" style="color:var(--warning);"></i> Choose Your Plan</h3>
-        <!-- Monthly / Yearly Toggle -->
         <div style="display:flex;background:var(--bg-hover);border-radius:10px;padding:3px;gap:2px;" id="intervalToggle">
             <button onclick="setBillingInterval('month')" id="btnMonth" style="padding:6px 16px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;background:transparent;color:var(--text-muted);">Monthly</button>
             <button onclick="setBillingInterval('year')" id="btnYear" style="padding:6px 16px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;background:var(--gradient);color:white;">Yearly <span style="font-size:10px;color:#a7f3d0;font-weight:800;">SAVE 17%</span></button>
@@ -160,7 +166,7 @@
         <div id="couponResult" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:10px;font-size:13px;"></div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:20px;align-items:start;">
-            <!-- ━━━ FREE ━━━ -->
+            <!-- FREE -->
             <div class="plan-card {% if sub.plan == 'free' %}current{% endif %}">
                 <div class="plan-icon" style="background:rgba(100,116,139,0.08);color:#64748b;"><i class="fas fa-paper-plane"></i></div>
                 <div class="plan-name">Free</div>
@@ -186,7 +192,7 @@
                 {% endif %}
             </div>
 
-            <!-- ━━━ PRO ━━━ -->
+            <!-- PRO -->
             <div class="plan-card {% if sub.plan == 'pro' %}current{% endif %} featured" style="overflow:visible;">
                 <div class="plan-badge">Most Popular</div>
                 <div class="plan-icon" style="background:var(--primary-soft);color:var(--primary);"><i class="fas fa-rocket"></i></div>
@@ -219,7 +225,7 @@
                 {% endif %}
             </div>
 
-            <!-- ━━━ ENTERPRISE ━━━ -->
+            <!-- ENTERPRISE -->
             <div class="plan-card {% if sub.plan == 'enterprise' %}current{% endif %}">
                 <div class="plan-icon" style="background:var(--warning-soft);color:var(--warning);"><i class="fas fa-crown"></i></div>
                 <div class="plan-name" style="color:var(--warning);">Enterprise</div>
@@ -253,7 +259,7 @@
     </div>
 </div>
 
-<!-- ═══════ FEATURE COMPARISON TABLE ═══════ -->
+<!-- FEATURE COMPARISON TABLE -->
 <div class="card" style="margin-bottom:20px;">
     <div class="card-header"><h3><i class="fas fa-th-list"></i> Plan Comparison</h3></div>
     <div class="card-body" style="padding:0;"><div class="table-container">
@@ -284,7 +290,7 @@
     </div></div>
 </div>
 
-<!-- ═══════ PAYMENT HISTORY ═══════ -->
+<!-- PAYMENT HISTORY -->
 <div class="card" style="margin-bottom:20px;">
     <div class="card-header">
         <h3><i class="fas fa-receipt" style="color:var(--success);"></i> Payment History</h3>
@@ -311,11 +317,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    {% if p.stripe_invoice_id %}
-                    <a href="#" onclick="downloadInvoice('{{ p.stripe_invoice_id }}');return false;" class="btn btn-sm btn-secondary" style="font-size:11px;padding:4px 10px;"><i class="fas fa-download" style="margin-right:3px;"></i> PDF</a>
-                    {% else %}
                     <button onclick="generateLocalInvoice({{ p.id }})" class="btn btn-sm btn-secondary" style="font-size:11px;padding:4px 10px;"><i class="fas fa-file-alt" style="margin-right:3px;"></i> Receipt</button>
-                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -331,7 +333,7 @@
     </div>
 </div>
 
-<!-- ═══════ BILLING DETAILS ═══════ -->
+<!-- BILLING DETAILS -->
 <div class="card">
     <div class="card-header"><h3><i class="fas fa-info-circle" style="color:var(--info);"></i> Billing Details</h3></div>
     <div class="card-body">
@@ -350,11 +352,7 @@
             </div>
             <div>
                 <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Payment Method</div>
-                <div style="font-weight:600;">{% if sub.stripe_customer_id %}<i class="fab fa-cc-stripe" style="color:#635bff;margin-right:4px;"></i> Stripe{% elif sub.plan == 'free' %}None required{% else %}Not configured{% endif %}</div>
-            </div>
-            <div>
-                <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Customer ID</div>
-                <div style="font-weight:600;font-family:monospace;font-size:12px;">{% if sub.stripe_customer_id %}{{ sub.stripe_customer_id }}{% else %}—{% endif %}</div>
+                <div style="font-weight:600;"><i class="fas fa-credit-card" style="color:var(--primary);margin-right:4px;"></i> Card Payment</div>
             </div>
             <div>
                 <div style="color:var(--text-muted);font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Member Since</div>
@@ -370,20 +368,65 @@
     </div>
 </div>
 
-<!-- ═══════ PAYMENT GATEWAY STATUS ═══════ -->
-{% if not stripe_configured %}
-<div class="card" style="margin-top:20px;border:1px dashed var(--warning);">
-    <div class="card-body" style="display:flex;align-items:center;gap:12px;">
-        <i class="fas fa-exclamation-triangle" style="font-size:24px;color:var(--warning);"></i>
-        <div>
-            <div style="font-weight:700;font-size:14px;color:var(--text-primary);">Payment Gateway Not Configured</div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Stripe keys are not set. Add <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_PUBLIC_KEY</code> to your <code>.env</code> file to enable payments.</div>
+<!-- CARD CHECKOUT MODAL -->
+<div id="cardModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border-radius:var(--radius);max-width:460px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;animation:modalIn .25s ease;">
+        <!-- Header -->
+        <div style="padding:24px 24px 0;text-align:center;">
+            <div style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;background:var(--primary);color:white;">
+                <i class="fas fa-credit-card"></i>
+            </div>
+            <h3 id="cardModalTitle" style="font-size:18px;font-weight:800;color:var(--text-primary);margin-bottom:4px;"></h3>
+            <p id="cardModalPrice" style="font-size:14px;color:var(--text-muted);margin-bottom:16px;"></p>
+        </div>
+        <!-- Card Form -->
+        <div style="padding:0 24px 24px;">
+            <div id="cardError" style="display:none;padding:10px 14px;border-radius:8px;font-size:12px;background:rgba(239,68,68,0.08);color:var(--danger);border:1px solid rgba(239,68,68,0.15);margin-bottom:14px;"></div>
+
+            <div style="margin-bottom:14px;">
+                <label class="card-form-label">Cardholder Name</label>
+                <input type="text" id="cardName" class="card-form-input" placeholder="John Doe" autocomplete="cc-name">
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <label class="card-form-label">Card Number</label>
+                <div style="position:relative;">
+                    <input type="text" id="cardNumber" class="card-form-input" placeholder="4242 4242 4242 4242" maxlength="19" autocomplete="cc-number" style="padding-right:90px;">
+                    <div class="card-icons" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);">
+                        <i class="fab fa-cc-visa" id="iconVisa" style="color:#1a1f71;"></i>
+                        <i class="fab fa-cc-mastercard" id="iconMc" style="color:#eb001b;"></i>
+                        <i class="fab fa-cc-amex" id="iconAmex" style="color:#006fcf;"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+                <div>
+                    <label class="card-form-label">Expiry Date</label>
+                    <input type="text" id="cardExpiry" class="card-form-input" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp">
+                </div>
+                <div>
+                    <label class="card-form-label">CVC</label>
+                    <input type="text" id="cardCvc" class="card-form-input" placeholder="123" maxlength="4" autocomplete="cc-csc">
+                </div>
+            </div>
+
+            <div style="padding:12px;background:var(--bg-hover);border-radius:10px;margin-bottom:16px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);">
+                <i class="fas fa-lock" style="color:var(--success);"></i>
+                <span>Your payment is secured with 256-bit SSL encryption</span>
+            </div>
+
+            <div style="display:flex;gap:8px;">
+                <button onclick="closeCardModal()" class="btn btn-secondary" style="flex:1;">Cancel</button>
+                <button onclick="processCardPayment()" id="payBtn" class="btn btn-primary" style="flex:2;justify-content:center;">
+                    <i class="fas fa-lock" style="margin-right:6px;"></i> <span id="payBtnText">Pay Now</span>
+                </button>
+            </div>
         </div>
     </div>
 </div>
-{% endif %}
 
-<!-- Modal Dialog -->
+<!-- General Modal (for confirmations/errors) -->
 <div id="billingModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:var(--bg-card);border-radius:var(--radius);max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;animation:modalIn .25s ease;">
         <div style="padding:24px 24px 0;text-align:center;">
@@ -401,8 +444,8 @@
 <script>
 var selectedInterval = 'year';
 var appliedCoupon = '';
+var checkoutPlan = '';
 
-// Init yearly as default on page load
 document.addEventListener('DOMContentLoaded', function() { setBillingInterval('year'); });
 
 function setBillingInterval(interval) {
@@ -411,10 +454,8 @@ function setBillingInterval(interval) {
     document.getElementById('btnMonth').style.color = interval === 'month' ? 'white' : 'var(--text-muted)';
     document.getElementById('btnYear').style.background = interval === 'year' ? 'var(--gradient)' : 'transparent';
     document.getElementById('btnYear').style.color = interval === 'year' ? 'white' : 'var(--text-muted)';
-    // Toggle price display
     document.querySelectorAll('.price-monthly').forEach(function(el) { el.style.display = interval === 'month' ? '' : 'none'; });
     document.querySelectorAll('.price-yearly').forEach(function(el) { el.style.display = interval === 'year' ? '' : 'none'; });
-    // Re-validate coupon if applied
     if (appliedCoupon) applyCoupon();
 }
 
@@ -441,7 +482,6 @@ function applyCoupon() {
             result.style.border = '1px solid rgba(16,185,129,0.2)';
             var discText = data.discount_type === 'percent' ? data.discount_value + '% off' : '$' + data.discount_value + ' off';
             result.innerHTML = '<i class="fas fa-check-circle" style="margin-right:6px;"></i><strong>' + data.code + '</strong> applied — ' + discText + ' &middot; You pay <strong>$' + data.final_price + '</strong> <s style="color:var(--text-muted);font-size:11px;">$' + data.original_price + '</s> <button onclick="removeCoupon()" style="border:none;background:none;color:var(--danger);cursor:pointer;margin-left:8px;font-size:11px;"><i class="fas fa-times"></i> Remove</button>';
-            // Update plan card prices with discount
             updatePlanPrices(data.discount_type, data.discount_value);
         } else {
             appliedCoupon = '';
@@ -469,95 +509,141 @@ function calcDisc(price, type, val) {
 }
 
 function updatePlanPrices(discType, discVal) {
-    var prices = {pro:{month:19,year:190},enterprise:{month:79,year:790}};
-    // Pro prices
-    var proM = calcDisc(prices.pro.month, discType, discVal);
-    var proY = calcDisc(prices.pro.year, discType, discVal);
-    var entM = calcDisc(prices.enterprise.month, discType, discVal);
-    var entY = calcDisc(prices.enterprise.year, discType, discVal);
-
-    // Update Pro card
-    var proMonthEl = document.getElementById('proMonthBtn');
-    var proYearEl = document.getElementById('proYearBtn');
-    if (proMonthEl) proMonthEl.innerHTML = 'Upgrade — <s style="opacity:0.5;">$19</s> $' + proM + '/mo';
-    if (proYearEl) proYearEl.innerHTML = 'Upgrade — <s style="opacity:0.5;">$190</s> $' + proY + '/yr';
-
-    // Update Enterprise card
-    var entMonthEl = document.getElementById('entMonthBtn');
-    var entYearEl = document.getElementById('entYearBtn');
-    if (entMonthEl) entMonthEl.innerHTML = 'Upgrade — <s style="opacity:0.5;">$79</s> $' + entM + '/mo';
-    if (entYearEl) entYearEl.innerHTML = 'Upgrade — <s style="opacity:0.5;">$190</s> $' + entY + '/yr';
+    var proM = calcDisc(19, discType, discVal), proY = calcDisc(190, discType, discVal);
+    var entM = calcDisc(79, discType, discVal), entY = calcDisc(790, discType, discVal);
+    var el;
+    el = document.getElementById('proMonthBtn'); if(el) el.innerHTML = 'Upgrade — <s style="opacity:0.5;">$19</s> $' + proM + '/mo';
+    el = document.getElementById('proYearBtn'); if(el) el.innerHTML = 'Upgrade — <s style="opacity:0.5;">$190</s> $' + proY + '/yr';
+    el = document.getElementById('entMonthBtn'); if(el) el.innerHTML = 'Upgrade — <s style="opacity:0.5;">$79</s> $' + entM + '/mo';
+    el = document.getElementById('entYearBtn'); if(el) el.innerHTML = 'Upgrade — <s style="opacity:0.5;">$790</s> $' + entY + '/yr';
 }
 
 function resetPlanPrices() {
-    var proMonthEl = document.getElementById('proMonthBtn');
-    var proYearEl = document.getElementById('proYearBtn');
-    if (proMonthEl) proMonthEl.textContent = 'Upgrade — $19/mo';
-    if (proYearEl) proYearEl.textContent = 'Upgrade — $190/yr';
-    var entMonthEl = document.getElementById('entMonthBtn');
-    var entYearEl = document.getElementById('entYearBtn');
-    if (entMonthEl) entMonthEl.textContent = 'Upgrade — $79/mo';
-    if (entYearEl) entYearEl.textContent = 'Upgrade — $790/yr';
+    var el;
+    el = document.getElementById('proMonthBtn'); if(el) el.textContent = 'Upgrade — $19/mo';
+    el = document.getElementById('proYearBtn'); if(el) el.textContent = 'Upgrade — $190/yr';
+    el = document.getElementById('entMonthBtn'); if(el) el.textContent = 'Upgrade — $79/mo';
+    el = document.getElementById('entYearBtn'); if(el) el.textContent = 'Upgrade — $790/yr';
 }
 
+// ═══════ CARD MODAL ═══════
+function upgradePlan(plan) {
+    checkoutPlan = plan;
+    var prices = {pro:{month:'$19/mo',year:'$190/yr'},enterprise:{month:'$79/mo',year:'$790/yr'}};
+    var priceLabel = prices[plan][selectedInterval];
+    document.getElementById('cardModalTitle').textContent = 'Upgrade to ' + plan.charAt(0).toUpperCase() + plan.slice(1);
+    document.getElementById('cardModalPrice').innerHTML = '<strong>' + priceLabel + '</strong>' + (selectedInterval === 'year' ? ' &middot; Billed yearly' : ' &middot; Billed monthly');
+    document.getElementById('payBtnText').textContent = 'Pay ' + priceLabel.split('/')[0];
+    document.getElementById('cardError').style.display = 'none';
+    // Clear form
+    document.getElementById('cardName').value = '';
+    document.getElementById('cardNumber').value = '';
+    document.getElementById('cardExpiry').value = '';
+    document.getElementById('cardCvc').value = '';
+    document.getElementById('payBtn').disabled = false;
+    document.getElementById('cardModal').style.display = 'flex';
+    document.getElementById('cardName').focus();
+}
+
+function closeCardModal() { document.getElementById('cardModal').style.display = 'none'; }
+
+// Format card number with spaces
+document.addEventListener('DOMContentLoaded', function() {
+    var cardInput = document.getElementById('cardNumber');
+    cardInput.addEventListener('input', function(e) {
+        var v = this.value.replace(/\s/g, '').replace(/\D/g, '');
+        var parts = v.match(/.{1,4}/g);
+        this.value = parts ? parts.join(' ') : '';
+        // Highlight card brand
+        var visa = document.getElementById('iconVisa');
+        var mc = document.getElementById('iconMc');
+        var amex = document.getElementById('iconAmex');
+        visa.classList.toggle('active', v.charAt(0) === '4');
+        mc.classList.toggle('active', v.charAt(0) === '5' || v.charAt(0) === '2');
+        amex.classList.toggle('active', v.substring(0,2) === '34' || v.substring(0,2) === '37');
+    });
+
+    var expiryInput = document.getElementById('cardExpiry');
+    expiryInput.addEventListener('input', function(e) {
+        var v = this.value.replace(/\D/g, '');
+        if (v.length >= 2) this.value = v.substring(0,2) + '/' + v.substring(2,4);
+        else this.value = v;
+    });
+
+    var cvcInput = document.getElementById('cardCvc');
+    cvcInput.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '');
+    });
+});
+
+function processCardPayment() {
+    var cardName = document.getElementById('cardName').value.trim();
+    var cardNumber = document.getElementById('cardNumber').value.replace(/\s/g, '');
+    var cardExpiry = document.getElementById('cardExpiry').value.trim();
+    var cardCvc = document.getElementById('cardCvc').value.trim();
+    var errEl = document.getElementById('cardError');
+
+    // Client-side validation
+    if (!cardName) { showCardError('Please enter cardholder name'); return; }
+    if (!cardNumber || cardNumber.length < 13 || !/^\d+$/.test(cardNumber)) { showCardError('Please enter a valid card number'); return; }
+    if (!cardExpiry || !/^\d{2}\/\d{2}$/.test(cardExpiry)) { showCardError('Please enter expiry as MM/YY'); return; }
+    if (!cardCvc || cardCvc.length < 3) { showCardError('Please enter a valid CVC'); return; }
+
+    // Disable button, show processing
+    var btn = document.getElementById('payBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i> Processing...';
+    errEl.style.display = 'none';
+
+    fetch('{% url "dashboard:checkout" %}', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken':'{{ csrf_token }}'},
+        body: JSON.stringify({
+            plan: checkoutPlan,
+            interval: selectedInterval,
+            coupon: appliedCoupon,
+            card_name: cardName,
+            card_number: cardNumber,
+            card_expiry: cardExpiry,
+            card_cvc: cardCvc
+        })
+    }).then(r => r.json()).then(data => {
+        if (data.status === 'ok') {
+            closeCardModal();
+            window.location.href = '{% url "dashboard:billing_success" %}';
+        } else {
+            showCardError(data.error || 'Payment failed. Please try again.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-lock" style="margin-right:6px;"></i> <span>Pay Now</span>';
+        }
+    }).catch(function() {
+        showCardError('Connection error. Please check your internet and try again.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-lock" style="margin-right:6px;"></i> <span>Pay Now</span>';
+    });
+}
+
+function showCardError(msg) {
+    var el = document.getElementById('cardError');
+    el.innerHTML = '<i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>' + msg;
+    el.style.display = 'block';
+}
+
+// ═══════ GENERAL MODAL ═══════
 function showBillingModal(icon, iconBg, title, msg, actions) {
-    var m = document.getElementById('billingModal');
     document.getElementById('modalIcon').innerHTML = '<i class="fas fa-'+icon+'"></i>';
     document.getElementById('modalIcon').style.background = iconBg;
     document.getElementById('modalIcon').style.color = 'white';
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalMsg').innerHTML = msg;
     document.getElementById('modalActions').innerHTML = actions;
-    m.style.display = 'flex';
+    document.getElementById('billingModal').style.display = 'flex';
 }
 function closeModal() { document.getElementById('billingModal').style.display = 'none'; }
 
-function upgradePlan(plan) {
-    {% if stripe_configured %}
-    var btn = event.target.closest('button');
-    var prices = {pro:{month:'$19/mo',year:'$190/yr'},enterprise:{month:'$79/mo',year:'$790/yr'}};
-    var planName = plan.charAt(0).toUpperCase() + plan.slice(1) + ' (' + prices[plan][selectedInterval] + ')';
-    showBillingModal('credit-card', 'var(--primary)', 'Upgrade to ' + planName,
-        'You will be redirected to Stripe\'s secure checkout page to complete your payment.<br><br><span style="font-size:11px;color:var(--text-muted);"><i class="fas fa-lock" style="margin-right:4px;"></i>256-bit SSL encrypted payment</span>',
-        '<button onclick="closeModal()" class="btn btn-secondary">Cancel</button>' +
-        '<button onclick="closeModal();processUpgrade(\''+plan+'\')" class="btn btn-primary"><i class="fas fa-arrow-right"></i> Continue to Payment</button>'
-    );
-    {% else %}
-    showBillingModal('exclamation-triangle', 'var(--warning)', 'Payment Gateway Not Ready',
-        'Stripe keys are not configured yet.<br><br>Add <code>STRIPE_PUBLIC_KEY</code> and <code>STRIPE_SECRET_KEY</code> to your <code>.env</code> file to enable payments.',
-        '<button onclick="closeModal()" class="btn btn-primary">Got it</button>'
-    );
-    {% endif %}
-}
-
-function processUpgrade(plan) {
-    var btns = document.querySelectorAll('.plan-card button');
-    btns.forEach(function(b) { if (b.textContent.includes('Upgrade')) { b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; b.disabled = true; } });
-
-    fetch('{% url "dashboard:checkout" %}', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json', 'X-CSRFToken':'{{ csrf_token }}'},
-        body: JSON.stringify({plan: plan, interval: selectedInterval, coupon: appliedCoupon})
-    }).then(r => r.json()).then(data => {
-        if (data.checkout_url) {
-            window.location.href = data.checkout_url;
-        } else {
-            showBillingModal('times-circle', 'var(--danger)', 'Payment Error',
-                data.error || 'Something went wrong. Please try again.',
-                '<button onclick="closeModal();location.reload();" class="btn btn-primary">Try Again</button>'
-            );
-        }
-    }).catch(function() {
-        showBillingModal('wifi', 'var(--danger)', 'Connection Error',
-            'Could not reach the payment server. Please check your internet connection and try again.',
-            '<button onclick="closeModal();location.reload();" class="btn btn-primary">Retry</button>'
-        );
-    });
-}
-
 function cancelPlan() {
     showBillingModal('exclamation-circle', 'var(--warning)', 'Cancel Subscription?',
-        '<div style="text-align:left;font-size:13px;"><div style="padding:4px 0;"><i class="fas fa-check" style="color:var(--success);margin-right:6px;"></i>Access continues until billing period ends</div><div style="padding:4px 0;"><i class="fas fa-check" style="color:var(--success);margin-right:6px;"></i>Downgraded to Free plan after that</div><div style="padding:4px 0;"><i class="fas fa-check" style="color:var(--success);margin-right:6px;"></i>Your data will NOT be deleted</div></div>',
+        '<div style="text-align:left;font-size:13px;"><div style="padding:4px 0;"><i class="fas fa-check" style="color:var(--success);margin-right:6px;"></i>You will be downgraded to the Free plan</div><div style="padding:4px 0;"><i class="fas fa-check" style="color:var(--success);margin-right:6px;"></i>Your data will NOT be deleted</div></div>',
         '<button onclick="closeModal()" class="btn btn-secondary">Keep Plan</button>' +
         '<button onclick="closeModal();processCancelPlan();" class="btn" style="background:var(--danger);color:white;">Cancel Subscription</button>'
     );
@@ -570,44 +656,22 @@ function processCancelPlan() {
     }).then(r => r.json()).then(data => {
         if (data.status === 'ok') {
             showBillingModal('check-circle', 'var(--success)', 'Subscription Cancelled',
-                'Your plan will be downgraded to Free at the end of the current billing period.',
+                'Your plan has been downgraded to Free.',
                 '<button onclick="closeModal();location.reload();" class="btn btn-primary">OK</button>'
             );
         } else {
-            showBillingModal('times-circle', 'var(--danger)', 'Error', data.error || 'Could not cancel. Please try again.',
+            showBillingModal('times-circle', 'var(--danger)', 'Error', data.error || 'Could not cancel.',
                 '<button onclick="closeModal()" class="btn btn-primary">OK</button>'
             );
         }
     });
 }
 
-// ═══════ INVOICE DOWNLOAD ═══════
-function downloadInvoice(invoiceId) {
-    {% if stripe_configured %}
-    showBillingModal('spinner fa-spin', 'var(--primary)', 'Fetching Invoice...', 'Getting your invoice PDF from Stripe...', '');
-    fetch('{% url "dashboard:download_invoice" %}', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
-        body: JSON.stringify({invoice_id: invoiceId})
-    }).then(r => r.json()).then(data => {
-        closeModal();
-        if (data.pdf_url) {
-            window.open(data.pdf_url, '_blank');
-        } else {
-            showBillingModal('exclamation-circle', 'var(--warning)', 'Invoice Not Available', data.error || 'Could not fetch invoice PDF.', '<button onclick="closeModal()" class="btn btn-primary">OK</button>');
-        }
-    }).catch(function() { closeModal(); });
-    {% else %}
-    generateLocalInvoice(0);
-    {% endif %}
-}
-
+// ═══════ LOCAL INVOICE ═══════
 function generateLocalInvoice(paymentId) {
-    // Generate a local HTML receipt
     var rows = document.querySelectorAll('.table-container table tbody tr');
     var row = null;
     rows.forEach(function(r) { if (r.innerHTML.includes('generateLocalInvoice('+paymentId+')') || paymentId === 0) { if (!row) row = r; } });
-
     var cells = row ? row.querySelectorAll('td') : [];
     var date = cells[0] ? cells[0].textContent.trim() : '';
     var desc = cells[1] ? cells[1].textContent.trim() : '';
@@ -629,9 +693,6 @@ function generateLocalInvoice(paymentId) {
     w.document.write('<div style="text-align:right;"><span class="badge">PAID</span><div style="font-size:12px;color:#6b7280;margin-top:6px;">' + date + '</div></div></div>');
     w.document.write('<table><tr><th>Description</th><th>Plan</th><th style="text-align:right;">Amount</th></tr>');
     w.document.write('<tr><td>' + desc + '</td><td>' + plan + '</td><td style="text-align:right;font-weight:700;">' + amount + '</td></tr>');
-    if (desc.includes('Coupon')) {
-        w.document.write('<tr><td colspan="2" style="color:#10b981;font-size:12px;"><i>Discount applied — see description</i></td><td></td></tr>');
-    }
     w.document.write('</table>');
     w.document.write('<div class="total">Total Paid: ' + amount + '</div>');
     w.document.write('<div style="margin-top:20px;padding:16px;background:#f6f5ff;border-radius:10px;font-size:12px;">');
@@ -639,20 +700,17 @@ function generateLocalInvoice(paymentId) {
     w.document.write('<strong>Email:</strong> {{ request.user.email }}<br>');
     w.document.write('<strong>Plan:</strong> ' + plan + '</div>');
     w.document.write('<div style="margin-top:20px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">Print / Save as PDF</button></div>');
-    w.document.write('<div class="footer">LiveVisitorHub &middot; Invoice generated automatically &middot; Questions? Contact support</div>');
+    w.document.write('<div class="footer">LiveVisitorHub &middot; Invoice generated automatically</div>');
     w.document.write('</body></html>');
     w.document.close();
 }
 
-// Close modal on backdrop click
-document.getElementById('billingModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-});
+// Close modals on backdrop click
+document.getElementById('cardModal').addEventListener('click', function(e) { if (e.target === this) closeCardModal(); });
+document.getElementById('billingModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
 
 {% if upgrade_plan %}
-// Auto-trigger upgrade for users coming from pricing page
 setTimeout(function() { upgradePlan('{{ upgrade_plan }}'); }, 500);
 {% endif %}
 </script>
 {% endblock %}
-

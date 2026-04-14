@@ -132,19 +132,20 @@ else:
         }
     }
 
-# Database - PostgreSQL for production, SQLite for dev
+# Database — always PostgreSQL (local + production)
 DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
 if DATABASE_URL:
-    try:
-        import dj_database_url
-        DATABASES = {'default': dj_database_url.parse(DATABASE_URL)}
-    except ImportError:
-        DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}}
+    import dj_database_url
+    DATABASES = {'default': dj_database_url.parse(DATABASE_URL)}
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'livetrack'),
+            'USER': os.getenv('DB_USER', 'postgres'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
         }
     }
 
@@ -214,12 +215,7 @@ else:
     SESSION_COOKIE_SAMESITE = 'None'
     CSRF_COOKIE_SAMESITE = 'None'
 
-# Stripe
-STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY', '')
-STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
-STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
-STRIPE_PRICE_PRO = os.getenv('STRIPE_PRICE_PRO', '')  # Stripe Price ID for Pro plan
-STRIPE_PRICE_ENTERPRISE = os.getenv('STRIPE_PRICE_ENTERPRISE', '')  # Stripe Price ID for Enterprise plan
+# Payment settings (Stripe removed — using built-in card checkout)
 
 # Always honor X-Forwarded-Proto when running behind a reverse proxy (Render, Heroku, Nginx).
 # Without this, request.is_secure() returns False and absolute URLs are http:// even on HTTPS

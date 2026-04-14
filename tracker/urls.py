@@ -16,7 +16,7 @@ urlpatterns = [
     path('api/kb/feedback/<int:article_id>/', dashboard_views.kb_article_feedback, name='kb_feedback'),
     path('api/survey/<int:survey_id>/submit/', dashboard_views.submit_survey_response, name='survey_submit'),
     path('api/whatsapp/webhook/', dashboard_views.whatsapp_webhook, name='whatsapp_webhook'),
-    path('api/stripe/webhook/', dashboard_views.stripe_webhook, name='stripe_webhook'),
+    # Stripe webhook removed — using built-in card checkout
     path('api/track/event/', dashboard_views.track_event_api, name='track_event'),
     path('api/track/performance/', dashboard_views.track_performance_api, name='track_performance'),
     path('api/track/clicks/', dashboard_views.track_clicks_api, name='track_clicks'),
