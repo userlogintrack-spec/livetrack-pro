@@ -1,5 +1,5 @@
 // LiveVisitorHub - Service Worker for PWA
-const CACHE_NAME = 'livetrack-v1';
+const CACHE_NAME = 'livetrack-v2';
 const OFFLINE_URL = '/dashboard/';
 
 // Assets to cache for offline
