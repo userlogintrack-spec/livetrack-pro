@@ -840,6 +840,7 @@
             <div id="menuAnalytics" class="nav-submenu">
                 <a href="{% url 'dashboard:advanced_analytics' %}" class="nav-link"><i class="fas fa-chart-line"></i> <span>Overview</span></a>
                 <a href="{% url 'dashboard:agent_stats' %}" class="nav-link {% block nav_stats %}{% endblock %}"><i class="fas fa-chart-pie"></i> <span>Agent Stats</span></a>
+                <a href="{% url 'dashboard:session_recordings' %}" class="nav-link {% block nav_recordings %}{% endblock %}"><i class="fas fa-video"></i> <span>Recordings</span></a>
             </div>
 
             <!-- Automation — all unlocked -->
@@ -877,6 +878,7 @@
                 <a href="{% url 'dashboard:billing' %}?upgrade=pro" class="nav-link locked" title="Upgrade to Pro to unlock"><i class="fas fa-chart-line"></i> <span>Overview</span><i class="fas fa-lock lock-icon"></i></a>
                 {% endif %}
                 <a href="{% url 'dashboard:agent_stats' %}" class="nav-link"><i class="fas fa-chart-pie"></i> <span>Agent Stats</span></a>
+                <a href="{% url 'dashboard:session_recordings' %}" class="nav-link {% block nav_recordings_owner %}{% endblock %}"><i class="fas fa-video"></i> <span>Recordings</span></a>
             </div>
 
             <!-- Always show Automation; lock AI/Flows for non-enterprise -->

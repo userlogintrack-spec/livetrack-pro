@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}Session Recordings{% endblock %}
 {% block page_title %}Session Recordings{% endblock %}
+{% block nav_recordings %}active{% endblock %}
+{% block nav_recordings_owner %}active{% endblock %}
 {% block top_actions %}
 <form method="GET" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
     <select name="device" class="form-control" style="width:auto;padding:6px;font-size:12px;" onchange="this.form.submit()">
