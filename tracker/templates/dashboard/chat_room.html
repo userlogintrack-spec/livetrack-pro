@@ -2408,6 +2408,19 @@
     let typingTimeout;
     let isScreenSharing = false;
     let inputMode = 'reply'; // 'reply' or 'whisper'
+    let micPermissionRequested = false;
+
+    function preRequestMicrophonePermission() {
+        if (micPermissionRequested) return;
+        if (!window.isSecureContext) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+        micPermissionRequested = true;
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+            stream.getTracks().forEach(function(track) { track.stop(); });
+        }).catch(function() {
+            // Ignore: user may deny or browser may block without user gesture.
+        });
+    }
 
     async function parseApiResponse(response) {
         const raw = await response.text();
@@ -3335,6 +3348,7 @@
     scrollToBottom();
     openSideTab('overview');
     connectWebSocket();
+    setTimeout(preRequestMicrophonePermission, 900);
 
     // ===== CHAT DURATION TIMER =====
     {% if room.status != 'closed' %}
@@ -4238,5 +4252,4 @@
     });
 </script>
 {% endblock %}
-
 

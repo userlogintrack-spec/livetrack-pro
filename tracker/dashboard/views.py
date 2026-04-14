@@ -26,7 +26,7 @@ from tracker.chat.models import (
     AgentWebsiteAccess,
 )
 from tracker.chat.security import create_ws_token
-from tracker.chat.utils import close_stale_chats
+from tracker.chat.utils import close_stale_chats, check_sla_breaches
 from tracker.core.models import WebsiteSettings, Organization, Website, WebsiteGroup
 from tracker.core.views import get_user_org
 
@@ -723,6 +723,12 @@ def api_stats(request):
     if not cache.get(f'stale_api_{org.id if org else 0}'):
         close_stale_chats(inactive_minutes=30)
         cache.set(f'stale_api_{org.id if org else 0}', True, 30)
+    if org and not cache.get(f'sla_api_{org.id}'):
+        check_sla_breaches(
+            sla_minutes=int(getattr(settings, 'CHAT_SLA_MINUTES', 5)),
+            org_id=org.id,
+        )
+        cache.set(f'sla_api_{org.id}', True, 30)
     now = timezone.now()
     last_30_min = now - timedelta(minutes=30)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)

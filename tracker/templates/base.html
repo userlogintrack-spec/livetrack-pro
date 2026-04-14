@@ -1051,6 +1051,92 @@
     }
     </script>
 
+    <!-- Notification Manager -->
+    <script>
+    var NotificationManager = {
+        permission: typeof Notification !== 'undefined' ? Notification.permission : 'denied',
+        soundEl: null,
+        _muted: JSON.parse(localStorage.getItem('notif_muted') || 'false'),
+        _lastNotif: {},
+
+        init: function() {
+            // Create notification sound
+            this.soundEl = document.createElement('audio');
+            this.soundEl.preload = 'auto';
+            this.soundEl.volume = 0.5;
+            this.soundEl.innerHTML = '<source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6YkYOAe3l9hY6Xnp6XjYN9eHl+h5CZnp6WjIN8d3h9hpCZnp6WjYR9eHl+hpCZnZyUi4J7d3h+hZCYnZyUjIN8eHl+hpCYnZyVjIR9eHp/h5GZnp6WjYR9eHl+hpCZnp6WjYR9eHl+h5GZnp6WjYR9eHl+hpCYnZyUjIN8eHl+hpGZnp6WjYR9eHl+hpCYnp6WjYR9eHl+h5GZnp6WjYR9eHp/h5GZnp6WjYR9eHl+hpCZnp6WjYR8eHl+hpGZnp6WjYR9eHl+h5GZnZyVjIR9eHl+hpCZnp6WjYR9eHl+h5GZnp6WjYR9eHl+h5GZnp6WjYR9eHl+h5GZnZyVjIR9eHl+hpGZnp6WjYR9eHl+h5GZnZyVjIN8eHl+hpGZnp6WjYR9" type="audio/wav">';
+            document.body.appendChild(this.soundEl);
+
+            // Auto-request browser notification permission
+            if (typeof Notification !== 'undefined' && this.permission === 'default') {
+                var self = this;
+                Notification.requestPermission().then(function(p) { self.permission = p; });
+            }
+        },
+
+        notify: function(opts) {
+            var category = opts.category || 'general';
+            var title = opts.title || 'Notification';
+            var body = opts.body || '';
+            var severity = opts.severity || 'info';
+            var url = opts.url || '';
+            var sound = opts.sound !== false;
+
+            // Rate limit: max 1 notification per category per 10 seconds
+            var now = Date.now();
+            if (this._lastNotif[category] && (now - this._lastNotif[category]) < 10000) return;
+            this._lastNotif[category] = now;
+
+            // 1. Toast notification
+            var toastType = severity === 'error' ? 'error' : severity === 'warning' ? 'warning' : 'success';
+            showToast(title + ' - ' + body, toastType);
+
+            // 2. Browser desktop notification (when tab not focused)
+            if (!document.hasFocus() && this.permission === 'granted') {
+                var n = new Notification(title, {
+                    body: body,
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%237c3aed" rx="20" width="100" height="100"/><text x="50" y="68" font-size="50" text-anchor="middle" fill="white">L</text></svg>',
+                    tag: 'lvh-' + category,
+                    requireInteraction: severity === 'error',
+                });
+                if (url) {
+                    n.onclick = function() { window.focus(); window.location.href = url; n.close(); };
+                } else {
+                    n.onclick = function() { window.focus(); n.close(); };
+                }
+                if (severity !== 'error') setTimeout(function() { n.close(); }, 8000);
+            }
+
+            // 3. Sound alert
+            if (sound && !this._muted && this.soundEl) {
+                try { this.soundEl.currentTime = 0; this.soundEl.play(); } catch(e) {}
+            }
+
+            // 4. Tab title flash when unfocused
+            if (!document.hasFocus() && !window._titleFlash) {
+                var baseTitle = window._baseTitle || document.title;
+                window._baseTitle = baseTitle;
+                var flashOn = true;
+                window._titleFlash = setInterval(function() {
+                    document.title = flashOn ? '** ' + title + ' **' : baseTitle;
+                    flashOn = !flashOn;
+                }, 1500);
+                window.addEventListener('focus', function clearFlash() {
+                    clearInterval(window._titleFlash);
+                    window._titleFlash = null;
+                    document.title = baseTitle;
+                    window.removeEventListener('focus', clearFlash);
+                }, {once: true});
+            }
+        },
+
+        mute: function() { this._muted = true; localStorage.setItem('notif_muted', 'true'); },
+        unmute: function() { this._muted = false; localStorage.setItem('notif_muted', 'false'); },
+    };
+
+    document.addEventListener('DOMContentLoaded', function() { NotificationManager.init(); });
+    </script>
+
     <script>
         // ===== SIDEBAR COLLAPSE (desktop) =====
         function toggleSidebar() {
@@ -1233,12 +1319,21 @@
         var dashboardSocket = null;
         var wsReconnectTimer = null;
         var wsReconnectDelay = 1000;
+        var wsHeartbeatTimer = null;
 
         function connectDashboardWS() {
             dashboardSocket = new WebSocket(wsScheme + '://' + window.location.host + '/ws/dashboard/');
 
             dashboardSocket.onopen = function() {
                 wsReconnectDelay = 1000;
+                if (wsHeartbeatTimer) {
+                    clearInterval(wsHeartbeatTimer);
+                }
+                wsHeartbeatTimer = setInterval(function() {
+                    if (dashboardSocket && dashboardSocket.readyState === WebSocket.OPEN) {
+                        dashboardSocket.send(JSON.stringify({ type: 'ping' }));
+                    }
+                }, 25000);
                 // Stop polling when WebSocket is connected
                 if (window._statsPollInterval) {
                     clearInterval(window._statsPollInterval);
@@ -1250,14 +1345,46 @@
                 var data = JSON.parse(e.data);
                 if (data.type === 'new_message_notify' || data.type === 'dashboard_update') {
                     refreshStats();
+                    // Notify on new messages
+                    if (data.type === 'new_message_notify') {
+                        NotificationManager.notify({
+                            category: 'new_message',
+                            title: 'New Message',
+                            body: (data.sender_name || 'Visitor') + ': ' + (data.message || '').substring(0, 80),
+                            severity: 'info',
+                            url: data.room_id ? '/dashboard/chats/' + data.room_id + '/' : '',
+                            sound: true,
+                        });
+                    }
+                    // Notify on new chat
+                    if (data.type === 'dashboard_update' && data.reason === 'new_chat') {
+                        NotificationManager.notify({
+                            category: 'new_chat',
+                            title: 'New Chat',
+                            body: 'A visitor started a new chat',
+                            severity: 'warning',
+                            url: data.room_id ? '/dashboard/chats/' + data.room_id + '/' : '/dashboard/chats/',
+                            sound: true,
+                        });
+                    }
                 }
                 if (data.type === 'visitor_activity') {
-                    // Dispatch custom event for dashboard home to listen
                     window.dispatchEvent(new CustomEvent('livetrack:visitor', { detail: data }));
+                }
+                if (data.type === 'pong') {
+                    return;
+                }
+                // Handle structured notification events from backend
+                if (data.type === 'notification') {
+                    NotificationManager.notify(data);
                 }
             };
 
             dashboardSocket.onclose = function() {
+                if (wsHeartbeatTimer) {
+                    clearInterval(wsHeartbeatTimer);
+                    wsHeartbeatTimer = null;
+                }
                 // Fallback to polling when WebSocket disconnects
                 if (!window._statsPollInterval) {
                     window._statsPollInterval = setInterval(refreshStats, 10000);

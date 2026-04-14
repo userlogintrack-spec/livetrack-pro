@@ -4,6 +4,7 @@ from urllib.parse import parse_qs
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils import timezone
+from django.conf import settings
 from tracker.chat.security import verify_ws_token
 
 logger = logging.getLogger(__name__)
@@ -423,6 +424,7 @@ class DashboardConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.dashboard_group, self.channel_name)
         await self.channel_layer.group_add(self.notify_group, self.channel_name)
         await self.accept()
+        await self._run_sla_check()
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.dashboard_group, self.channel_name)
@@ -435,8 +437,13 @@ class DashboardConsumer(AsyncWebsocketConsumer):
         return profile.organization_id if profile and profile.organization_id else None
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        if data.get('type') == 'agent_join':
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
+            return
+
+        msg_type = data.get('type')
+        if msg_type == 'agent_join':
             room_id = data.get('room_id')
             await self.assign_agent(room_id, self.scope['user'].id)
             await self.channel_layer.group_send(
@@ -447,6 +454,12 @@ class DashboardConsumer(AsyncWebsocketConsumer):
                     'room_id': room_id,
                 }
             )
+            return
+
+        # Lightweight heartbeat from dashboard pages; also used to trigger periodic SLA checks.
+        if msg_type == 'ping':
+            await self.send(text_data=json.dumps({'type': 'pong'}))
+            await self._run_sla_check()
 
     async def new_message_notify(self, event):
         await self.send(text_data=json.dumps(event))
@@ -455,6 +468,10 @@ class DashboardConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event))
 
     async def visitor_activity(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def notification(self, event):
+        """Forward real-time notification events to connected dashboard clients."""
         await self.send(text_data=json.dumps(event))
 
     @database_sync_to_async
@@ -468,3 +485,19 @@ class DashboardConsumer(AsyncWebsocketConsumer):
                 room.save(update_fields=['agent', 'status', 'updated_at'])
         except ChatRoom.DoesNotExist:
             logger.warning("Failed to assign agent for room %s", room_id)
+
+    @database_sync_to_async
+    def _run_sla_check(self):
+        if not self.org_id:
+            return
+        from django.core.cache import cache
+        from tracker.chat.utils import check_sla_breaches
+
+        cache_key = f'sla_ws_{self.org_id}'
+        if cache.get(cache_key):
+            return
+        check_sla_breaches(
+            sla_minutes=int(getattr(settings, 'CHAT_SLA_MINUTES', 5)),
+            org_id=self.org_id,
+        )
+        cache.set(cache_key, True, 30)

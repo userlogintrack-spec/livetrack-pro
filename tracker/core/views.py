@@ -630,7 +630,7 @@ def widget_init(request):
         ua = request.META.get('HTTP_USER_AGENT', '')
         browser, os_name, device_type = parse_user_agent(ua)
 
-        visitor, _ = _resolve_or_create_visitor(
+        visitor, visitor_created = _resolve_or_create_visitor(
             org=org, ip=ip, ua=ua, session_key=session_key, visitor_fingerprint=visitor_fingerprint,
             website=website,
             defaults={
@@ -638,6 +638,24 @@ def widget_init(request):
                 'country': country_name, 'city': city_name,
             },
         )
+        # Notify dashboard agents about new visitor
+        if visitor_created and org:
+            from tracker.chat.notifications import send_dashboard_notification
+            domain = website.domain if website else 'direct'
+            location = country_name or 'Unknown'
+            if city_name:
+                location = f'{city_name}, {location}'
+            send_dashboard_notification(
+                org_id=org.id,
+                category='new_visitor',
+                title='New Visitor',
+                body=f'{location} on {domain} ({browser}, {device_type})',
+                severity='info',
+                url=f'/dashboard/visitors/{visitor.id}/',
+                sound=False,
+                website=website,
+            )
+
         if (country_name and not visitor.country) or (city_name and not visitor.city):
             visitor.country = visitor.country or country_name
             visitor.city = visitor.city or city_name
@@ -769,6 +787,26 @@ def widget_track_pageview(request):
             )
         except Exception:
             pass
+
+    # Hot lead notification (score >= 70, once per visitor session)
+    computed_score = min(100, page_count * 5)
+    if computed_score >= 70 and visitor.organization_id:
+        hot_key = f'hot_lead_notified:{visitor.id}'
+        if not cache.get(hot_key):
+            cache.set(hot_key, True, 3600)
+            from tracker.chat.notifications import send_dashboard_notification
+            location = visitor.country or 'Unknown'
+            if visitor.city:
+                location = f'{visitor.city}, {location}'
+            send_dashboard_notification(
+                org_id=visitor.organization_id,
+                category='hot_lead',
+                title='Hot Lead',
+                body=f'Visitor from {location} scored {computed_score} ({page_count} pages viewed)',
+                severity='warning',
+                url=f'/dashboard/visitors/{visitor.id}/',
+                sound=True,
+            )
 
     return JsonResponse({
         'ok': True,
@@ -1112,7 +1150,35 @@ def widget_start_chat(request):
             subject=data.get('subject', ''),
             status='waiting',
         )
-        auto_assign_agent(room)
+        assigned = auto_assign_agent(room)
+
+        # Notify dashboard agents about new chat
+        from tracker.chat.notifications import send_dashboard_notification
+        subject_preview = (data.get('subject', '') or '')[:60]
+        chat_body = f'{visitor_name} started a chat'
+        if subject_preview:
+            chat_body += f': {subject_preview}'
+        send_dashboard_notification(
+            org_id=org.id,
+            category='new_chat',
+            title='New Chat',
+            body=chat_body,
+            severity='warning',
+            url=f'/dashboard/chats/{room_id}/',
+            sound=True,
+            website=website,
+        )
+        # Extra alert if no agent was assigned
+        if not assigned:
+            send_dashboard_notification(
+                org_id=org.id,
+                category='no_agents',
+                title='No Agents Available',
+                body=f'{visitor_name} is waiting - no agents online to handle this chat',
+                severity='error',
+                url=f'/dashboard/chats/{room_id}/',
+                sound=True,
+            )
 
         # Fire webhook for new chat
         from tracker.dashboard.views import fire_webhook
@@ -1377,6 +1443,18 @@ def submit_offline_message(request):
             message=message,
             ip_address=get_client_ip(request),
         )
+        # Notify dashboard agents about offline message
+        if org:
+            from tracker.chat.notifications import send_dashboard_notification
+            send_dashboard_notification(
+                org_id=org.id,
+                category='offline_message',
+                title='Offline Message',
+                body=f'{name} ({email}): {message[:80]}',
+                severity='info',
+                url='/dashboard/chats/?tab=offline',
+                sound=True,
+            )
         return JsonResponse({'status': 'ok'})
 
     return JsonResponse({'error': 'POST required'}, status=405)

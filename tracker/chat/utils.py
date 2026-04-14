@@ -76,3 +76,33 @@ def auto_assign_agent(room):
             room.save(update_fields=['agent', 'status', 'updated_at'])
             return user
     return None
+
+
+def check_sla_breaches(sla_minutes=5, org_id=None):
+    """Check for waiting chats that exceeded SLA response time and notify."""
+    from tracker.chat.notifications import send_dashboard_notification
+    from django.core.cache import cache
+
+    cutoff = timezone.now() - timedelta(minutes=sla_minutes)
+    breached = ChatRoom.objects.filter(
+        status='waiting',
+        created_at__lt=cutoff,
+    )
+    if org_id:
+        breached = breached.filter(organization_id=org_id)
+    breached = breached.select_related('organization')
+
+    for room in breached:
+        cache_key = f'sla_breach_notified:{room.room_id}'
+        if not cache.get(cache_key):
+            cache.set(cache_key, True, 1800)
+            wait_mins = int((timezone.now() - room.created_at).total_seconds() / 60)
+            send_dashboard_notification(
+                org_id=room.organization_id,
+                category='sla_breach',
+                title='SLA Breach',
+                body=f'{room.visitor_name} waiting {wait_mins}+ mins with no agent response',
+                severity='error',
+                url=f'/dashboard/chats/{room.room_id}/',
+                sound=True,
+            )
