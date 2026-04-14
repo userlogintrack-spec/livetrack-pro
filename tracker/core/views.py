@@ -142,31 +142,34 @@ def _spam_score(text):
 
 
 def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None, visitor_fingerprint='', website=None):
-    """Centralised dedup: returns the canonical Visitor row for this device.
+    """Centralised dedup: returns the canonical Visitor row for this device+website.
 
     Match priority:
-        1. existing row with session_key + org -> exact match
-        2. brand new row with the given session_key
+        1. existing row with session_key + org + website -> exact match
+        2. fingerprint + org + website -> returning visitor on same domain
+        3. brand new row
 
-    Important: do not merge by IP/User-Agent. Multiple users can share the same
-    office/public IP and often the same browser UA, which can leak chat history
-    between different people. Visitor identity must remain session-based.
+    Visitors are scoped per-website so the same user on two different domains
+    gets two separate Visitor rows. This keeps analytics domain-isolated.
     """
     from tracker.visitors.models import Visitor
     if not session_key:
         session_key = uuid.uuid4().hex
 
-    # 1. Exact session match
+    # Build website filter — match same website (or both NULL)
+    ws_match = {'website': website} if website else {'website__isnull': True}
+
+    # 1. Exact session + website match
     if session_key:
-        v = Visitor.objects.filter(organization=org, session_key=session_key).first()
+        v = Visitor.objects.filter(organization=org, session_key=session_key, **ws_match).first()
         if v:
             return v, False
 
-    # 2. Fingerprint fallback (for cookie/session-restricted environments)
+    # 2. Fingerprint fallback (per-website)
     if visitor_fingerprint:
         cutoff = timezone.now() - timedelta(days=30)
         v = (Visitor.objects.filter(
-            organization=org, visitor_fingerprint=visitor_fingerprint, last_seen__gte=cutoff
+            organization=org, visitor_fingerprint=visitor_fingerprint, last_seen__gte=cutoff, **ws_match
         ).order_by('-last_seen').first())
         if v:
             if session_key and v.session_key != session_key:
@@ -186,7 +189,7 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None, visitor_
                 v.save(update_fields=updates)
             return v, False
 
-    # 3. Create new
+    # 3. Create new — one visitor per session per website
     create_kwargs = {
         'organization': org,
         'website': website,

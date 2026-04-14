@@ -81,6 +81,13 @@
     <div class="card-body" style="padding:20px 24px;">
         <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:18px 24px;">
             <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Website</div>
+                <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-globe" style="font-size:11px;color:var(--primary);"></i>
+                    {% if visitor.website %}<span style="font-weight:600;color:var(--primary);">{{ visitor.website.domain }}</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+                </div>
+            </div>
+            <div>
                 <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Distinct ID</div>
                 <div style="font-size:13px;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
                     <i class="fas fa-key" style="font-size:11px;color:var(--text-muted);"></i>

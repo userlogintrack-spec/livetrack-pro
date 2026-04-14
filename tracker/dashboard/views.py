@@ -564,6 +564,7 @@ def visitor_list(request):
 
     group_options = [
         ('activity', 'Activity'),
+        ('website', 'Website'),
         ('ip', 'IP Address'),
         ('page_title', 'Page title'),
         ('page_url', 'Page URL'),
@@ -582,7 +583,7 @@ def visitor_list(request):
     latest_pageviews = PageView.objects.filter(visitor_id=OuterRef('pk')).order_by('-timestamp')
     latest_chats = ChatRoom.objects.filter(visitor_id=OuterRef('pk')).order_by('-created_at')
 
-    visitors = Visitor.objects.filter(organization=org, **ws_filter).annotate(
+    visitors = Visitor.objects.filter(organization=org, **ws_filter).select_related('website').annotate(
         page_count=Count('page_views'),
         chat_count=Count('chat_rooms'),
         latest_page_title=Subquery(latest_pageviews.values('page_title')[:1]),
@@ -635,6 +636,8 @@ def visitor_list(request):
     for v in visitor_list_data:
         if group_by == 'ip':
             v.group_value = v.ip_address or 'Unknown IP'
+        elif group_by == 'website':
+            v.group_value = v.website.domain if v.website else 'No Website'
         elif group_by == 'activity':
             v.group_value = 'Online' if v.last_seen >= last_30_min else 'Inactive'
         elif group_by == 'page_title':
