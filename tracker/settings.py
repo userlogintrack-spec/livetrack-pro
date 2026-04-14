@@ -215,7 +215,7 @@ else:
     SESSION_COOKIE_SAMESITE = 'None'
     CSRF_COOKIE_SAMESITE = 'None'
 
-# Payment settings (Stripe removed — using built-in card checkout)
+# Payment: built-in card checkout (no Stripe needed)
 
 # Always honor X-Forwarded-Proto when running behind a reverse proxy (Render, Heroku, Nginx).
 # Without this, request.is_secure() returns False and absolute URLs are http:// even on HTTPS

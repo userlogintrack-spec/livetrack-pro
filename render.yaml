@@ -36,7 +36,7 @@ services:
       # - key: REDIS_URL
       #   sync: false
 
-      # Stripe removed — using built-in card checkout
+      # Payment: built-in card checkout (no Stripe)
 
       # Behind Render's proxy
       - key: TRUST_X_FORWARDED_FOR
