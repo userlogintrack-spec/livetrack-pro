@@ -882,9 +882,11 @@ def widget_script(request):
 
   // ===== Page view tracking =====
   var lastTrackedUrl = "";
+  var recPages = 1;
   function trackPageView() {
     var url = location.href;
     if (url === lastTrackedUrl) return;
+    if (lastTrackedUrl && url !== lastTrackedUrl) recPages += 1;
     lastTrackedUrl = url;
     var payload = {
       key: WIDGET_KEY,
@@ -918,6 +920,115 @@ def widget_script(request):
   history.replaceState = function() { _replace.apply(this, arguments); setTimeout(trackPageView, 0); };
   window.addEventListener("popstate", function(){ setTimeout(trackPageView, 0); });
   window.addEventListener("hashchange", function(){ setTimeout(trackPageView, 0); });
+
+  // ===== Session Recording (lightweight) =====
+  var recSessionId = "";
+  var recStartedAt = Date.now();
+  var recBuffer = [];
+  var recHasRage = false;
+  var recHasDead = false;
+  var recHasErrors = false;
+  var clickBurst = [];
+
+  function recPayload(extra) {
+    var payload = {
+      key: WIDGET_KEY,
+      session_key: getSessionKey(),
+      parent_domain: location.hostname || "",
+      session_id: recSessionId
+    };
+    for (var k in extra) payload[k] = extra[k];
+    return payload;
+  }
+
+  function recPost(path, body, keepalive) {
+    try {
+      return fetch(BASE + path, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        credentials: "include",
+        keepalive: !!keepalive,
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      return Promise.resolve(null);
+    }
+  }
+
+  function trackRecEvent(type, data) {
+    var evt = { t: Date.now(), type: type };
+    for (var k in (data || {})) evt[k] = data[k];
+    recBuffer.push(evt);
+    if (recBuffer.length > 400) recBuffer = recBuffer.slice(-400);
+  }
+
+  function startSessionRecording() {
+    recPost("/api/track/session/", recPayload({
+      action: "create",
+      url: location.href,
+      screen_w: screen.width || 0,
+      screen_h: screen.height || 0
+    }), false).then(function(r){ return r ? r.json() : null; }).then(function(d){
+      if (d && d.session_id) recSessionId = d.session_id;
+    }).catch(function(){});
+  }
+
+  function flushSessionRecording(force) {
+    if (!recSessionId || recBuffer.length === 0) return;
+    var batch = recBuffer.splice(0, 120);
+    recPost("/api/track/session/", recPayload({
+      action: "append",
+      events: batch,
+      duration: Math.max(1, Math.floor((Date.now() - recStartedAt) / 1000)),
+      pages: recPages,
+      has_rage: recHasRage,
+      has_dead: recHasDead,
+      has_errors: recHasErrors
+    }), !!force).catch(function(){});
+  }
+
+  document.addEventListener("click", function(e) {
+    var target = e.target || {};
+    var now = Date.now();
+    var x = e.clientX || 0, y = e.clientY || 0;
+    trackRecEvent("click", {
+      x: x,
+      y: y,
+      tag: (target.tagName || "").toLowerCase(),
+      text: ((target.innerText || target.textContent || "").trim().slice(0, 80))
+    });
+    clickBurst.push({t: now, x: x, y: y});
+    clickBurst = clickBurst.filter(function(c){ return now - c.t <= 1000; });
+    if (clickBurst.length >= 4) recHasRage = true;
+  }, true);
+
+  var _scrollTimer = null;
+  window.addEventListener("scroll", function() {
+    if (_scrollTimer) clearTimeout(_scrollTimer);
+    _scrollTimer = setTimeout(function() {
+      var doc = document.documentElement || document.body;
+      var maxScroll = Math.max(doc.scrollHeight - window.innerHeight, 1);
+      var scrollPct = Math.min(100, Math.round((window.scrollY / maxScroll) * 100));
+      trackRecEvent("scroll", { y: window.scrollY || 0, pct: scrollPct });
+    }, 150);
+  }, {passive: true});
+
+  window.addEventListener("error", function(ev) {
+    recHasErrors = true;
+    trackRecEvent("error", { msg: (ev.message || "").slice(0, 200) });
+    recPost("/api/track/js-error/", recPayload({
+      message: ev.message || "Script error",
+      source: ev.filename || "",
+      line: ev.lineno || 0,
+      col: ev.colno || 0,
+      stack: ev.error && ev.error.stack ? String(ev.error.stack).slice(0, 1800) : "",
+      url: location.href
+    }), false).catch(function(){});
+  });
+
+  window.addEventListener("beforeunload", function() { flushSessionRecording(true); });
+  setInterval(function(){ flushSessionRecording(false); }, 10000);
+  setTimeout(startSessionRecording, 900);
 
   var style = document.createElement("style");
   style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:all .3s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}";

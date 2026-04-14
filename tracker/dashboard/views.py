@@ -2956,13 +2956,9 @@ def track_event_api(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     data = json.loads(request.body) if request.body else {}
-    session_key = request.session.session_key
+    org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
-
-    from tracker.core.views import _get_org_from_request
-    org = _get_org_from_request(request)
-    visitor = Visitor.objects.filter(session_key=session_key, organization=org).first()
     if not visitor:
         return JsonResponse({'error': 'Visitor not found'}, status=404)
 
@@ -3091,19 +3087,32 @@ def _send_scheduled_report(report, org):
 
 # ─── Tracking APIs (called from visitor's browser JS) ───
 
+def _resolve_tracking_visitor(request, data):
+    """Resolve org + visitor for tracking APIs with session_key fallback."""
+    from tracker.core.views import _get_org_from_request
+
+    org = _get_org_from_request(request)
+    session_key = request.session.session_key or ''
+    body_session_key = (data.get('session_key') or '').strip()
+    if not session_key and body_session_key:
+        session_key = body_session_key
+
+    if not session_key:
+        return org, None, ''
+
+    visitor = Visitor.objects.filter(session_key=session_key, organization=org).first()
+    return org, visitor, session_key
+
+
 @csrf_exempt
 def track_clicks_api(request):
     """Batch receive click data for heatmaps."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     data = json.loads(request.body) if request.body else {}
-    session_key = request.session.session_key
+    org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
-
-    from tracker.core.views import _get_org_from_request
-    org = _get_org_from_request(request)
-    visitor = Visitor.objects.filter(session_key=session_key, organization=org).first()
     if not visitor:
         return JsonResponse({'error': 'Visitor not found'}, status=404)
 
@@ -3159,13 +3168,9 @@ def track_scroll_api(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     data = json.loads(request.body) if request.body else {}
-    session_key = request.session.session_key
+    org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
-
-    from tracker.core.views import _get_org_from_request
-    org = _get_org_from_request(request)
-    visitor = Visitor.objects.filter(session_key=session_key, organization=org).first()
     if not visitor:
         return JsonResponse({'error': 'Visitor not found'}, status=404)
 
@@ -3186,13 +3191,9 @@ def track_js_error_api(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     data = json.loads(request.body) if request.body else {}
-    session_key = request.session.session_key
+    org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
-
-    from tracker.core.views import _get_org_from_request
-    org = _get_org_from_request(request)
-    visitor = Visitor.objects.filter(session_key=session_key, organization=org).first()
     if not visitor:
         return JsonResponse({'error': 'Visitor not found'}, status=404)
 
@@ -3218,13 +3219,9 @@ def track_session_api(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     data = json.loads(request.body) if request.body else {}
-    session_key = request.session.session_key
+    org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
-
-    from tracker.core.views import _get_org_from_request
-    org = _get_org_from_request(request)
-    visitor = Visitor.objects.filter(session_key=session_key, organization=org).first()
     if not visitor:
         return JsonResponse({'error': 'Visitor not found'}, status=404)
 
@@ -3281,13 +3278,9 @@ def track_frustration_api(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     data = json.loads(request.body) if request.body else {}
-    session_key = request.session.session_key
+    org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
-
-    from tracker.core.views import _get_org_from_request
-    org = _get_org_from_request(request)
-    visitor = Visitor.objects.filter(session_key=session_key, organization=org).first()
     if not visitor:
         return JsonResponse({'error': 'Visitor not found'}, status=404)
 
