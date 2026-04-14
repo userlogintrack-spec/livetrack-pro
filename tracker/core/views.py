@@ -905,7 +905,10 @@ def widget_script(request):
         body: JSON.stringify(payload),
         keepalive: true
       }).then(function(r){ return r.json(); }).then(function(d){
-        if (d && d.session_key) setSessionKey(d.session_key);
+        if (d && d.session_key) {
+          setSessionKey(d.session_key);
+          if (!recSessionId) setTimeout(startSessionRecording, 200);
+        }
       }).catch(function(){});
     } catch(e) {}
   }
@@ -929,6 +932,8 @@ def widget_script(request):
   var recHasDead = false;
   var recHasErrors = false;
   var clickBurst = [];
+  var recCreateAttempts = 0;
+  var recCreateMaxAttempts = 6;
 
   function recPayload(extra) {
     var payload = {
@@ -963,13 +968,28 @@ def widget_script(request):
   }
 
   function startSessionRecording() {
+    var sk = getSessionKey();
+    if (!sk) {
+      if (recCreateAttempts < recCreateMaxAttempts) {
+        recCreateAttempts += 1;
+        setTimeout(startSessionRecording, 1200);
+      }
+      return;
+    }
     recPost("/api/track/session/", recPayload({
       action: "create",
       url: location.href,
       screen_w: screen.width || 0,
       screen_h: screen.height || 0
     }), false).then(function(r){ return r ? r.json() : null; }).then(function(d){
-      if (d && d.session_id) recSessionId = d.session_id;
+      if (d && d.session_id) {
+        recSessionId = d.session_id;
+        return;
+      }
+      if (recCreateAttempts < recCreateMaxAttempts) {
+        recCreateAttempts += 1;
+        setTimeout(startSessionRecording, 1200);
+      }
     }).catch(function(){});
   }
 

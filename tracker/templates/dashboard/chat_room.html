@@ -3650,13 +3650,40 @@
     let isVideoOff = false;
     let currentCallType = 'audio'; // 'audio' or 'video'
 
+    function getCallMediaConstraints(type) {
+        return { audio: true, video: type === 'video' };
+    }
+
+    async function requestCallMedia(type, showAllowModal) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showToast('This browser does not support call permissions.', 'error');
+            return null;
+        }
+        try {
+            return await navigator.mediaDevices.getUserMedia(getCallMediaConstraints(type));
+        } catch (err) {
+            if (showAllowModal) {
+                const label = type === 'video' ? 'microphone + camera' : 'microphone';
+                const allow = await showModal({
+                    title: 'Permission Required',
+                    message: 'Call start karne ke liye ' + label + ' allow karein.',
+                    icon: 'fa-microphone',
+                    type: 'warning',
+                    confirmText: 'Allow'
+                });
+                if (allow) {
+                    return requestCallMedia(type, false);
+                }
+            }
+            showToast('Permission denied. Browser popup me Allow karein.', 'error');
+            return null;
+        }
+    }
+
     async function startCall(type) {
         currentCallType = type;
-        try {
-            const constraints = { audio: true, video: type === 'video' };
-            localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch(err) {
-            showToast('Cannot access ' + (type === 'video' ? 'camera & microphone' : 'microphone') + '. Please allow permission.', 'error');
+        localStream = await requestCallMedia(type, true);
+        if (!localStream) {
             return;
         }
 
@@ -3735,11 +3762,8 @@
         const data = window._pendingCallOffer;
         if (!data) return;
 
-        try {
-            const constraints = { audio: true, video: currentCallType === 'video' };
-            localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch(err) {
-            showToast('Cannot access microphone/camera.', 'error');
+        localStream = await requestCallMedia(currentCallType, true);
+        if (!localStream) {
             return;
         }
 
@@ -4252,4 +4276,3 @@
     });
 </script>
 {% endblock %}
-

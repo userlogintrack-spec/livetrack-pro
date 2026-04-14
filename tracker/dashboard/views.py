@@ -3234,6 +3234,7 @@ def track_session_api(request):
             session_id=session_id,
             defaults={
                 'organization': org, 'visitor': visitor,
+                'website': visitor.website,
                 'start_url': data.get('url', '')[:500],
                 'device_type': visitor.device_type,
                 'screen_width': int(data.get('screen_w', 0)),
@@ -3245,6 +3246,8 @@ def track_session_api(request):
     elif action == 'append':
         rec = SessionRecording.objects.filter(session_id=session_id).first()
         if rec:
+            if not rec.website_id and visitor.website_id:
+                rec.website_id = visitor.website_id
             events = rec.events_data or []
             new_events = data.get('events', [])
             events.extend(new_events[:100])  # Max 100 events per batch
