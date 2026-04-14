@@ -133,18 +133,26 @@ else:
     }
 
 # Database — always PostgreSQL (local + production)
+# Production: set DATABASE_URL in Render dashboard (Neon Postgres)
+# Local: set DB_NAME, DB_USER, DB_PASSWORD, DB_HOST in .env
 DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
 if DATABASE_URL:
     import dj_database_url
     DATABASES = {'default': dj_database_url.parse(DATABASE_URL)}
 else:
+    _db_host = os.getenv('DB_HOST', '').strip()
+    if not _db_host and not DEBUG:
+        raise RuntimeError(
+            'DATABASE_URL or DB_HOST must be set in production. '
+            'Set DATABASE_URL in Render dashboard to your Neon Postgres URL.'
+        )
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': os.getenv('DB_NAME', 'livetrack'),
             'USER': os.getenv('DB_USER', 'postgres'),
             'PASSWORD': os.getenv('DB_PASSWORD', ''),
-            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'HOST': _db_host or 'localhost',
             'PORT': os.getenv('DB_PORT', '5432'),
         }
     }
