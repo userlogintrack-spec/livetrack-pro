@@ -406,8 +406,17 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard:home')
     if request.method == 'POST':
+        # Rate limit: 8 attempts per IP per 10 minutes
+        ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or request.META.get('REMOTE_ADDR', 'unknown')
+        rl_key = f'auth_rl:login:{ip}'
+        attempts = cache.get(rl_key, 0)
+        if attempts >= 8:
+            messages.error(request, 'Too many login attempts. Please try again in 10 minutes.')
+            return render(request, 'core/login.html', {'form': AuthenticationForm()})
+        cache.set(rl_key, attempts + 1, timeout=600)
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
+            cache.delete(rl_key)
             user = form.get_user()
             login(request, user)
             # Ensure agent profile exists with org
@@ -429,6 +438,12 @@ def register_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard:home')
     if request.method == 'POST':
+        ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or request.META.get('REMOTE_ADDR', 'unknown')
+        rl_key = f'auth_rl:register:{ip}'
+        if cache.get(rl_key, 0) >= 5:
+            messages.error(request, 'Too many signup attempts. Please try again later.')
+            return render(request, 'core/register.html', {})
+        cache.set(rl_key, cache.get(rl_key, 0) + 1, timeout=3600)
         username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip()
         password = request.POST.get('password', '').strip()
@@ -1247,6 +1262,61 @@ def widget_cursor_track(request):
     }
     cache.set(f'cursor:{sk}', payload, timeout=60)
     return JsonResponse({'ok': True})
+
+
+@csrf_exempt
+def gdpr_request(request):
+    """GDPR self-service: visitor can request data export or deletion via session_key.
+    POST {action: 'export'|'delete', session_key: '...', email: '...'}
+    Export returns JSON with all data; delete schedules immediate purge of PII fields.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    data = _parse_json_body(request) or {}
+    action = (data.get('action') or '').strip().lower()
+    sk = (data.get('session_key') or request.session.session_key or '').strip()
+    if action not in ('export', 'delete') or not sk:
+        return JsonResponse({'error': 'action (export|delete) and session_key required'}, status=400)
+    # Rate limit: 3 GDPR requests per IP per day
+    ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or request.META.get('REMOTE_ADDR', 'unknown')
+    rl = f'gdpr_rl:{ip}'
+    if cache.get(rl, 0) >= 3:
+        return JsonResponse({'error': 'rate limited; try again tomorrow'}, status=429)
+    cache.set(rl, cache.get(rl, 0) + 1, timeout=86400)
+
+    from tracker.visitors.models import Visitor, PageView
+    from tracker.chat.models import ChatRoom, Message, OfflineMessage
+    visitor = Visitor.objects.filter(session_key=sk).first()
+    if not visitor:
+        return JsonResponse({'error': 'no data found for this session'}, status=404)
+
+    if action == 'export':
+        rooms = ChatRoom.objects.filter(visitor=visitor).values('id', 'created_at', 'status', 'rating')
+        msgs = Message.objects.filter(room__visitor=visitor).values('content', 'sender_type', 'created_at')
+        pvs = PageView.objects.filter(visitor=visitor).values('url', 'title', 'created_at')[:500]
+        return JsonResponse({
+            'visitor': {
+                'ip': visitor.ip_address, 'country': visitor.country, 'browser': visitor.browser,
+                'os': visitor.os, 'device': visitor.device_type, 'first_seen': visitor.first_seen,
+                'last_seen': visitor.last_seen,
+            },
+            'page_views': list(pvs), 'chats': list(rooms), 'messages': list(msgs),
+        }, json_dumps_params={'default': str})
+
+    # action == 'delete' — anonymize PII immediately (preserve aggregate counts)
+    from django.db import transaction
+    with transaction.atomic():
+        visitor.ip_address = '0.0.0.0'
+        visitor.email = ''
+        visitor.name = 'Deleted User'
+        visitor.phone = ''
+        visitor.user_agent = ''
+        visitor.referrer = ''
+        visitor.save()
+        Message.objects.filter(room__visitor=visitor).update(content='[deleted by GDPR request]')
+        OfflineMessage.objects.filter(visitor=visitor).update(message='[deleted]', email='', name='Deleted')
+        cache.delete(f'cursor:{sk}')
+    return JsonResponse({'ok': True, 'message': 'Your data has been anonymized.'})
 
 
 def cursor_fetch(request, session_key):

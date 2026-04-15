@@ -13,4 +13,5 @@ urlpatterns = [
     path('chat/offline-message/', views.submit_offline_message, name='offline_message'),
     path('widget/cursor/', views.widget_cursor_track, name='widget_cursor_track'),
     path('cursor/<str:session_key>/', views.cursor_fetch, name='cursor_fetch'),
+    path('gdpr/', views.gdpr_request, name='gdpr_request'),
 ]

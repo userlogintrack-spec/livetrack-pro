@@ -271,3 +271,22 @@ LOGGING = {
         'django.request': {'handlers': ['console', 'app_file'], 'level': 'ERROR', 'propagate': False},
     },
 }
+
+# ───── Sentry error monitoring (opt-in via SENTRY_DSN env var) ─────
+SENTRY_DSN = os.getenv('SENTRY_DSN', '').strip()
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration(), LoggingIntegration(level=None, event_level=None)],
+            environment=os.getenv('SENTRY_ENV', 'production' if not DEBUG else 'development'),
+            release=os.getenv('SENTRY_RELEASE', None),
+            traces_sample_rate=float(os.getenv('SENTRY_TRACES_RATE', '0.1')),
+            send_default_pii=False,
+        )
+    except ImportError:
+        import logging as _logging
+        _logging.getLogger(__name__).warning('SENTRY_DSN set but sentry-sdk not installed. Run: pip install sentry-sdk')

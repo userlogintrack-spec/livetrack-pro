@@ -1366,6 +1366,7 @@
             { keys: 'g t', label: 'Open Tour Guide', url: '{% url "dashboard:tour_guide" %}' },
             { keys: 'g p', label: 'My Profile',      url: '{% url "dashboard:profile" %}' },
             { keys: 't',   label: 'Toggle theme',    action: function(){ toggleDashTheme(); } },
+            { keys: 'ctrl k', label: 'Open command palette', action: function(){ openCommandPalette(); } },
             { keys: '?',   label: 'Show this help',  action: function(){ showShortcutsModal(); } },
             { keys: 'esc', label: 'Close modal',     action: function(){ hideShortcutsModal(); } },
           ];
@@ -1425,6 +1426,119 @@
           }
           window.showShortcutsModal = function(){ buildModal().style.display = 'flex'; };
           window.hideShortcutsModal = function(){ if (modal) modal.style.display = 'none'; };
+        })();
+
+        // ===== TOAST NOTIFICATION SYSTEM =====
+        (function(){
+          var container = null;
+          function ensure(){
+            if (container) return container;
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.style.cssText = 'position:fixed;top:80px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;pointer-events:none;max-width:380px;';
+            document.body.appendChild(container);
+            return container;
+          }
+          var COLORS = {
+            success: { bg: 'var(--success-soft)', fg: 'var(--success)', border: 'var(--success)', icon: 'fa-circle-check' },
+            error:   { bg: 'var(--danger-soft)',  fg: 'var(--danger)',  border: 'var(--danger)',  icon: 'fa-circle-exclamation' },
+            warning: { bg: 'var(--warning-soft)', fg: 'var(--warning)', border: 'var(--warning)', icon: 'fa-triangle-exclamation' },
+            info:    { bg: 'var(--accent-soft)',  fg: 'var(--accent)',  border: 'var(--accent)',  icon: 'fa-circle-info' },
+          };
+          function show(message, type, opts){
+            opts = opts || {}; type = type || 'info';
+            var c = COLORS[type] || COLORS.info;
+            var t = document.createElement('div');
+            t.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-left:4px solid '+c.border+';border-radius:10px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.12);display:flex;align-items:flex-start;gap:10px;pointer-events:auto;font-size:13px;color:var(--text-primary);min-width:260px;animation:toastIn .25s cubic-bezier(.2,.9,.3,1);';
+            t.innerHTML = '<i class="fas '+c.icon+'" style="color:'+c.fg+';font-size:16px;margin-top:1px;"></i><div style="flex:1;line-height:1.4;">'+message+'</div><button style="background:transparent;border:0;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px;" aria-label="Dismiss">&times;</button>';
+            var dismiss = function(){ t.style.animation='toastOut .2s ease forwards'; setTimeout(function(){ t.remove(); }, 200); };
+            t.querySelector('button').onclick = dismiss;
+            ensure().appendChild(t);
+            if (opts.sticky !== true) setTimeout(dismiss, opts.duration || 4500);
+            return t;
+          }
+          window.toast = {
+            success: function(m, o){ return show(m, 'success', o); },
+            error:   function(m, o){ return show(m, 'error', o); },
+            warning: function(m, o){ return show(m, 'warning', o); },
+            info:    function(m, o){ return show(m, 'info', o); },
+          };
+          // Inject keyframes once
+          if (!document.getElementById('toastStyles')){
+            var s = document.createElement('style'); s.id = 'toastStyles';
+            s.textContent = '@keyframes toastIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes toastOut{to{transform:translateX(120%);opacity:0}}';
+            document.head.appendChild(s);
+          }
+          // Auto-promote Django messages framework if present in DOM
+          document.querySelectorAll('[data-django-message]').forEach(function(el){
+            var t = el.dataset.djangoMessage || 'info';
+            window.toast[COLORS[t] ? t : 'info'](el.textContent.trim());
+            el.remove();
+          });
+        })();
+
+        // ===== Cmd+K COMMAND PALETTE =====
+        (function(){
+          var COMMANDS = [
+            { label: 'Go to Dashboard',    icon: 'fa-house',         url: '{% url "dashboard:home" %}',           keywords: 'home overview' },
+            { label: 'Go to Chats',        icon: 'fa-comments',      url: '{% url "dashboard:chat_list" %}',      keywords: 'messages conversations inbox' },
+            { label: 'Go to Visitors',     icon: 'fa-users',         url: '{% url "dashboard:visitor_list" %}',   keywords: 'users people audience' },
+            { label: 'Go to Recordings',   icon: 'fa-video',         url: '{% url "dashboard:session_recordings" %}', keywords: 'session replay video' },
+            { label: 'Go to Analytics',    icon: 'fa-chart-line',    url: '{% url "dashboard:analytics" %}',      keywords: 'stats data charts metrics' },
+            { label: 'Go to Heatmaps',     icon: 'fa-fire',          url: '{% url "dashboard:heatmaps" %}',       keywords: 'click scroll attention' },
+            { label: 'Frustration Signals',icon: 'fa-angry',         url: '{% url "dashboard:frustration_dashboard" %}', keywords: 'rage dead clicks' },
+            { label: 'AI Bot Configuration',icon:'fa-robot',         url: '{% url "dashboard:ai_bot_config" %}',  keywords: 'ai bot autoreply chatbot' },
+            { label: 'Knowledge Base',     icon: 'fa-book',          url: '{% url "dashboard:kb_manage" %}',      keywords: 'help articles kb' },
+            { label: 'Quick Replies',      icon: 'fa-reply-all',     url: '{% url "dashboard:canned_responses" %}', keywords: 'canned templates shortcuts' },
+            { label: 'Webhooks',           icon: 'fa-plug',          url: '{% url "dashboard:webhooks" %}',       keywords: 'integrations api events' },
+            { label: 'Widget Settings',    icon: 'fa-palette',       url: '{% url "dashboard:website_settings" %}', keywords: 'embed appearance customize' },
+            { label: 'Manage Agents',      icon: 'fa-user-plus',     url: '{% url "dashboard:add_agent" %}',      keywords: 'team users staff' },
+            { label: 'Billing & Plan',     icon: 'fa-credit-card',   url: '{% url "dashboard:billing" %}',        keywords: 'subscription payment upgrade' },
+            { label: 'Profile',            icon: 'fa-user-circle',   url: '{% url "dashboard:profile" %}',        keywords: 'account me' },
+            { label: 'Tour Guide',         icon: 'fa-map-signs',     url: '{% url "dashboard:tour_guide" %}',     keywords: 'help features intro' },
+            { label: 'Toggle Dark / Light',icon: 'fa-moon',          action: function(){ toggleDashTheme(); },    keywords: 'theme dark light night' },
+            { label: 'Show Keyboard Shortcuts', icon: 'fa-keyboard', action: function(){ showShortcutsModal(); }, keywords: 'help keys hotkeys' },
+          ];
+          var palette = null, input = null, list = null, items = [], selectedIdx = 0;
+          function build(){
+            if (palette) return;
+            palette = document.createElement('div');
+            palette.id = 'cmdkPalette';
+            palette.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);z-index:9998;display:none;align-items:flex-start;justify-content:center;padding-top:12vh;';
+            palette.innerHTML = '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 70px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column;max-height:70vh;"><div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border-subtle);"><i class="fas fa-search" style="color:var(--text-muted);"></i><input id="cmdkInput" placeholder="Search commands, pages, actions…" style="flex:1;border:0;background:transparent;color:var(--text-primary);font-size:15px;outline:none;"><kbd style="background:var(--bg-hover);border:1px solid var(--border);padding:2px 6px;border-radius:4px;font-size:10px;color:var(--text-muted);">Esc</kbd></div><div id="cmdkList" style="overflow-y:auto;padding:6px;"></div><div style="border-top:1px solid var(--border-subtle);padding:8px 14px;display:flex;gap:14px;font-size:11px;color:var(--text-muted);"><span><kbd style="background:var(--bg-hover);padding:1px 5px;border-radius:3px;font-size:10px;">↑↓</kbd> navigate</span><span><kbd style="background:var(--bg-hover);padding:1px 5px;border-radius:3px;font-size:10px;">↵</kbd> select</span><span><kbd style="background:var(--bg-hover);padding:1px 5px;border-radius:3px;font-size:10px;">esc</kbd> close</span></div></div>';
+            palette.addEventListener('click', function(ev){ if (ev.target === palette) close(); });
+            document.body.appendChild(palette);
+            input = document.getElementById('cmdkInput');
+            list = document.getElementById('cmdkList');
+            input.addEventListener('input', render);
+            input.addEventListener('keydown', function(ev){
+              if (ev.key === 'ArrowDown'){ ev.preventDefault(); selectedIdx = Math.min(items.length-1, selectedIdx+1); render(true); }
+              else if (ev.key === 'ArrowUp'){ ev.preventDefault(); selectedIdx = Math.max(0, selectedIdx-1); render(true); }
+              else if (ev.key === 'Enter'){ ev.preventDefault(); if (items[selectedIdx]) execute(items[selectedIdx]); }
+              else if (ev.key === 'Escape'){ close(); }
+            });
+          }
+          function execute(cmd){ close(); if (cmd.url) window.location.href = cmd.url; else if (cmd.action) cmd.action(); }
+          function render(keepFilter){
+            var q = input.value.trim().toLowerCase();
+            items = COMMANDS.filter(function(c){ return !q || (c.label+' '+(c.keywords||'')).toLowerCase().indexOf(q) !== -1; });
+            if (!keepFilter) selectedIdx = 0;
+            if (selectedIdx >= items.length) selectedIdx = Math.max(0, items.length-1);
+            list.innerHTML = items.length ? items.map(function(c, i){
+              var sel = i === selectedIdx;
+              return '<div class="cmdk-item" data-i="'+i+'" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;background:'+(sel?'var(--accent-soft)':'transparent')+';color:var(--text-primary);"><i class="fas '+c.icon+'" style="width:18px;text-align:center;color:'+(sel?'var(--accent)':'var(--text-secondary)')+';"></i><span style="flex:1;font-size:14px;">'+c.label+'</span>'+(sel?'<i class="fas fa-arrow-right" style="color:var(--accent);font-size:11px;"></i>':'')+'</div>';
+            }).join('') : '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">No commands match "'+input.value+'"</div>';
+            list.querySelectorAll('.cmdk-item').forEach(function(el){
+              el.onclick = function(){ execute(items[parseInt(this.dataset.i,10)]); };
+              el.onmouseenter = function(){ selectedIdx = parseInt(this.dataset.i, 10); render(true); };
+            });
+          }
+          function open(){ build(); palette.style.display = 'flex'; input.value = ''; selectedIdx = 0; render(); setTimeout(function(){ input.focus(); }, 30); }
+          function close(){ if (palette) palette.style.display = 'none'; }
+          window.openCommandPalette = open;
+          document.addEventListener('keydown', function(ev){
+            if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k'){ ev.preventDefault(); open(); }
+          });
         })();
 
         // ===== LIVE STATS =====
