@@ -7,120 +7,327 @@
 {% endblock %}
 
 {% block content %}
-<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
-    <div class="stat-card purple"><div class="stat-icon"><i class="fas fa-user"></i></div><div class="stat-value" style="font-size:16px;">{{ recording.visitor.ip_address }}</div><div class="stat-label">Visitor</div></div>
-    <div class="stat-card blue"><div class="stat-icon"><i class="fas fa-clock"></i></div><div class="stat-value">{{ recording.duration }}s</div><div class="stat-label">Duration</div></div>
-    <div class="stat-card green"><div class="stat-icon"><i class="fas fa-file"></i></div><div class="stat-value">{{ recording.pages_visited }}</div><div class="stat-label">Pages</div></div>
-    <div class="stat-card orange"><div class="stat-icon"><i class="fas fa-angry"></i></div><div class="stat-value">{{ recording.frustration_score }}</div><div class="stat-label">Frustration</div></div>
-    <div class="stat-card {% if recording.has_rage_clicks %}orange{% else %}green{% endif %}"><div class="stat-icon"><i class="fas fa-{% if recording.has_rage_clicks %}bolt{% else %}check{% endif %}"></i></div><div class="stat-value">{% if recording.has_rage_clicks %}Yes{% else %}No{% endif %}</div><div class="stat-label">Rage Clicks</div></div>
-</div>
+<style>
+  .cl-shell { background:#fff; border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,.04); }
+  .cl-topbar { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; background:#f8fafc; border-bottom:1px solid #eef2f6; }
+  .cl-topbar .left, .cl-topbar .right { display:flex; align-items:center; gap:10px; font-size:13px; }
+  .cl-topbar .left .ico { color:#0ea5e9; }
+  .cl-pill { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border:1px solid #cbd5e1; background:#fff; color:#0f172a; font-weight:600; font-size:13px; border-radius:8px; cursor:pointer; transition:all .2s; }
+  .cl-pill:hover { border-color:#0ea5e9; color:#0ea5e9; }
+  .cl-pill .star { color:#0ea5e9; }
+  .cl-pill.primary { background:linear-gradient(135deg,#0ea5e9,#6366f1); border-color:transparent; color:#fff; }
+  .cl-pill.primary:hover { color:#fff; filter:brightness(1.05); }
 
-<div class="grid-2" style="grid-template-columns:2fr 1fr;">
-    <!-- Replay Area -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-play-circle"></i> Session Replay</h3>
-            <div style="display:flex;gap:6px;">
-                <button onclick="playReplay()" class="btn btn-sm btn-primary" id="playBtn"><i class="fas fa-play"></i> Play</button>
-                <button onclick="pauseReplay()" class="btn btn-sm btn-secondary" id="pauseBtn" style="display:none;"><i class="fas fa-pause"></i> Pause</button>
-                <span style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;" id="replayTime">0:00</span>
-            </div>
+  .cl-modes { display:flex; align-items:center; justify-content:space-between; padding:10px 18px; background:#fff; border-bottom:1px solid #eef2f6; }
+  .cl-modes .group { display:flex; gap:8px; }
+  .cl-mode { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-size:13px; font-weight:600; color:#334155; cursor:pointer; transition:all .15s; }
+  .cl-mode:hover { border-color:#0ea5e9; }
+  .cl-mode.active { border-color:#0ea5e9; color:#0ea5e9; box-shadow:inset 0 0 0 1px #0ea5e9; }
+  .cl-mode .ic { font-size:14px; }
+  .cl-icons { display:flex; gap:14px; color:#94a3b8; }
+  .cl-icons i { cursor:pointer; transition:color .2s; }
+  .cl-icons i:hover { color:#0ea5e9; }
+
+  .cl-stage { position:relative; background:#eef2f6; min-height:520px; height:62vh; overflow:hidden; }
+  .cl-stage iframe { position:absolute; inset:0; width:100%; height:100%; border:0; background:#fff; }
+  .cl-stage .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:13px; flex-direction:column; gap:8px; }
+  .cl-overlay { position:absolute; inset:0; pointer-events:none; }
+  .cl-cursor { position:absolute; width:22px; height:22px; border-radius:50%; background:rgba(14,165,233,.25); border:2px solid #0ea5e9; transform:translate(-50%,-50%); transition:left .12s linear, top .12s linear, background .2s, transform .2s; box-shadow:0 0 0 6px rgba(14,165,233,.12); }
+  .cl-cursor.click { background:rgba(244,63,94,.35); border-color:#f43f5e; transform:translate(-50%,-50%) scale(1.4); }
+  .cl-click-dot { position:absolute; width:18px; height:18px; border-radius:50%; transform:translate(-50%,-50%); pointer-events:none; }
+  .cl-click-dot.normal { background:rgba(14,165,233,.5); }
+  .cl-click-dot.rage { background:rgba(244,63,94,.55); box-shadow:0 0 0 6px rgba(244,63,94,.18); }
+  .cl-click-dot.dead { background:rgba(245,158,11,.55); }
+
+  .cl-popup { position:absolute; right:16px; top:16px; max-width:260px; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; box-shadow:0 6px 24px rgba(15,23,42,.08); font-size:12px; color:#334155; }
+  .cl-popup .t { font-weight:700; color:#0f172a; margin-bottom:4px; }
+  .cl-popup .m { color:#64748b; font-size:11px; }
+  .cl-popup a { color:#0ea5e9; text-decoration:none; }
+
+  .cl-player { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; background:#fff; border-top:1px solid #eef2f6; gap:14px; }
+  .cl-scrub { flex:1; height:6px; background:#e2e8f0; border-radius:99px; position:relative; cursor:pointer; }
+  .cl-scrub .fill { position:absolute; left:0; top:0; bottom:0; width:0%; background:linear-gradient(90deg,#0ea5e9,#6366f1); border-radius:99px; }
+  .cl-scrub .head { position:absolute; top:50%; transform:translate(-50%,-50%); width:14px; height:14px; border-radius:50%; background:#fff; border:2px solid #0ea5e9; box-shadow:0 2px 6px rgba(0,0,0,.15); left:0%; }
+  .cl-controls { display:flex; align-items:center; gap:14px; }
+  .cl-btn-round { width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; border:0; display:flex; align-items:center; justify-content:center; font-size:14px; cursor:pointer; box-shadow:0 4px 12px rgba(14,165,233,.35); transition:transform .15s; }
+  .cl-btn-round:hover { transform:scale(1.06); }
+  .cl-icon-btn { background:transparent; border:0; color:#475569; font-size:16px; cursor:pointer; padding:6px; border-radius:6px; }
+  .cl-icon-btn:hover { background:#f1f5f9; color:#0ea5e9; }
+  .cl-speed { background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:4px 8px; font-size:13px; cursor:pointer; }
+  .cl-time { font-variant-numeric:tabular-nums; font-size:13px; color:#0f172a; font-weight:600; min-width:90px; text-align:center; }
+
+  .cl-side { display:grid; grid-template-columns:1fr 320px; gap:0; }
+  .cl-events { background:#fafbfc; border-left:1px solid #eef2f6; max-height:calc(62vh + 110px); overflow-y:auto; }
+  .cl-events .h { padding:12px 14px; font-weight:700; font-size:12px; color:#0f172a; border-bottom:1px solid #eef2f6; background:#fff; position:sticky; top:0; display:flex; align-items:center; justify-content:space-between; }
+  .cl-event { padding:8px 14px; border-bottom:1px solid #eef2f6; font-size:12px; cursor:pointer; transition:background .15s; }
+  .cl-event:hover { background:#f1f5f9; }
+  .cl-event .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .cl-event .tag { font-weight:700; color:#0f172a; }
+  .cl-event .t { color:#94a3b8; font-size:11px; font-variant-numeric:tabular-nums; }
+  .cl-event.click .tag::before { content:'\f25a'; font-family:'Font Awesome 6 Free'; font-weight:900; color:#0ea5e9; margin-right:6px; }
+  .cl-event.rage .tag::before { content:'\f0e7'; font-family:'Font Awesome 6 Free'; font-weight:900; color:#f43f5e; margin-right:6px; }
+  .cl-event.error .tag::before { content:'\f188'; font-family:'Font Awesome 6 Free'; font-weight:900; color:#ef4444; margin-right:6px; }
+  .cl-event .sub { color:#64748b; font-size:11px; margin-top:2px; }
+
+  .cl-meta { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; padding:14px 18px; background:#f8fafc; border-bottom:1px solid #eef2f6; }
+  .cl-meta .m { background:#fff; border:1px solid #eef2f6; border-radius:10px; padding:10px 12px; }
+  .cl-meta .lab { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; font-weight:700; }
+  .cl-meta .val { font-size:14px; color:#0f172a; font-weight:700; margin-top:2px; }
+  .cl-meta .val.warn { color:#f59e0b; }
+  .cl-meta .val.danger { color:#ef4444; }
+
+  @media (max-width: 980px) {
+    .cl-side { grid-template-columns:1fr; }
+    .cl-events { max-height:280px; border-left:0; border-top:1px solid #eef2f6; }
+  }
+</style>
+
+<div class="cl-shell">
+
+  <!-- TOP BAR -->
+  <div class="cl-topbar">
+    <div class="left">
+      <i class="fas fa-bookmark ico"></i>
+      <span style="font-weight:600;color:#0f172a;">Save as segment</span>
+    </div>
+    <div class="right">
+      <button class="cl-pill"><i class="fas fa-star star"></i> View highlights</button>
+      <button class="cl-pill primary"><i class="fas fa-magic-wand-sparkles"></i> Summarize recording <i class="fas fa-chevron-down"></i></button>
+    </div>
+  </div>
+
+  <!-- MODE TABS -->
+  <div class="cl-modes">
+    <div class="group">
+      <button class="cl-mode active" data-mode="details"><i class="fas fa-rectangle-list ic"></i> More details</button>
+      <button class="cl-mode" data-mode="click"><i class="fas fa-mouse-pointer ic"></i> Click</button>
+      <button class="cl-mode" data-mode="scroll"><i class="fas fa-arrows-up-down ic"></i> Scroll</button>
+      <button class="cl-mode" data-mode="attention"><i class="fas fa-eye ic"></i> Attention</button>
+    </div>
+    <div class="cl-icons">
+      <i class="far fa-star" title="Favorite"></i>
+      <i class="far fa-comment" title="Comments"></i>
+      <i class="far fa-window-maximize" title="Fullscreen" id="clFullscreen"></i>
+      <i class="fas fa-share-nodes" title="Share"></i>
+    </div>
+  </div>
+
+  <!-- META STRIP -->
+  <div class="cl-meta">
+    <div class="m"><div class="lab">Visitor</div><div class="val">{{ recording.visitor.ip_address }}</div></div>
+    <div class="m"><div class="lab">Duration</div><div class="val">{{ recording.duration }}s</div></div>
+    <div class="m"><div class="lab">Pages</div><div class="val">{{ recording.pages_visited }}</div></div>
+    <div class="m"><div class="lab">Frustration</div><div class="val {% if recording.frustration_score > 50 %}danger{% elif recording.frustration_score > 20 %}warn{% endif %}">{{ recording.frustration_score }}</div></div>
+    <div class="m"><div class="lab">Rage Clicks</div><div class="val {% if recording.has_rage_clicks %}danger{% endif %}">{% if recording.has_rage_clicks %}Yes{% else %}No{% endif %}</div></div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div class="cl-side">
+    <div>
+      <div class="cl-stage" id="clStage">
+        {% if recording.start_url %}
+        <iframe id="clFrame" src="{{ recording.start_url }}" sandbox="allow-same-origin allow-scripts" referrerpolicy="no-referrer"></iframe>
+        {% else %}
+        <div class="empty"><i class="fas fa-image" style="font-size:48px;opacity:.3;"></i><div>No page URL recorded</div></div>
+        {% endif %}
+        <div class="cl-overlay" id="clOverlay">
+          <div class="cl-cursor" id="clCursor" style="display:none;left:50%;top:50%;"></div>
         </div>
-        <div class="card-body" style="position:relative;min-height:400px;background:#f0f0f0;border-radius:8px;overflow:hidden;border:2px solid var(--border);" id="replayCanvas">
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);">
-                <div style="text-align:center;">
-                    <i class="fas fa-play-circle" style="font-size:48px;opacity:0.3;margin-bottom:8px;"></i>
-                    <p>{{ recording.events_data|length }} events recorded</p>
-                    <p style="font-size:12px;">Start URL: {{ recording.start_url|truncatechars:60 }}</p>
-                </div>
-            </div>
-            <!-- Cursor indicator -->
-            <div id="replayCursor" style="display:none;position:absolute;width:18px;height:18px;border-radius:50%;background:var(--accent-soft);border:2px solid var(--accent);transform:translate(-50%,-50%);pointer-events:none;transition:all 0.1s;z-index:10;"></div>
+        <div class="cl-popup" id="clPopup" style="display:none;">
+          <div class="t" id="clPopupTitle">{{ recording.start_url|truncatechars:48 }}</div>
+          <div class="m"><span id="clPopupTime">00:00</span> · Page <span id="clPopupPage">1</span> · Tab 1</div>
         </div>
-        <!-- Timeline -->
-        <div style="padding:12px;background:var(--bg-hover);border-radius:0 0 var(--radius) var(--radius);">
-            <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;cursor:pointer;" id="timeline">
-                <div style="height:100%;background:var(--gradient);width:0%;transition:width 0.1s;" id="timelineProgress"></div>
-            </div>
+      </div>
+
+      <!-- PLAYER -->
+      <div class="cl-player">
+        <div class="cl-controls">
+          <button class="cl-btn-round" id="clPlay"><i class="fas fa-play" id="clPlayIcon"></i></button>
+          <button class="cl-icon-btn" id="clBack10" title="Back 10s"><i class="fas fa-rotate-left"></i><sub style="font-size:9px;">10</sub></button>
+          <button class="cl-icon-btn" id="clFwd30" title="Forward 30s"><i class="fas fa-rotate-right"></i><sub style="font-size:9px;">30</sub></button>
+          <button class="cl-icon-btn" id="clPrev" title="Previous event"><i class="fas fa-backward-step"></i></button>
+          <button class="cl-icon-btn" id="clNext" title="Next event"><i class="fas fa-forward-step"></i></button>
+          <select class="cl-speed" id="clSpeed">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </select>
+          <span class="cl-time" id="clTime">00:00 / 00:00</span>
         </div>
+        <div class="cl-scrub" id="clScrub">
+          <div class="fill" id="clFill"></div>
+          <div class="head" id="clHead"></div>
+        </div>
+        <div class="cl-controls">
+          <button class="cl-icon-btn" title="Add note"><i class="far fa-note-sticky"></i> <span style="font-size:12px;">Add note</span></button>
+          <button class="cl-icon-btn" title="Settings"><i class="fas fa-gear"></i></button>
+        </div>
+      </div>
     </div>
 
-    <!-- Event Log -->
-    <div class="card">
-        <div class="card-header"><h3><i class="fas fa-list"></i> Event Log</h3></div>
-        <div class="card-body" style="max-height:500px;overflow-y:auto;">
-            {% if errors %}
-            <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:8px;"><i class="fas fa-bug"></i> JS Errors</div>
-            {% for e in errors %}
-            <div style="padding:6px 8px;background:var(--danger-soft);border-radius:6px;margin-bottom:4px;font-size:11px;">
-                <div style="font-weight:600;color:var(--danger);">{{ e.error_message|truncatewords:12 }}</div>
-                <div style="color:var(--text-muted);">Line {{ e.error_line }} &middot; {{ e.page_url|truncatechars:40 }}</div>
-            </div>
-            {% endfor %}
-            {% endif %}
+    <!-- EVENTS PANEL -->
+    <div class="cl-events">
+      <div class="h">Events <span style="color:#94a3b8;font-weight:600;">{{ recording.events_data|length }}</span></div>
 
-            {% if frustrations %}
-            <div style="font-weight:600;font-size:12px;color:var(--warning);margin-top:12px;margin-bottom:8px;"><i class="fas fa-angry"></i> Frustration Signals</div>
-            {% for f in frustrations %}
-            <div style="padding:6px 8px;background:var(--warning-soft);border-radius:6px;margin-bottom:4px;font-size:11px;">
-                <div style="font-weight:600;color:var(--warning);">{{ f.get_signal_type_display }}</div>
-                <div style="color:var(--text-muted);">{{ f.page_path }} {% if f.element_text %}&middot; "{{ f.element_text|truncatewords:5 }}"{% endif %}</div>
-            </div>
-            {% endfor %}
-            {% endif %}
+      {% for e in errors %}
+      <div class="cl-event error">
+        <div class="row"><span class="tag">JS Error</span><span class="t">L{{ e.error_line }}</span></div>
+        <div class="sub">{{ e.error_message|truncatewords:10 }}</div>
+      </div>
+      {% endfor %}
 
-            {% if clicks %}
-            <div style="font-weight:600;font-size:12px;color:var(--primary);margin-top:12px;margin-bottom:8px;"><i class="fas fa-mouse-pointer"></i> Clicks ({{ clicks.count }})</div>
-            {% for c in clicks|slice:":20" %}
-            <div style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:11px;display:flex;justify-content:space-between;">
-                <span>{{ c.element_tag }} {% if c.element_text %}"{{ c.element_text|truncatewords:3 }}"{% endif %}</span>
-                <span style="color:{% if c.click_type == 'rage' %}var(--danger){% elif c.click_type == 'dead' %}var(--warning){% else %}var(--text-muted){% endif %};">{{ c.click_type }}</span>
-            </div>
-            {% endfor %}
-            {% endif %}
-        </div>
+      {% for f in frustrations %}
+      <div class="cl-event rage">
+        <div class="row"><span class="tag">{{ f.get_signal_type_display }}</span></div>
+        <div class="sub">{{ f.page_path }}{% if f.element_text %} · "{{ f.element_text|truncatewords:5 }}"{% endif %}</div>
+      </div>
+      {% endfor %}
+
+      {% for c in clicks|slice:":50" %}
+      <div class="cl-event {% if c.click_type == 'rage' %}rage{% else %}click{% endif %}" data-x="{{ c.x_percent|default:'50' }}" data-y="{{ c.y_percent|default:'50' }}">
+        <div class="row"><span class="tag">{{ c.element_tag|default:"click" }}</span><span class="t">{{ c.click_type }}</span></div>
+        {% if c.element_text %}<div class="sub">"{{ c.element_text|truncatewords:5 }}"</div>{% endif %}
+      </div>
+      {% endfor %}
+
+      {% if not errors and not frustrations and not clicks %}
+      <div style="padding:24px;text-align:center;color:#94a3b8;font-size:12px;">No events recorded</div>
+      {% endif %}
     </div>
+  </div>
+
 </div>
 
 <script>
-var events = {{ events_json|safe }};
-var cursor = document.getElementById('replayCursor');
-var progress = document.getElementById('timelineProgress');
-var timeDisplay = document.getElementById('replayTime');
-var playing = false, eventIdx = 0, timer = null;
+(function(){
+  var events = {{ events_json|safe }} || [];
+  var clicksData = [
+    {% for c in clicks %}{ x: {{ c.x_percent|default:50 }}, y: {{ c.y_percent|default:50 }}, type: "{{ c.click_type }}" }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+  var stage = document.getElementById('clStage');
+  var overlay = document.getElementById('clOverlay');
+  var cursor = document.getElementById('clCursor');
+  var fill = document.getElementById('clFill');
+  var head = document.getElementById('clHead');
+  var timeLbl = document.getElementById('clTime');
+  var playBtn = document.getElementById('clPlay');
+  var playIcon = document.getElementById('clPlayIcon');
+  var speedSel = document.getElementById('clSpeed');
+  var popup = document.getElementById('clPopup');
+  var popupTime = document.getElementById('clPopupTime');
 
-function playReplay() {
-    if (!events || events.length === 0) return;
-    playing = true;
-    cursor.style.display = 'block';
-    document.getElementById('playBtn').style.display = 'none';
-    document.getElementById('pauseBtn').style.display = 'inline-flex';
-    timer = setInterval(function() {
-        if (eventIdx >= events.length) { pauseReplay(); return; }
-        var ev = events[eventIdx];
-        if (ev.x !== undefined && ev.y !== undefined) {
-            cursor.style.left = ev.x + '%';
-            cursor.style.top = ev.y + '%';
-            if (ev.type === 'click') {
-                cursor.style.background = 'var(--danger-soft)';
-                cursor.style.borderColor = 'var(--danger)';
-                setTimeout(function() {
-                    cursor.style.background = 'var(--accent-soft)';
-                    cursor.style.borderColor = 'var(--accent)';
-                }, 200);
-            }
-        }
-        progress.style.width = ((eventIdx / events.length) * 100) + '%';
-        var secs = Math.floor(eventIdx * 0.1);
-        timeDisplay.textContent = Math.floor(secs/60) + ':' + ('0'+secs%60).slice(-2);
-        eventIdx++;
-    }, 100);
-}
-function pauseReplay() {
-    playing = false;
-    clearInterval(timer);
-    document.getElementById('playBtn').style.display = 'inline-flex';
-    document.getElementById('pauseBtn').style.display = 'none';
-}
+  var idx = 0, playing = false, timer = null, speed = 1;
+  var totalSecs = Math.max(1, Math.ceil(events.length * 0.1));
+
+  function fmt(s){ s = Math.max(0,Math.floor(s)); return ('0'+Math.floor(s/60)).slice(-2)+':'+('0'+(s%60)).slice(-2); }
+  function updateTime(){
+    var cur = idx * 0.1;
+    timeLbl.textContent = fmt(cur) + ' / ' + fmt(totalSecs);
+    var pct = (idx / Math.max(1,events.length)) * 100;
+    fill.style.width = pct + '%'; head.style.left = pct + '%';
+    if (popup) { popup.style.display = 'block'; popupTime.textContent = fmt(cur); }
+  }
+  function step(){
+    if (idx >= events.length) { pause(); return; }
+    var ev = events[idx];
+    if (ev && ev.x != null && ev.y != null) {
+      cursor.style.display = 'block';
+      cursor.style.left = ev.x + '%';
+      cursor.style.top = ev.y + '%';
+      if (ev.type === 'click') {
+        cursor.classList.add('click');
+        setTimeout(function(){ cursor.classList.remove('click'); }, 240);
+      }
+    }
+    updateTime();
+    idx++;
+  }
+  function play(){
+    if (idx >= events.length) idx = 0;
+    playing = true; playIcon.className = 'fas fa-pause';
+    timer = setInterval(step, 100 / speed);
+  }
+  function pause(){
+    playing = false; playIcon.className = 'fas fa-play';
+    clearInterval(timer); timer = null;
+  }
+  playBtn.addEventListener('click', function(){ playing ? pause() : play(); });
+  speedSel.addEventListener('change', function(){
+    speed = parseFloat(this.value);
+    if (playing) { pause(); play(); }
+  });
+  document.getElementById('clBack10').addEventListener('click', function(){ idx = Math.max(0, idx-100); updateTime(); });
+  document.getElementById('clFwd30').addEventListener('click', function(){ idx = Math.min(events.length, idx+300); updateTime(); });
+  document.getElementById('clPrev').addEventListener('click', function(){ idx = Math.max(0, idx-1); step(); });
+  document.getElementById('clNext').addEventListener('click', function(){ step(); });
+  document.getElementById('clScrub').addEventListener('click', function(ev){
+    var rect = this.getBoundingClientRect();
+    var pct = (ev.clientX - rect.left) / rect.width;
+    idx = Math.floor(pct * events.length);
+    updateTime();
+  });
+
+  // Heatmap modes
+  function clearOverlayDots(){
+    overlay.querySelectorAll('.cl-click-dot').forEach(function(n){ n.remove(); });
+  }
+  function renderClicks(){
+    clearOverlayDots();
+    clicksData.forEach(function(c){
+      var d = document.createElement('div');
+      d.className = 'cl-click-dot ' + (c.type === 'rage' ? 'rage' : c.type === 'dead' ? 'dead' : 'normal');
+      d.style.left = c.x + '%'; d.style.top = c.y + '%';
+      overlay.appendChild(d);
+    });
+  }
+  function renderScroll(){
+    clearOverlayDots();
+    var d = document.createElement('div');
+    d.style.cssText = 'position:absolute;left:0;right:0;top:0;height:100%;background:linear-gradient(180deg,rgba(14,165,233,.35),rgba(14,165,233,.05) 60%,transparent);pointer-events:none;';
+    d.className = 'cl-click-dot';
+    overlay.appendChild(d);
+  }
+  function renderAttention(){
+    clearOverlayDots();
+    var d = document.createElement('div');
+    d.style.cssText = 'position:absolute;left:50%;top:40%;width:340px;height:240px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(244,63,94,.45),rgba(245,158,11,.25) 50%,transparent 80%);pointer-events:none;filter:blur(12px);';
+    d.className = 'cl-click-dot';
+    overlay.appendChild(d);
+  }
+  document.querySelectorAll('.cl-mode').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.cl-mode').forEach(function(b){ b.classList.remove('active'); });
+      this.classList.add('active');
+      var mode = this.dataset.mode;
+      if (mode === 'click') renderClicks();
+      else if (mode === 'scroll') renderScroll();
+      else if (mode === 'attention') renderAttention();
+      else clearOverlayDots();
+    });
+  });
+
+  // Click event row → seek + show overlay dot
+  document.querySelectorAll('.cl-event[data-x]').forEach(function(el){
+    el.addEventListener('click', function(){
+      var x = this.dataset.x, y = this.dataset.y;
+      cursor.style.display = 'block';
+      cursor.style.left = x + '%'; cursor.style.top = y + '%';
+      cursor.classList.add('click');
+      setTimeout(function(){ cursor.classList.remove('click'); }, 400);
+    });
+  });
+
+  // Fullscreen
+  document.getElementById('clFullscreen').addEventListener('click', function(){
+    var s = document.querySelector('.cl-shell');
+    if (!document.fullscreenElement) s.requestFullscreen && s.requestFullscreen();
+    else document.exitFullscreen && document.exitFullscreen();
+  });
+
+  updateTime();
+})();
 </script>
 {% endblock %}
