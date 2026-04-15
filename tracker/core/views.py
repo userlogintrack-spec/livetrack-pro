@@ -1078,9 +1078,12 @@ def widget_script(request):
   style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:all .3s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}";
   document.head.appendChild(style);
 
+  var ICON_CHAT = '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  var ICON_CLOSE = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
   var btn = document.createElement("button");
   btn.className = "ltw-btn";
-  btn.innerHTML = '<i class="fa fa-comment" aria-hidden="true"></i>';
+  btn.innerHTML = ICON_CHAT;
 
   var frame = document.createElement("iframe");
   frame.className = "ltw-frame";
@@ -1096,15 +1099,13 @@ def widget_script(request):
   function closePanel() {
     isOpen = false;
     frame.style.display = "none";
-    btn.innerHTML = "??";
-    btn.style.fontSize = "22px";
+    btn.innerHTML = ICON_CHAT;
   }
 
   btn.onclick = function() {
     isOpen = !isOpen;
     frame.style.display = isOpen ? "block" : "none";
-    btn.innerHTML = isOpen ? '<i class="fa fa-times" aria-hidden="true"></i>' : '<i class="fa fa-comment" aria-hidden="true"></i>';
-    btn.style.fontSize = isOpen ? "18px" : "22px";
+    btn.innerHTML = isOpen ? ICON_CLOSE : ICON_CHAT;
   };
 
   // Listen for messages from the iframe (close button, session sync)
@@ -1117,8 +1118,7 @@ def widget_script(request):
       if (d.type === "ltw-open") {
         isOpen = true;
         frame.style.display = "block";
-        btn.innerHTML = "?";
-        btn.style.fontSize = "18px";
+        btn.innerHTML = ICON_CLOSE;
         return;
       }
     }
