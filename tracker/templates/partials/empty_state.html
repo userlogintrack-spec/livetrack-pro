@@ -1,0 +1,54 @@
+{% comment %}
+Reusable empty-state component.
+Usage:
+  {% include 'partials/empty_state.html' with icon='fa-users' title='No visitors yet' subtitle='Visitors will appear here once they browse your site.' cta_label='Set up tracking' cta_url='/dashboard/website/' %}
+
+Optional: variant='card'|'inline' (default 'card'), tone='neutral'|'success'|'warning'|'danger' (default 'neutral')
+{% endcomment %}
+{% with _icon=icon|default:"fa-inbox" _tone=tone|default:"neutral" _variant=variant|default:"card" %}
+<div class="empty-state empty-{{ _tone }}{% if _variant == 'card' %} empty-card{% endif %}" role="status">
+  <div class="empty-art">
+    <svg viewBox="0 0 200 140" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="es-grad-{{ _tone }}" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="100" cy="118" rx="70" ry="6" fill="var(--border)" opacity="0.4"/>
+      <rect x="46" y="30" width="108" height="76" rx="10" fill="url(#es-grad-{{ _tone }})" stroke="var(--border)" stroke-width="1.5"/>
+      <line x1="60" y1="50" x2="120" y2="50" stroke="var(--border)" stroke-width="2" stroke-linecap="round"/>
+      <line x1="60" y1="62" x2="100" y2="62" stroke="var(--border)" stroke-width="2" stroke-linecap="round"/>
+      <line x1="60" y1="74" x2="110" y2="74" stroke="var(--border)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="148" cy="42" r="14" fill="var(--bg-card)" stroke="var(--accent)" stroke-width="2"/>
+    </svg>
+    <i class="fas {{ _icon }} empty-icon" aria-hidden="true"></i>
+  </div>
+  <h3 class="empty-title">{{ title|default:"Nothing here yet" }}</h3>
+  {% if subtitle %}<p class="empty-sub">{{ subtitle }}</p>{% endif %}
+  {% if cta_url and cta_label %}
+  <a href="{{ cta_url }}" class="btn btn-primary empty-cta">
+    {% if cta_icon %}<i class="fas {{ cta_icon }}"></i> {% endif %}{{ cta_label }}
+  </a>
+  {% endif %}
+  {% if secondary_url and secondary_label %}
+  <a href="{{ secondary_url }}" class="empty-link">{{ secondary_label }} →</a>
+  {% endif %}
+</div>
+
+<style>
+  .empty-state{text-align:center;padding:48px 24px;color:var(--text-muted);}
+  .empty-state.empty-card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:64px 24px;}
+  .empty-art{position:relative;width:200px;height:140px;margin:0 auto 18px;}
+  .empty-art svg{width:100%;height:100%;display:block;}
+  .empty-icon{position:absolute;top:48%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:var(--accent);background:var(--bg-card);width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.08);}
+  .empty-title{font-size:17px;font-weight:700;color:var(--text-primary);margin:0 0 6px;}
+  .empty-sub{font-size:13px;color:var(--text-muted);margin:0 auto 20px;max-width:380px;line-height:1.6;}
+  .empty-cta{display:inline-flex;align-items:center;gap:8px;}
+  .empty-link{display:block;margin-top:14px;font-size:12px;color:var(--accent);text-decoration:none;font-weight:600;}
+  .empty-link:hover{text-decoration:underline;}
+  .empty-success .empty-icon{color:var(--success);}
+  .empty-warning .empty-icon{color:var(--warning);}
+  .empty-danger .empty-icon{color:var(--danger);}
+</style>
+{% endwith %}

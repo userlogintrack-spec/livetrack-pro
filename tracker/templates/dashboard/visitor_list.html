@@ -25,7 +25,7 @@
     }
     .v-header {
         display: grid;
-        grid-template-columns: 44px 1.4fr 1fr 80px 80px 80px 120px;
+        grid-template-columns: 28px 44px 1.4fr 1fr 80px 80px 80px 120px;
         gap: 0;
         padding: 10px 16px;
         background: var(--bg-secondary);
@@ -37,17 +37,35 @@
         color: var(--text-muted);
         align-items: center;
     }
+    .v-row-wrap {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+        transition: background .15s;
+    }
+    .v-row-wrap:last-child { border-bottom: none; }
+    .v-row-wrap:hover, .v-row-wrap.checked { background: var(--accent-soft); }
+    .v-row-check { padding: 0 0 0 16px; }
     .v-row {
         display: grid;
         grid-template-columns: 44px 1.4fr 1fr 80px 80px 80px 120px;
         gap: 0;
-        padding: 10px 16px;
-        border-bottom: 1px solid var(--border);
+        padding: 10px 16px 10px 0;
         align-items: center;
         text-decoration: none;
         color: inherit;
-        transition: background .15s;
     }
+    .v-bulk-bar {
+        position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+        background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+        padding: 10px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.15);
+        display: none; align-items: center; gap: 12px; z-index: 100;
+        font-size: 13px;
+    }
+    .v-bulk-bar.show { display: flex; }
+    .v-bulk-bar .count { font-weight: 700; color: var(--text-primary); }
+    .v-bulk-bar .btn { padding: 6px 12px; font-size: 12px; }
     .v-row:last-child { border-bottom: none; }
     .v-row:hover { background: var(--accent-soft); }
     .v-avatar {
@@ -142,6 +160,51 @@
     <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
 </form>
 
+<!-- Saved Views -->
+<div id="savedViewsBar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:12px;">
+    <span style="color:var(--text-muted);font-weight:600;"><i class="fas fa-bookmark"></i> Saved views:</span>
+    <div id="savedViewsList" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    <button type="button" id="saveCurrentViewBtn" class="btn btn-sm btn-secondary" style="padding:4px 10px;font-size:11px;"><i class="fas fa-plus"></i> Save current</button>
+</div>
+
+<script>
+(function(){
+  var KEY = 'visitorList_savedViews_v1';
+  function load(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e){ return []; } }
+  function save(arr){ try { localStorage.setItem(KEY, JSON.stringify(arr)); } catch(e){} }
+  var list = document.getElementById('savedViewsList');
+  function render(){
+    var views = load();
+    list.innerHTML = views.length ? views.map(function(v, i){
+      var isCurrent = (location.pathname + location.search) === v.url;
+      return '<a href="'+v.url+'" class="btn btn-sm '+(isCurrent?'btn-primary':'btn-secondary')+'" style="padding:4px 10px;font-size:11px;display:inline-flex;gap:4px;align-items:center;" title="'+v.url+'"><i class="fas fa-filter" style="font-size:9px;"></i>'+v.name+' <span data-i="'+i+'" class="rmView" style="opacity:.6;cursor:pointer;margin-left:4px;" title="Remove">×</span></a>';
+    }).join('') : '<span style="color:var(--text-muted);font-size:11px;font-style:italic;">None yet — save your current filter to reuse later</span>';
+    list.querySelectorAll('.rmView').forEach(function(el){
+      el.onclick = function(ev){
+        ev.preventDefault(); ev.stopPropagation();
+        var i = parseInt(this.dataset.i, 10);
+        var v = load(); v.splice(i, 1); save(v); render();
+        if (window.toast) toast.info('View removed');
+      };
+    });
+  }
+  document.getElementById('saveCurrentViewBtn').onclick = function(){
+    var name = prompt('Name this view:', 'My View');
+    if (!name) return;
+    var url = location.pathname + location.search;
+    var v = load();
+    if (v.some(function(x){ return x.url === url; })) {
+      if (window.toast) toast.warning('This filter is already saved'); else alert('Already saved');
+      return;
+    }
+    v.push({ name: name.slice(0, 30), url: url });
+    save(v); render();
+    if (window.toast) toast.success('View "'+name+'" saved');
+  };
+  render();
+})();
+</script>
+
 <div class="filter-tabs">
     <a href="?filter=all&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'all' %}active{% endif %}"><i class="fas fa-users"></i> All Visitors</a>
     <a href="?filter=online&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'online' %}active{% endif %}"><i class="fas fa-circle" style="font-size:8px;color:#10b981;"></i> Online Now</a>
@@ -154,6 +217,7 @@
         <div class="group-divider">{{ group_by_label }}: {{ grp.grouper }} ({{ grp.list|length }})</div>
         <div class="v-table">
             <div class="v-header">
+                <div><input type="checkbox" class="v-check-all" title="Select all"></div>
                 <div></div>
                 <div>Visitor</div>
                 <div class="v-col-info">Info</div>
@@ -163,7 +227,9 @@
                 <div class="v-col-time" style="text-align:right;">Last seen</div>
             </div>
             {% for v in grp.list %}
-            <a href="{% url 'dashboard:visitor_detail' v.id %}" class="v-row">
+            <div class="v-row-wrap" data-vid="{{ v.id }}">
+              <div class="v-row-check"><input type="checkbox" class="v-check" data-vid="{{ v.id }}"></div>
+              <a href="{% url 'dashboard:visitor_detail' v.id %}" class="v-row">
                 <img class="v-avatar" src="https://api.dicebear.com/9.x/notionists-neutral/svg?seed={{ v.visitor_fingerprint|default:v.session_key|urlencode }}" alt="" loading="lazy">
                 <div class="v-identity">
                     <div class="v-ip">
@@ -184,17 +250,75 @@
                 <div class="v-stat v-stat-pages">{{ v.page_count }}</div>
                 <div class="v-stat v-stat-chats">{{ v.chat_count }}</div>
                 <div class="v-time">{{ v.last_seen|timesince }} ago</div>
-            </a>
+              </a>
+            </div>
             {% endfor %}
         </div>
     {% endfor %}
-{% else %}
-<div class="card">
-    <div class="card-body" style="text-align:center;padding:56px 20px;color:var(--text-muted);">
-        <i class="fas fa-users" style="font-size:40px;opacity:0.15;display:block;margin-bottom:12px;"></i>
-        <p style="font-size:15px;font-weight:600;">No visitors found</p>
-        <p style="font-size:13px;margin-top:4px;">Visitors will appear here when they browse your website.</p>
+
+    <!-- Bulk action floating bar -->
+    <div class="v-bulk-bar" id="vBulkBar">
+        <span class="count"><span id="vBulkCount">0</span> selected</span>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="bulkVisitorAction('export')"><i class="fas fa-download"></i> Export CSV</button>
+        <button type="button" class="btn btn-sm btn-danger" onclick="bulkVisitorAction('ban')"><i class="fas fa-ban"></i> Ban</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="vClearSelection()" style="margin-left:8px;"><i class="fas fa-times"></i></button>
     </div>
-</div>
+
+    <script>
+    (function(){
+      var bar = document.getElementById('vBulkBar');
+      var countEl = document.getElementById('vBulkCount');
+      function selected(){ return Array.from(document.querySelectorAll('.v-check:checked')).map(function(c){ return c.dataset.vid; }); }
+      function update(){
+        var n = selected().length;
+        countEl.textContent = n;
+        bar.classList.toggle('show', n > 0);
+        document.querySelectorAll('.v-row-wrap').forEach(function(r){
+          var c = r.querySelector('.v-check');
+          r.classList.toggle('checked', c && c.checked);
+        });
+      }
+      document.addEventListener('change', function(ev){
+        if (ev.target.classList.contains('v-check')) update();
+        else if (ev.target.classList.contains('v-check-all')){
+          var checked = ev.target.checked;
+          var table = ev.target.closest('.v-table');
+          if (table) table.querySelectorAll('.v-check').forEach(function(c){ c.checked = checked; });
+          update();
+        }
+      });
+      window.vClearSelection = function(){
+        document.querySelectorAll('.v-check, .v-check-all').forEach(function(c){ c.checked = false; });
+        update();
+      };
+      window.bulkVisitorAction = function(action){
+        var ids = selected();
+        if (!ids.length) return;
+        if (action === 'ban' && !confirm('Ban ' + ids.length + ' visitor(s)? They will not be able to start chats.')) return;
+        var csrftoken = document.querySelector('[name=csrfmiddlewaretoken]');
+        csrftoken = csrftoken ? csrftoken.value : '{{ csrf_token }}';
+        if (action === 'export'){
+          var url = '{% url "dashboard:export_visitors" %}?ids=' + ids.join(',');
+          window.location.href = url; return;
+        }
+        fetch('/dashboard/visitors/bulk/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+          body: JSON.stringify({ action: action, ids: ids })
+        }).then(function(r){ return r.json(); }).then(function(d){
+          if (d && d.ok){
+            if (window.toast) toast.success((d.affected || ids.length) + ' visitor(s) updated');
+            else alert('Done');
+            setTimeout(function(){ location.reload(); }, 800);
+          } else {
+            if (window.toast) toast.error((d && d.error) || 'Action failed');
+          }
+        }).catch(function(){ if (window.toast) toast.error('Network error'); });
+      };
+    })();
+    </script>
+{% else %}
+{% include 'partials/empty_state.html' with icon='fa-users' title='No visitors yet' subtitle='Visitors appear here as soon as your tracking script loads on a page. Make sure the widget is installed on your site.' cta_label='Configure widget' cta_url='/dashboard/website/' cta_icon='fa-globe' secondary_label='Read the install guide' secondary_url='/dashboard/tour/' %}
 {% endif %}
 {% endblock %}

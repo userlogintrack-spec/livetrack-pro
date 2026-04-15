@@ -22,6 +22,7 @@ urlpatterns = [
     path('visitors/<int:visitor_id>/', views.visitor_detail, name='visitor_detail'),
     path('visitors/<int:visitor_id>/note/', views.add_visitor_note, name='add_note'),
     path('visitors/<int:visitor_id>/ban/', views.ban_visitor, name='ban_visitor'),
+    path('visitors/bulk/', views.visitors_bulk_action, name='visitors_bulk_action'),
     # Exports
     path('export/visitors/', views.export_visitors_csv, name='export_visitors'),
     path('export/chats/', views.export_chats_csv, name='export_chats'),

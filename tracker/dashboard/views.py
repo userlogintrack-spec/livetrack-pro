@@ -983,6 +983,14 @@ def export_visitors_csv(request):
 
     ws_filter = get_website_filter(request, org)
     visitors_qs = Visitor.objects.filter(organization=org, **ws_filter)
+    ids_param = request.GET.get('ids', '').strip()
+    if ids_param:
+        try:
+            id_list = [int(x) for x in ids_param.split(',') if x.strip().isdigit()]
+            if id_list:
+                visitors_qs = visitors_qs.filter(id__in=id_list)
+        except ValueError:
+            pass
     if date_from:
         visitors_qs = visitors_qs.filter(first_visit__date__gte=date_from)
     if date_to:
@@ -4452,3 +4460,31 @@ def _badge_svg(count, label, color):
   <text x="22" y="16" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="600" fill="{color}">{text}</text>
 </svg>'''
 
+
+
+@login_required
+@csrf_exempt
+def visitors_bulk_action(request):
+    """Bulk action on selected visitors (ban/unban). Owner/admin only."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner:
+        return JsonResponse({'error': 'permission denied'}, status=403)
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'invalid JSON'}, status=400)
+    action = (data.get('action') or '').strip().lower()
+    ids = data.get('ids') or []
+    if action not in ('ban', 'unban') or not isinstance(ids, list) or not ids:
+        return JsonResponse({'error': 'action (ban|unban) and ids required'}, status=400)
+    try:
+        id_list = [int(x) for x in ids if str(x).isdigit()]
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'invalid ids'}, status=400)
+    org = get_user_org(request.user)
+    qs = Visitor.objects.filter(organization=org, id__in=id_list)
+    affected = qs.update(is_banned=(action == 'ban'))
+    return JsonResponse({'ok': True, 'action': action, 'affected': affected})
