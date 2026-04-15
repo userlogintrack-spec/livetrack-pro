@@ -1,8 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Session Replay{% endblock %}
 {% block page_title %}Replay: {{ recording.session_id|truncatechars:12 }}{% endblock %}
-{% block nav_recordings %}active{% endblock %}
-{% block nav_recordings_owner %}active{% endblock %}
+{% block nav_recordings_top %}active{% endblock %}
 {% block top_actions %}
 <a href="{% url 'dashboard:session_recordings' %}" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
 {% endblock %}
