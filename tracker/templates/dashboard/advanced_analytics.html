@@ -290,7 +290,7 @@
             <td style="font-weight:600;">{{ c.week }}</td>
             <td>{{ c.total }}</td>
             {% for r in c.retention %}
-            <td><span style="background:rgba(124,58,237,{{ r|divisibleby:1 }}{% if r > 50 %}0.3{% elif r > 20 %}0.15{% else %}0.05{% endif %});padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">{{ r }}%</span></td>
+            <td><span style="background:var(--accent-soft);padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">{{ r }}%</span></td>
             {% endfor %}
             {% for i in "xxxx" %}{% if forloop.counter > c.retention|length %}<td style="color:var(--text-muted);font-size:11px;">-</td>{% endif %}{% endfor %}
         </tr>

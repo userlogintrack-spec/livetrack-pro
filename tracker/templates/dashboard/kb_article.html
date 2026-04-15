@@ -10,11 +10,11 @@
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Inter',sans-serif; background:#f5f3ff; color:#1e1b4b; }
         .topbar { background:white; border-bottom:1px solid #e5e2ff; padding:16px 20px; }
-        .topbar a { color:#7c3aed; text-decoration:none; font-weight:600; font-size:14px; }
+        .topbar a { color:var(--accent); text-decoration:none; font-weight:600; font-size:14px; }
         .container { max-width:800px; margin:0 auto; padding:40px 20px; }
         .article-card { background:white; border:1px solid #e5e2ff; border-radius:14px; padding:32px; margin-bottom:24px; }
         .breadcrumb { font-size:13px; color:#9ca3af; margin-bottom:16px; }
-        .breadcrumb a { color:#7c3aed; text-decoration:none; }
+        .breadcrumb a { color:var(--accent); text-decoration:none; }
         h1 { font-size:28px; font-weight:800; margin-bottom:8px; }
         .meta { font-size:13px; color:#9ca3af; margin-bottom:24px; }
         .content { font-size:15px; line-height:1.8; color:#374151; }
@@ -28,14 +28,14 @@
         .feedback { text-align:center; padding:24px; border-top:1px solid #e5e2ff; margin-top:24px; }
         .feedback p { font-size:14px; color:#6b7280; margin-bottom:12px; }
         .feedback button { padding:8px 20px; border:1px solid #e5e2ff; border-radius:8px; background:white; cursor:pointer; font-size:14px; margin:0 4px; transition:all 0.2s; font-family:inherit; }
-        .feedback button:hover { border-color:#7c3aed; color:#7c3aed; }
-        .feedback button.voted { background:#7c3aed; color:white; border-color:#7c3aed; }
+        .feedback button:hover { border-color:var(--accent); color:var(--accent); }
+        .feedback button.voted { background:var(--accent); color:white; border-color:var(--accent); }
         .related { margin-top:24px; }
         .related h3 { font-size:16px; font-weight:700; margin-bottom:12px; }
         .related a { display:block; padding:10px 14px; background:white; border:1px solid #e5e2ff; border-radius:8px; margin-bottom:6px; text-decoration:none; color:#1e1b4b; font-size:14px; transition:all 0.2s; }
         .related a:hover { border-color:#c4b5fd; background:#f5f3ff; }
         .footer { text-align:center; padding:40px; color:#9ca3af; font-size:13px; }
-        .footer a { color:#7c3aed; text-decoration:none; font-weight:600; }
+        .footer a { color:var(--accent); text-decoration:none; font-weight:600; }
     </style>
 </head>
 <body>
@@ -68,7 +68,7 @@
         <div class="related">
             <h3>Related Articles</h3>
             {% for r in related %}
-            <a href="{% url 'kb_article' org_slug=org.slug article_slug=r.slug %}"><i class="fas fa-file-alt" style="color:#7c3aed;margin-right:8px;"></i> {{ r.title }}</a>
+            <a href="{% url 'kb_article' org_slug=org.slug article_slug=r.slug %}"><i class="fas fa-file-alt" style="color:var(--accent);margin-right:8px;"></i> {{ r.title }}</a>
             {% endfor %}
         </div>
         {% endif %}
@@ -83,7 +83,7 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({helpful: helpful})
         }).then(function() {
-            document.getElementById('feedbackSection').innerHTML = '<p style="color:#7c3aed;font-weight:600;">Thank you for your feedback!</p>';
+            document.getElementById('feedbackSection').innerHTML = '<p style="color:var(--accent);font-weight:600;">Thank you for your feedback!</p>';
         });
     }
     </script>

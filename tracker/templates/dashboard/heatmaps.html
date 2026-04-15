@@ -105,7 +105,7 @@ if (clickData.length > 0) {
     document.getElementById('heatmapPlaceholder').style.display = 'none';
     clickData.forEach(function(pt) {
         var dot = document.createElement('div');
-        var color = pt.click_type === 'rage' ? 'rgba(239,68,68,0.6)' : pt.click_type === 'dead' ? 'rgba(245,158,11,0.6)' : 'rgba(124,58,237,0.4)';
+        var color = pt.click_type === 'rage' ? 'rgba(239,68,68,0.6)' : pt.click_type === 'dead' ? 'rgba(245,158,11,0.6)' : 'var(--accent-soft)';
         var size = pt.click_type === 'rage' ? 18 : pt.click_type === 'dead' ? 14 : 10;
         dot.style.cssText = 'position:absolute;width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+color+';left:'+pt.x_percent+'%;top:'+pt.y_percent+'%;transform:translate(-50%,-50%);pointer-events:none;';
         canvas.appendChild(dot);

@@ -36,7 +36,7 @@
                 </div>
             </div>
             <!-- Cursor indicator -->
-            <div id="replayCursor" style="display:none;position:absolute;width:20px;height:20px;border-radius:50%;background:rgba(124,58,237,0.5);border:2px solid #7c3aed;transform:translate(-50%,-50%);pointer-events:none;transition:all 0.1s;z-index:10;"></div>
+            <div id="replayCursor" style="display:none;position:absolute;width:18px;height:18px;border-radius:50%;background:var(--accent-soft);border:2px solid var(--accent);transform:translate(-50%,-50%);pointer-events:none;transition:all 0.1s;z-index:10;"></div>
         </div>
         <!-- Timeline -->
         <div style="padding:12px;background:var(--bg-hover);border-radius:0 0 var(--radius) var(--radius);">
@@ -103,8 +103,12 @@ function playReplay() {
             cursor.style.left = ev.x + '%';
             cursor.style.top = ev.y + '%';
             if (ev.type === 'click') {
-                cursor.style.background = 'rgba(239,68,68,0.6)';
-                setTimeout(function() { cursor.style.background = 'rgba(124,58,237,0.5)'; }, 200);
+                cursor.style.background = 'var(--danger-soft)';
+                cursor.style.borderColor = 'var(--danger)';
+                setTimeout(function() {
+                    cursor.style.background = 'var(--accent-soft)';
+                    cursor.style.borderColor = 'var(--accent)';
+                }, 200);
             }
         }
         progress.style.width = ((eventIdx / events.length) * 100) + '%';

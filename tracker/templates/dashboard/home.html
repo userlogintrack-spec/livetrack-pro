@@ -200,7 +200,7 @@
 <!-- ═══ Setup Screen: Add Your First Domain ═══ -->
 <div style="display:flex;align-items:center;justify-content:center;min-height:60vh;">
     <div style="text-align:center;max-width:520px;width:100%;">
-        <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a78bfa);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;">
+        <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;margin:0 auto 24px;">
             <i class="fas fa-globe" style="font-size:36px;color:#fff;"></i>
         </div>
         <h2 style="font-size:24px;font-weight:800;color:var(--text-primary);margin-bottom:8px;">Add your first website</h2>
@@ -232,7 +232,7 @@
                     </div>
                     <div>
                         <label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px;">Widget Color</label>
-                        <input type="color" id="setupWidgetColor" value="#7c3aed" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-primary);">
+                        <input type="color" id="setupWidgetColor" value="var(--accent)" style="width:100%;height:36px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-primary);">
                     </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -302,7 +302,7 @@ function saveSetupWebsite() {
             name: name,
             domain: domain,
             widget_title: wTitle,
-            widget_color: wColor === '#7c3aed' ? '' : wColor,
+            widget_color: wColor === 'var(--accent)' ? '' : wColor,
             widget_position: wPos,
             welcome_message: wMsg
         }),
