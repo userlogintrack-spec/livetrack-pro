@@ -268,6 +268,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not org:
             return None
 
+        # Runtime plan gate — only enterprise subscriptions may invoke the AI bot
+        sub = getattr(org, 'subscription', None)
+        if not sub or not sub.is_active or not sub.plan_limits.get('ai_bot'):
+            return None
+
         try:
             config = AIBotConfig.objects.get(organization=org, is_enabled=True)
         except AIBotConfig.DoesNotExist:
