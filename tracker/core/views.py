@@ -840,7 +840,9 @@ def widget_script(request):
         blocked_js = (
             "(function(){console.warn('LiveVisitorHub widget blocked on this domain.');})();"
         )
-        return HttpResponse(blocked_js, content_type='application/javascript; charset=utf-8')
+        blocked_resp = HttpResponse(blocked_js, content_type='application/javascript; charset=utf-8')
+        blocked_resp['Cache-Control'] = 'public, max-age=300'
+        return blocked_resp
     # Website-level settings override org defaults
     widget_color = (website.widget_color if website and website.widget_color else None) or (org.widget_color if org else '#7c3aed')
     widget_title = (website.widget_title if website and website.widget_title else None) or (org.widget_title if org else 'LiveVisitorHub Support')
@@ -852,6 +854,10 @@ def widget_script(request):
 (function() {
   if (window.LiveTrackWidgetLoaded) return;
   window.LiveTrackWidgetLoaded = true;
+  // Swallow any unexpected widget error so the host page is never affected.
+  function _safe(fn) { return function() { try { return fn.apply(this, arguments); } catch(e) {} }; }
+  var _idle = window.requestIdleCallback || function(cb){ return setTimeout(function(){ cb({ didTimeout:false, timeRemaining:function(){return 50;} }); }, 1); };
+  try {
   var BASE = "__BASE__";
   var WIDGET_KEY = "__WIDGET_KEY__";
   var WC = "__WIDGET_COLOR__";
@@ -1030,7 +1036,7 @@ def widget_script(request):
     clickBurst.push({t: now, x: x, y: y});
     clickBurst = clickBurst.filter(function(c){ return now - c.t <= 1000; });
     if (clickBurst.length >= 4) recHasRage = true;
-  }, true);
+  }, { capture: true, passive: true });
 
   var _scrollTimer = null;
   window.addEventListener("scroll", function() {
@@ -1043,22 +1049,30 @@ def widget_script(request):
     }, 150);
   }, {passive: true});
 
-  window.addEventListener("error", function(ev) {
+  // Report only widget-originated errors; never hijack host page errors.
+  window.addEventListener("error", _safe(function(ev) {
+    var src = (ev && ev.filename) || "";
+    if (!src || src.indexOf(BASE) !== 0) return;
     recHasErrors = true;
     trackRecEvent("error", { msg: (ev.message || "").slice(0, 200) });
     recPost("/api/track/js-error/", recPayload({
       message: ev.message || "Script error",
-      source: ev.filename || "",
+      source: src,
       line: ev.lineno || 0,
       col: ev.colno || 0,
       stack: ev.error && ev.error.stack ? String(ev.error.stack).slice(0, 1800) : "",
       url: location.href
     }), false).catch(function(){});
-  });
+  }));
 
-  window.addEventListener("beforeunload", function() { flushSessionRecording(true); });
-  setInterval(function(){ flushSessionRecording(false); }, 10000);
-  setTimeout(startSessionRecording, 900);
+  // pagehide is more reliable than beforeunload on mobile Safari.
+  window.addEventListener("pagehide", _safe(function() { flushSessionRecording(true); }));
+  document.addEventListener("visibilitychange", _safe(function() {
+    if (document.visibilityState === "hidden") flushSessionRecording(true);
+  }));
+  setInterval(_safe(function(){ flushSessionRecording(false); }), 15000);
+  // Defer recording start until browser is idle — zero impact on host LCP/TTI.
+  _idle(function(){ try { startSessionRecording(); } catch(e) {} }, { timeout: 3000 });
 
   var style = document.createElement("style");
   style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:all .3s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}";
@@ -1124,6 +1138,7 @@ def widget_script(request):
       }
     }, parseInt("__PROACTIVE_DELAY__") * 1000);
   }
+  } catch(e) { /* widget top-level guard — never propagate to host page */ }
 })();
 """
     # Proactive chat settings
@@ -1140,7 +1155,19 @@ def widget_script(request):
     js = js.replace("__PROACTIVE__", proactive_enabled)
     js = js.replace("__PROACTIVE_MSG__", proactive_msg.replace('"', '\\"'))
     js = js.replace("__PROACTIVE_DELAY__", proactive_delay)
-    return HttpResponse(js, content_type='application/javascript; charset=utf-8')
+
+    # ─── Browser/CDN caching so host sites don't re-download on every page view ───
+    import hashlib
+    etag = '"' + hashlib.md5(js.encode('utf-8')).hexdigest() + '"'
+    if request.META.get('HTTP_IF_NONE_MATCH') == etag:
+        resp = HttpResponse(status=304)
+    else:
+        resp = HttpResponse(js, content_type='application/javascript; charset=utf-8')
+    resp['ETag'] = etag
+    # 5 min fresh, serve stale for another hour while revalidating in background
+    resp['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
+    resp['Vary'] = 'Accept-Encoding'
+    return resp
 
 
 def _get_time_greeting(name):
