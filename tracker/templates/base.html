@@ -1354,6 +1354,79 @@
         // Set icon on load
         updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
 
+        // ===== KEYBOARD SHORTCUTS =====
+        (function(){
+          var SHORTCUTS = [
+            { keys: 'g c', label: 'Go to Chats',     url: '{% url "dashboard:chat_list" %}' },
+            { keys: 'g v', label: 'Go to Visitors',  url: '{% url "dashboard:visitor_list" %}' },
+            { keys: 'g h', label: 'Go to Dashboard', url: '{% url "dashboard:home" %}' },
+            { keys: 'g r', label: 'Go to Recordings',url: '{% url "dashboard:session_recordings" %}' },
+            { keys: 'g a', label: 'Go to Analytics', url: '{% url "dashboard:analytics" %}' },
+            { keys: 'g s', label: 'Go to Settings',  url: '{% url "dashboard:website_settings" %}' },
+            { keys: 'g t', label: 'Open Tour Guide', url: '{% url "dashboard:tour_guide" %}' },
+            { keys: 'g p', label: 'My Profile',      url: '{% url "dashboard:profile" %}' },
+            { keys: 't',   label: 'Toggle theme',    action: function(){ toggleDashTheme(); } },
+            { keys: '?',   label: 'Show this help',  action: function(){ showShortcutsModal(); } },
+            { keys: 'esc', label: 'Close modal',     action: function(){ hideShortcutsModal(); } },
+          ];
+
+          function isTypingTarget(el){
+            if (!el) return false;
+            var tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+          }
+
+          var pendingG = false, pendingTimer = null;
+          document.addEventListener('keydown', function(ev){
+            if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+            if (ev.key === 'Escape') { hideShortcutsModal(); return; }
+            if (isTypingTarget(document.activeElement)) return;
+            var k = ev.key;
+            // ? to open help
+            if (k === '?') { ev.preventDefault(); showShortcutsModal(); return; }
+            // Two-key sequence: g + letter
+            if (pendingG){
+              clearTimeout(pendingTimer); pendingG = false;
+              var match = SHORTCUTS.find(function(s){ return s.keys === 'g ' + k.toLowerCase(); });
+              if (match){
+                ev.preventDefault();
+                if (match.url) window.location.href = match.url;
+                else if (match.action) match.action();
+              }
+              return;
+            }
+            if (k.toLowerCase() === 'g'){
+              pendingG = true;
+              pendingTimer = setTimeout(function(){ pendingG = false; }, 1200);
+              return;
+            }
+            // Single keys
+            if (k.toLowerCase() === 't' && !pendingG){ ev.preventDefault(); toggleDashTheme(); }
+          });
+
+          // Modal builder
+          var modal = null;
+          function buildModal(){
+            if (modal) return modal;
+            modal = document.createElement('div');
+            modal.id = 'shortcutsModal';
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;animation:fadeIn .15s ease;';
+            var rows = SHORTCUTS.map(function(s){
+              var keys = s.keys.split(' ').map(function(k){
+                var label = k === 'esc' ? 'Esc' : k.toUpperCase();
+                return '<kbd style="background:var(--bg-hover);border:1px solid var(--border);border-bottom-width:2px;color:var(--text-primary);padding:3px 9px;border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:600;min-width:24px;text-align:center;display:inline-block;">'+label+'</kbd>';
+              }).join(' <span style="color:var(--text-muted);font-size:11px;">then</span> ');
+              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-subtle);"><span style="color:var(--text-secondary);font-size:13px;">'+s.label+'</span><span>'+keys+'</span></div>';
+            }).join('');
+            modal.innerHTML = '<div style="background:var(--bg-card);border-radius:16px;max-width:480px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:85vh;overflow-y:auto;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3 style="margin:0;font-size:18px;color:var(--text-primary);font-weight:700;"><i class="fas fa-keyboard" style="margin-right:8px;color:var(--accent);"></i>Keyboard Shortcuts</h3><button onclick="hideShortcutsModal()" style="background:transparent;border:0;font-size:18px;color:var(--text-muted);cursor:pointer;padding:4px 8px;">&times;</button></div>'+rows+'<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);">Press <kbd style="background:var(--bg-hover);border:1px solid var(--border);padding:1px 6px;border-radius:4px;font-size:10px;">?</kbd> anytime to view this list.</div></div>';
+            modal.addEventListener('click', function(ev){ if (ev.target === modal) hideShortcutsModal(); });
+            document.body.appendChild(modal);
+            return modal;
+          }
+          window.showShortcutsModal = function(){ buildModal().style.display = 'flex'; };
+          window.hideShortcutsModal = function(){ if (modal) modal.style.display = 'none'; };
+        })();
+
         // ===== LIVE STATS =====
         function updateBadges(data) {
             var el = document.getElementById('liveOnlineCount');

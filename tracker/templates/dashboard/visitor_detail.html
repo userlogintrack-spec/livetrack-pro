@@ -17,6 +17,32 @@
 {% endblock %}
 
 {% block content %}
+
+<!-- Live Cursor Preview -->
+<div class="card" id="liveCursorCard" style="margin-bottom:16px;display:none;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <h3 style="margin:0;display:flex;align-items:center;gap:8px;font-size:15px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:var(--success);box-shadow:0 0 0 4px rgba(48,164,108,.2);animation:pulse 2s infinite;"></span>
+            Live Cursor Preview
+            <span style="font-size:11px;color:var(--text-muted);font-weight:500;" id="liveCursorMeta"></span>
+        </h3>
+        <button onclick="toggleCursorPreview()" class="btn btn-sm btn-secondary" id="cursorPauseBtn"><i class="fas fa-pause"></i> Pause</button>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div style="position:relative;background:#1a1a1f;height:380px;overflow:hidden;border-radius:0 0 var(--radius) var(--radius);" id="cursorStage">
+            <iframe id="cursorFrame" style="position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff;" sandbox="allow-same-origin"></iframe>
+            <div id="cursorDot" style="position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(0,113,227,.35);border:2px solid #0071e3;transform:translate(-50%,-50%);pointer-events:none;transition:left .3s ease, top .3s ease;box-shadow:0 0 0 8px rgba(0,113,227,.12);display:none;z-index:10;"></div>
+            <div id="cursorEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;flex-direction:column;gap:8px;">
+                <i class="fas fa-mouse-pointer" style="font-size:32px;opacity:.4;"></i>
+                <div>Waiting for visitor activity…</div>
+                <div style="font-size:11px;opacity:.7;">Visitor must be active in the last 30 seconds</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}</style>
+
 <!-- Profile Card -->
 <div class="card" style="margin-bottom:16px;">
     <div class="card-body" style="padding:24px;">
@@ -451,5 +477,45 @@ window.addEventListener('livetrack:visitor', function(e) {
         if (timeEl) { timeEl.style.color = 'var(--text-muted)'; timeEl.style.fontWeight = '400'; }
     }, 5000);
 });
+
+// ===== LIVE CURSOR PREVIEW =====
+(function(){
+  var sk = "{{ visitor.session_key|escapejs }}";
+  if (!sk) return;
+  var card = document.getElementById('liveCursorCard');
+  var dot = document.getElementById('cursorDot');
+  var frame = document.getElementById('cursorFrame');
+  var empty = document.getElementById('cursorEmpty');
+  var meta = document.getElementById('liveCursorMeta');
+  var pauseBtn = document.getElementById('cursorPauseBtn');
+  var loadedUrl = null, paused = false, timer = null;
+
+  function poll(){
+    if (paused) return;
+    fetch('/api/cursor/' + encodeURIComponent(sk) + '/', { credentials: 'same-origin' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(data){
+        if (!data || !data.live){
+          empty.style.display = 'flex'; dot.style.display = 'none';
+          card.style.display = 'block'; meta.textContent = data && data.age_ms ? '· last seen ' + Math.round(data.age_ms/1000) + 's ago' : '';
+          return;
+        }
+        card.style.display = 'block'; empty.style.display = 'none';
+        if (data.url && data.url !== loadedUrl){ loadedUrl = data.url; frame.src = data.url; }
+        dot.style.display = 'block';
+        dot.style.left = data.x + '%';
+        dot.style.top = data.y + '%';
+        meta.textContent = '· on ' + (data.url ? new URL(data.url).pathname : '');
+      })
+      .catch(function(){});
+  }
+  window.toggleCursorPreview = function(){
+    paused = !paused;
+    pauseBtn.innerHTML = paused ? '<i class="fas fa-play"></i> Resume' : '<i class="fas fa-pause"></i> Pause';
+    if (!paused) poll();
+  };
+  poll();
+  timer = setInterval(poll, 2000);
+})();
 </script>
 {% endblock %}

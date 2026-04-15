@@ -11,4 +11,6 @@ urlpatterns = [
     path('chat/transcript/<str:room_id>/', views.widget_chat_transcript, name='widget_chat_transcript'),
     path('chat/rate/<str:room_id>/', views.chat_rate, name='chat_rate'),
     path('chat/offline-message/', views.submit_offline_message, name='offline_message'),
+    path('widget/cursor/', views.widget_cursor_track, name='widget_cursor_track'),
+    path('cursor/<str:session_key>/', views.cursor_fetch, name='cursor_fetch'),
 ]

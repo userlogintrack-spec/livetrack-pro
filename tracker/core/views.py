@@ -1074,6 +1074,24 @@ def widget_script(request):
   // Defer recording start until browser is idle — zero impact on host LCP/TTI.
   _idle(function(){ try { startSessionRecording(); } catch(e) {} }, { timeout: 3000 });
 
+  // ─── Live cursor heartbeat — throttled, sent only while tab visible ───
+  var _cursorX = 0, _cursorY = 0, _cursorDirty = false;
+  document.addEventListener("mousemove", function(ev){
+    var vw = window.innerWidth || 1, vh = window.innerHeight || 1;
+    _cursorX = (ev.clientX / vw) * 100;
+    _cursorY = (ev.clientY / vh) * 100;
+    _cursorDirty = true;
+  }, { passive: true });
+  setInterval(_safe(function(){
+    if (!_cursorDirty || document.visibilityState === "hidden") return;
+    _cursorDirty = false;
+    recPost("/api/widget/cursor/", recPayload({
+      x: _cursorX, y: _cursorY,
+      url: location.href,
+      vw: window.innerWidth, vh: window.innerHeight
+    }), false).catch(function(){});
+  }), 1500);
+
   var style = document.createElement("style");
   style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:transform .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-btn:focus-visible{outline:3px solid rgba(59,130,246,.5);outline-offset:2px}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}@keyframes ltw-pulse{0%,100%{transform:scale(1);box-shadow:0 8px 24px rgba(0,0,0,.2)}50%{transform:scale(1.12);box-shadow:0 12px 36px rgba(0,0,0,.35)}}@media(prefers-reduced-motion:reduce){.ltw-btn,.ltw-btn:hover{transition:none;transform:none}.ltw-btn[style*=\"animation\"]{animation:none!important}}";
   document.head.appendChild(style);
@@ -1203,6 +1221,43 @@ def widget_script(request):
     resp['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
     resp['Vary'] = 'Accept-Encoding'
     return resp
+
+
+@csrf_exempt
+def widget_cursor_track(request):
+    """Receive throttled cursor heartbeats from the widget and cache for live preview."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    data = _parse_json_body(request) or {}
+    sk = (data.get('session_key') or request.session.session_key or '').strip()
+    if not sk:
+        return JsonResponse({'error': 'no session'}, status=400)
+    try:
+        x = float(data.get('x', 0))
+        y = float(data.get('y', 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'bad coords'}, status=400)
+    payload = {
+        'x': max(0.0, min(100.0, x)),
+        'y': max(0.0, min(100.0, y)),
+        'url': (data.get('url') or '')[:500],
+        'vw': int(data.get('vw') or 0),
+        'vh': int(data.get('vh') or 0),
+        'ts': int(timezone.now().timestamp() * 1000),
+    }
+    cache.set(f'cursor:{sk}', payload, timeout=60)
+    return JsonResponse({'ok': True})
+
+
+def cursor_fetch(request, session_key):
+    """Return latest cursor position for a session — used by dashboard live preview."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'auth required'}, status=401)
+    data = cache.get(f'cursor:{session_key}')
+    if not data:
+        return JsonResponse({'live': False})
+    age_ms = int(timezone.now().timestamp() * 1000) - data.get('ts', 0)
+    return JsonResponse({'live': age_ms < 30000, 'age_ms': age_ms, **data})
 
 
 def _get_time_greeting(name):
