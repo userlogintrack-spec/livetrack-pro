@@ -1128,19 +1128,42 @@ def widget_script(request):
     }
   });
 
-  // Proactive chat trigger
+  // Proactive chat — fires once via the earliest of: time delay, exit-intent, scroll depth.
   if ("__PROACTIVE__" === "true") {
-    setTimeout(function() {
-      if (!isOpen) {
-        btn.style.animation = "ltw-pulse 1.5s ease infinite";
-        var notif = document.createElement("div");
-        notif.style.cssText = "position:fixed;__PANEL_POS_CSS__;bottom:90px;z-index:999999;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.12);font-family:Inter,Arial,sans-serif;max-width:260px;cursor:pointer;";
-        notif.innerHTML = '<div style="font-size:13px;font-weight:600;color:#1f2937;">__PROACTIVE_MSG__</div><div style="font-size:11px;color:#9ca3af;margin-top:4px;">Click to chat with us</div>';
-        notif.onclick = function() { notif.remove(); btn.click(); };
-        document.body.appendChild(notif);
-        setTimeout(function() { if (notif.parentNode) notif.remove(); }, 10000);
+    var proactiveFired = false;
+    function fireProactive(reason) {
+      if (proactiveFired || isOpen) return;
+      proactiveFired = true;
+      btn.style.animation = "ltw-pulse 1.5s ease infinite";
+      var notif = document.createElement("div");
+      notif.setAttribute("role", "dialog");
+      notif.setAttribute("aria-label", "Proactive chat invitation");
+      notif.style.cssText = "position:fixed;__PANEL_POS_CSS__;bottom:90px;z-index:999999;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.12);font-family:Inter,Arial,sans-serif;max-width:260px;cursor:pointer;";
+      notif.innerHTML = '<div style="font-size:13px;font-weight:600;color:#1f2937;">__PROACTIVE_MSG__</div><div style="font-size:11px;color:#9ca3af;margin-top:4px;">Click to chat with us</div>';
+      notif.onclick = function() { notif.remove(); btn.click(); };
+      document.body.appendChild(notif);
+      setTimeout(function() { if (notif.parentNode) notif.remove(); }, 10000);
+      try { trackRecEvent("proactive_shown", { reason: reason }); } catch(e) {}
+    }
+    // 1. Time-based
+    setTimeout(function(){ fireProactive("delay"); }, parseInt("__PROACTIVE_DELAY__") * 1000);
+    // 2. Exit-intent (mouse leaves viewport top — desktop only)
+    document.addEventListener("mouseout", function(ev) {
+      if (proactiveFired) return;
+      if (!ev.toElement && !ev.relatedTarget && ev.clientY <= 5) fireProactive("exit_intent");
+    });
+    // 3. Scroll depth >=50%
+    var scrollHandler = function() {
+      if (proactiveFired) return;
+      var h = document.documentElement;
+      var scrolled = (h.scrollTop || document.body.scrollTop) + h.clientHeight;
+      var total = h.scrollHeight || 1;
+      if (scrolled / total >= 0.5) {
+        window.removeEventListener("scroll", scrollHandler);
+        fireProactive("scroll_50");
       }
-    }, parseInt("__PROACTIVE_DELAY__") * 1000);
+    };
+    window.addEventListener("scroll", scrollHandler, { passive: true });
   }
   } catch(e) { /* widget top-level guard — never propagate to host page */ }
 })();
@@ -1161,12 +1184,20 @@ def widget_script(request):
     js = js.replace("__PROACTIVE_DELAY__", proactive_delay)
 
     # ─── Browser/CDN caching so host sites don't re-download on every page view ───
-    import hashlib
+    import hashlib, gzip
     etag = '"' + hashlib.md5(js.encode('utf-8')).hexdigest() + '"'
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:
         resp = HttpResponse(status=304)
     else:
-        resp = HttpResponse(js, content_type='application/javascript; charset=utf-8')
+        body = js.encode('utf-8')
+        accept_enc = request.META.get('HTTP_ACCEPT_ENCODING', '')
+        if 'gzip' in accept_enc and len(body) > 200:
+            body = gzip.compress(body, compresslevel=6)
+            resp = HttpResponse(body, content_type='application/javascript; charset=utf-8')
+            resp['Content-Encoding'] = 'gzip'
+            resp['Content-Length'] = str(len(body))
+        else:
+            resp = HttpResponse(body, content_type='application/javascript; charset=utf-8')
     resp['ETag'] = etag
     # 5 min fresh, serve stale for another hour while revalidating in background
     resp['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
