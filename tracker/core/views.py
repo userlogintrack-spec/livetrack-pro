@@ -1075,7 +1075,7 @@ def widget_script(request):
   _idle(function(){ try { startSessionRecording(); } catch(e) {} }, { timeout: 3000 });
 
   var style = document.createElement("style");
-  style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:all .3s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}";
+  style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:transform .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-btn:focus-visible{outline:3px solid rgba(59,130,246,.5);outline-offset:2px}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}@keyframes ltw-pulse{0%,100%{transform:scale(1);box-shadow:0 8px 24px rgba(0,0,0,.2)}50%{transform:scale(1.12);box-shadow:0 12px 36px rgba(0,0,0,.35)}}@media(prefers-reduced-motion:reduce){.ltw-btn,.ltw-btn:hover{transition:none;transform:none}.ltw-btn[style*=\"animation\"]{animation:none!important}}";
   document.head.appendChild(style);
 
   var ICON_CHAT = '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
@@ -1083,10 +1083,15 @@ def widget_script(request):
 
   var btn = document.createElement("button");
   btn.className = "ltw-btn";
+  btn.type = "button";
+  btn.setAttribute("aria-label", "Open chat");
+  btn.setAttribute("aria-expanded", "false");
   btn.innerHTML = ICON_CHAT;
 
   var frame = document.createElement("iframe");
   frame.className = "ltw-frame";
+  frame.title = "Live chat";
+  frame.loading = "lazy";
   // Pass current session_key into iframe so chat & tracking share the same visitor
   var _sk = encodeURIComponent(getSessionKey() || "");
 	  var _pd = encodeURIComponent(location.hostname || "");
@@ -1096,17 +1101,21 @@ def widget_script(request):
   document.body.appendChild(btn);
   document.body.appendChild(frame);
 
-  function closePanel() {
-    isOpen = false;
-    frame.style.display = "none";
-    btn.innerHTML = ICON_CHAT;
+  function setOpen(open) {
+    isOpen = open;
+    frame.style.display = open ? "block" : "none";
+    btn.innerHTML = open ? ICON_CLOSE : ICON_CHAT;
+    btn.setAttribute("aria-label", open ? "Close chat" : "Open chat");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) btn.style.animation = "";
   }
+  function closePanel() { setOpen(false); }
 
-  btn.onclick = function() {
-    isOpen = !isOpen;
-    frame.style.display = isOpen ? "block" : "none";
-    btn.innerHTML = isOpen ? ICON_CLOSE : ICON_CHAT;
-  };
+  btn.onclick = function() { setOpen(!isOpen); };
+
+  document.addEventListener("keydown", function(ev) {
+    if (ev.key === "Escape" && isOpen) closePanel();
+  });
 
   // Listen for messages from the iframe (close button, session sync)
   window.addEventListener("message", function(ev) {
@@ -1115,12 +1124,7 @@ def widget_script(request):
     if (d && typeof d === "object") {
       if (d.type === "ltw-close") { closePanel(); return; }
       if (d.type === "ltw-session" && d.sessionKey) { setSessionKey(d.sessionKey); return; }
-      if (d.type === "ltw-open") {
-        isOpen = true;
-        frame.style.display = "block";
-        btn.innerHTML = ICON_CLOSE;
-        return;
-      }
+      if (d.type === "ltw-open") { setOpen(true); return; }
     }
   });
 
