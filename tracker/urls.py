@@ -1,10 +1,28 @@
 from django.contrib import admin
+from django.db import connection
+from django.http import JsonResponse
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.decorators.cache import never_cache
 from tracker.dashboard import views as dashboard_views
 
+
+@never_cache
+def healthz(request):
+    """Liveness + readiness probe for Render / k8s. Pings the DB so a dead
+    Postgres / network split shows up as a 503 instead of a fake 200."""
+    try:
+        with connection.cursor() as c:
+            c.execute('SELECT 1')
+            c.fetchone()
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'error': str(e)[:200]}, status=503)
+
+
 urlpatterns = [
+    path('healthz/', healthz, name='healthz'),
     path('admin/', admin.site.urls),
     path('accounts/', include('tracker.core.urls')),
     path('dashboard/', include('tracker.dashboard.urls')),
