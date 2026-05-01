@@ -35,8 +35,12 @@
     <div class="card">
         <div class="card-header"><h3><i class="fas fa-fire"></i> Click Heatmap</h3></div>
         <div class="card-body" style="position:relative;min-height:400px;background:#f8f9fa;border-radius:8px;overflow:hidden;" id="heatmapCanvas">
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;" id="heatmapPlaceholder">
-                {% if total_clicks > 0 %}Loading heatmap...{% else %}No click data yet. Add the tracking script to your site.{% endif %}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;" id="heatmapPlaceholder">
+                {% if total_clicks > 0 %}
+                    {% include "partials/loader.html" with msg="Rendering heatmap..." %}
+                {% else %}
+                    <div style="color:var(--text-muted);font-size:14px;">No click data yet. Add the tracking script to your site.</div>
+                {% endif %}
             </div>
         </div>
     </div>

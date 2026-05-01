@@ -1,0 +1,14 @@
+{% comment %}
+Reusable inline loader.
+Usage:
+    {% include "partials/loader.html" %}
+    {% include "partials/loader.html" with msg="Loading visitors..." %}
+    {% include "partials/loader.html" with msg="Crunching data..." size="xl" %}
+    {% include "partials/loader.html" with size="sm" inline=True %}   {# small inline spinner only #}
+{% endcomment %}
+{% if inline %}<span class="lt-spinner{% if size == 'lg' %} lt-spinner-lg{% elif size == 'xl' %} lt-spinner-xl{% endif %}" role="status" aria-label="Loading"></span>{% else %}
+<div class="lt-loader-inline" role="status" aria-live="polite">
+    <span class="lt-spinner {% if size == 'xl' %}lt-spinner-xl{% else %}lt-spinner-lg{% endif %}" aria-hidden="true"></span>
+    <span>{{ msg|default:"Loading..." }}</span>
+</div>
+{% endif %}
