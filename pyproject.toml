@@ -1,0 +1,48 @@
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+exclude = [
+    "*/migrations/*",
+    "staticfiles/*",
+    "media/*",
+    "__pycache__/*",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "B",    # flake8-bugbear (likely bugs)
+    "DJ",   # flake8-django
+    "S",    # flake8-bandit (security)
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501",   # line too long — Django views can be readable past 120
+    "S101",   # assert allowed (used in tests)
+    "S105",   # hardcoded password (false positives on config keys)
+    "S311",   # non-cryptographic random — fine for non-security uses
+    "B008",   # function call in default arg — Django timezone.now is idiomatic
+    "DJ001",  # null=True on string field — codebase uses this for legacy compat
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tracker/settings.py" = ["S105", "F401"]
+"tests/*" = ["S101", "S106"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tracker"]
+combine-as-imports = true
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+extend-exclude = '''
+/(
+    migrations
+  | staticfiles
+  | media
+)/
+'''

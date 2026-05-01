@@ -59,6 +59,8 @@ class Visitor(models.Model):
             models.Index(fields=['-last_seen']),
             models.Index(fields=['organization', '-last_seen']),
             models.Index(fields=['organization', 'is_banned']),
+            models.Index(fields=['organization', 'visitor_fingerprint']),
+            models.Index(fields=['website', '-last_seen']),
         ]
 
     def __str__(self):

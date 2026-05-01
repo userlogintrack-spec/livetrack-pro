@@ -61,13 +61,32 @@ def _client_ip(request):
     return request.META.get('REMOTE_ADDR', '0.0.0.0')
 
 
+_JSON_BODY_MAX_BYTES = 1 * 1024 * 1024  # 1MB — well above any legitimate widget payload
+
+
 def _parse_json_body(request):
-    if not request.body:
+    """Safely decode a JSON request body.
+
+    Returns:
+        dict on success, {} for empty body, None for malformed/oversized/non-object input.
+
+    Guards against:
+    - DoS via huge payloads (1MB cap)
+    - Top-level non-object JSON (e.g. `[1,2,3]` or `"foo"`) which would break
+      callers that immediately do `data.get(...)` and crash with AttributeError.
+    """
+    body = request.body
+    if not body:
         return {}
-    try:
-        return json.loads(request.body)
-    except json.JSONDecodeError:
+    if len(body) > _JSON_BODY_MAX_BYTES:
         return None
+    try:
+        parsed = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return parsed
 
 
 def _rate_limit(request, scope, limit, window_seconds):

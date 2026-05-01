@@ -11,7 +11,7 @@ services:
       python manage.py collectstatic --noinput &&
       python manage.py migrate --noinput
     startCommand: daphne -b 0.0.0.0 -p $PORT tracker.asgi:application
-    healthCheckPath: /
+    healthCheckPath: /healthz/
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
