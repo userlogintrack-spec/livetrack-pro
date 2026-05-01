@@ -250,7 +250,7 @@
 <div id="feedModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
     <div class="modal-box" style="width:520px;">
         <div class="modal-title"><span><i class="fas fa-bolt" style="color:var(--warning);margin-right:8px;"></i>Live Domain Activity</span><button onclick="document.getElementById('feedModal').style.display='none'" class="modal-close"><i class="fas fa-times"></i></button></div>
-        <div id="feedContent" style="max-height:400px;overflow-y:auto;"><div style="text-align:center;padding:24px;color:var(--text-muted);">Loading...</div></div>
+        <div id="feedContent" style="max-height:400px;overflow-y:auto;">{% include "partials/loader.html" with msg="Loading activity..." %}</div>
     </div>
 </div>
 
@@ -309,7 +309,23 @@ function assignGroup(wsId) { document.getElementById('assignWsId').value=wsId; d
 function doAssignGroup(gid) { var wsId=document.getElementById('assignWsId').value; fetch('{% url "dashboard:website_groups" %}',{method:'POST',headers:{'X-CSRFToken':csrfToken,'Content-Type':'application/json'},body:JSON.stringify({action:'assign',website_id:parseInt(wsId),group_id:gid})}).then(function(r){return r.json();}).then(function(d){document.getElementById('assignGroupModal').style.display='none';showToast('Group assigned!','success');location.reload();}); }
 
 // ═══ Activity Feed ═══
-function showActivityFeed() { document.getElementById('feedModal').style.display='flex'; fetch('{% url "dashboard:website_activity_feed" %}').then(function(r){return r.json();}).then(function(d){ var html=''; d.feed.forEach(function(f){ var pages=f.recent_pages.map(function(p){return p.page_title||p.url;}).slice(0,3).join(', '); html+='<div class="feed-item"><span class="feed-dot" style="background:'+(f.online>0?'var(--success)':'var(--text-muted)');+'"></span><span class="feed-domain">'+f.name+'</span><span class="feed-count">'+f.online+' online</span><span class="feed-pages">'+f.domain+(pages?' — '+pages:'')+'</span></div>'; }); if(!d.feed.length) html='<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">No active websites</div>'; document.getElementById('feedContent').innerHTML=html; }); }
+function showActivityFeed() {
+    document.getElementById('feedModal').style.display='flex';
+    Loader.inline('#feedContent', 'Loading activity...');
+    fetch('{% url "dashboard:website_activity_feed" %}')
+        .then(function(r){return r.json();})
+        .then(function(d){
+            var html=''; d.feed.forEach(function(f){
+                var pages=f.recent_pages.map(function(p){return p.page_title||p.url;}).slice(0,3).join(', ');
+                html+='<div class="feed-item"><span class="feed-dot" style="background:'+(f.online>0?'var(--success)':'var(--text-muted)')+';"></span><span class="feed-domain">'+f.name+'</span><span class="feed-count">'+f.online+' online</span><span class="feed-pages">'+f.domain+(pages?' — '+pages:'')+'</span></div>';
+            });
+            if(!d.feed.length) html='<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">No active websites</div>';
+            document.getElementById('feedContent').innerHTML=html;
+        })
+        .catch(function(){
+            document.getElementById('feedContent').innerHTML='<div style="text-align:center;padding:24px;color:var(--danger);font-size:12px;">Failed to load activity</div>';
+        });
+}
 
 // ═══ Badge ═══
 function showBadgeModal() { document.getElementById('badgeModal').style.display='flex'; }

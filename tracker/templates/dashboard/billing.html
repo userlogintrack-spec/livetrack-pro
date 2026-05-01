@@ -463,16 +463,14 @@ function applyCoupon() {
     var code = document.getElementById('couponInput').value.trim();
     if (!code) return;
     var btn = document.getElementById('couponBtn');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    btn.disabled = true;
+    Loader.button(btn);
 
     fetch('{% url "dashboard:validate_coupon" %}', {
         method: 'POST',
         headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
         body: JSON.stringify({code: code, plan: 'pro', interval: selectedInterval})
     }).then(r => r.json()).then(data => {
-        btn.innerHTML = '<i class="fas fa-check"></i> Apply';
-        btn.disabled = false;
+        Loader.buttonReset(btn);
         var result = document.getElementById('couponResult');
         result.style.display = 'block';
         if (data.valid) {
@@ -491,8 +489,7 @@ function applyCoupon() {
             result.innerHTML = '<i class="fas fa-times-circle" style="margin-right:6px;"></i>' + data.error;
         }
     }).catch(function() {
-        btn.innerHTML = '<i class="fas fa-check"></i> Apply';
-        btn.disabled = false;
+        Loader.buttonReset(btn);
     });
 }
 
@@ -589,10 +586,11 @@ function processCardPayment() {
     if (!cardExpiry || !/^\d{2}\/\d{2}$/.test(cardExpiry)) { showCardError('Please enter expiry as MM/YY'); return; }
     if (!cardCvc || cardCvc.length < 3) { showCardError('Please enter a valid CVC'); return; }
 
-    // Disable button, show processing
+    // Disable button, show processing — also full-page overlay so the user can't navigate
+    // away mid-charge (payment endpoint is non-idempotent).
     var btn = document.getElementById('payBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i> Processing...';
+    Loader.button(btn);
+    Loader.show('Processing payment...');
     errEl.style.display = 'none';
 
     fetch('{% url "dashboard:checkout" %}', {
@@ -612,14 +610,14 @@ function processCardPayment() {
             closeCardModal();
             window.location.href = '{% url "dashboard:billing_success" %}';
         } else {
+            Loader.hide();
             showCardError(data.error || 'Payment failed. Please try again.');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-lock" style="margin-right:6px;"></i> <span>Pay Now</span>';
+            Loader.buttonReset(btn);
         }
     }).catch(function() {
+        Loader.hide();
         showCardError('Connection error. Please check your internet and try again.');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-lock" style="margin-right:6px;"></i> <span>Pay Now</span>';
+        Loader.buttonReset(btn);
     });
 }
 
