@@ -217,7 +217,7 @@ def _normalize_domain(host):
     if host.startswith('http://') or host.startswith('https://'):
         try:
             host = urlparse(host).hostname or host
-        except Exception:
+        except (ValueError, AttributeError):
             pass
     if ':' in host:
         host = host.split(':', 1)[0]
@@ -321,6 +321,7 @@ def _resolve_country_for_request(request, ip_address):
             country_name, city_name = get_geo_from_ip(ip_address)
             cache.set(cache_key, {'country': country_name, 'city': city_name}, 60 * 60 * 24)
         except Exception:
+            logger.warning('geo lookup failed for ip=%s', ip_address, exc_info=True)
             country_name, city_name = '', ''
     return (country_name or '').strip(), country_code, (city_name or '').strip()
 
@@ -801,7 +802,7 @@ def widget_track_pageview(request):
                 }
             )
         except Exception:
-            pass
+            logger.warning('dashboard ws broadcast failed for visitor=%s', visitor.id, exc_info=True)
 
     # Hot lead notification (score >= 70, once per visitor session)
     computed_score = min(100, page_count * 5)
@@ -1274,9 +1275,13 @@ def gdpr_request(request):
         return JsonResponse({'error': 'POST required'}, status=405)
     data = _parse_json_body(request) or {}
     action = (data.get('action') or '').strip().lower()
-    sk = (data.get('session_key') or request.session.session_key or '').strip()
-    if action not in ('export', 'delete') or not sk:
-        return JsonResponse({'error': 'action (export|delete) and session_key required'}, status=400)
+    # Only trust the session_key from the visitor's own session — never from POST body,
+    # otherwise anyone who learns a session_key (e.g. via XSS/leaked log) could wipe another visitor's data.
+    sk = (request.session.session_key or '').strip()
+    if action not in ('export', 'delete'):
+        return JsonResponse({'error': 'action (export|delete) required'}, status=400)
+    if not sk:
+        return JsonResponse({'error': 'no active session — visit the site first'}, status=400)
     # Rate limit: 3 GDPR requests per IP per day
     ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or request.META.get('REMOTE_ADDR', 'unknown')
     rl = f'gdpr_rl:{ip}'

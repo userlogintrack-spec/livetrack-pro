@@ -208,9 +208,11 @@ LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 GEOIP_PATH = os.path.join(BASE_DIR, 'geoip')
 
-# CORS — allow widget to work on any website
+# CORS — widget loads on any customer site, so we accept all origins on /api/
+# but DO NOT allow credentials, otherwise a malicious site could read another customer's
+# session-authenticated responses. Widget endpoints authenticate via tracking_key, not cookies.
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = False
 CORS_URLS_REGEX = r'^/api/.*$'  # Only allow CORS on /api/ endpoints
 
 # Session cookie for cross-origin widget embedding

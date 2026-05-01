@@ -6,9 +6,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Count, Q, Avg, Sum, F, Max, Subquery, OuterRef
 from django.views.decorators.csrf import csrf_exempt
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import datetime, timedelta
 import json
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -1716,7 +1717,7 @@ def fire_webhook(org, event, payload):
                 req.add_header('X-LiveTrack-Signature', sig)
             urllib.request.urlopen(req, timeout=5)
         except Exception:
-            pass
+            logger.warning('webhook delivery failed url=%s', url, exc_info=True)
 
     if not org:
         return
@@ -3890,16 +3891,20 @@ def website_manage_view(request):
             domain = domain.replace('https://', '').replace('http://', '').split('/')[0].lstrip('www.')
             if Website.objects.filter(organization=org, domain=domain).exists():
                 return JsonResponse({'error': 'This domain already exists'}, status=400)
-            ws = Website.objects.create(
-                organization=org, name=name, domain=domain,
-                widget_title=(data.get('widget_title') or '').strip(),
-                widget_color=(data.get('widget_color') or '').strip(),
-                widget_position=(data.get('widget_position') or '').strip(),
-                welcome_message=(data.get('welcome_message') or '').strip(),
-            )
-            # Grant all existing agents access to new website
-            for agent in AgentProfile.objects.filter(organization=org):
-                AgentWebsiteAccess.objects.get_or_create(agent=agent, website=ws)
+            with transaction.atomic():
+                ws = Website.objects.create(
+                    organization=org, name=name, domain=domain,
+                    widget_title=(data.get('widget_title') or '').strip(),
+                    widget_color=(data.get('widget_color') or '').strip(),
+                    widget_position=(data.get('widget_position') or '').strip(),
+                    welcome_message=(data.get('welcome_message') or '').strip(),
+                )
+                # Grant all existing agents access to new website
+                AgentWebsiteAccess.objects.bulk_create(
+                    [AgentWebsiteAccess(agent=agent, website=ws)
+                     for agent in AgentProfile.objects.filter(organization=org)],
+                    ignore_conflicts=True,
+                )
             return JsonResponse({
                 'status': 'ok', 'id': ws.id, 'name': ws.name,
                 'domain': ws.domain, 'tracking_key': ws.tracking_key,
@@ -3931,25 +3936,29 @@ def website_manage_view(request):
 
         return JsonResponse({'error': 'Invalid action'}, status=400)
 
-    websites = list(Website.objects.filter(organization=org).select_related('group'))
     base_url = request.build_absolute_uri('/').rstrip('/')
     host = request.get_host().split(':')[0]
     if host not in ('localhost', '127.0.0.1') and base_url.startswith('http://'):
         base_url = 'https://' + base_url[len('http://'):]
 
-    # Per-website stats
+    # Per-website stats — one annotated query instead of 6 per website (was N+1)
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     last_30_min = now - timedelta(minutes=30)
     last_7d = now - timedelta(days=7)
 
-    for ws in websites:
-        ws.stat_visitors_total = Visitor.objects.filter(website=ws).count()
-        ws.stat_visitors_today = Visitor.objects.filter(website=ws, first_visit__gte=today_start).count()
-        ws.stat_visitors_online = Visitor.objects.filter(website=ws, last_seen__gte=last_30_min).count()
-        ws.stat_pageviews_7d = PageView.objects.filter(visitor__website=ws, timestamp__gte=last_7d).count()
-        ws.stat_chats_total = ChatRoom.objects.filter(website=ws).count()
-        ws.stat_chats_active = ChatRoom.objects.filter(website=ws, status__in=['waiting', 'active']).count()
+    websites = list(
+        Website.objects.filter(organization=org)
+        .select_related('group')
+        .annotate(
+            stat_visitors_total=Count('visitors', distinct=True),
+            stat_visitors_today=Count('visitors', filter=Q(visitors__first_visit__gte=today_start), distinct=True),
+            stat_visitors_online=Count('visitors', filter=Q(visitors__last_seen__gte=last_30_min), distinct=True),
+            stat_pageviews_7d=Count('visitors__page_views', filter=Q(visitors__page_views__timestamp__gte=last_7d)),
+            stat_chats_total=Count('chat_rooms', distinct=True),
+            stat_chats_active=Count('chat_rooms', filter=Q(chat_rooms__status__in=['waiting', 'active']), distinct=True),
+        )
+    )
 
     return render(request, 'dashboard/website_manage.html', {
         'websites': websites,
@@ -4274,35 +4283,45 @@ def website_activity_feed(request):
     last_5_min = now - timedelta(minutes=5)
     last_30_min = now - timedelta(minutes=30)
 
-    websites = Website.objects.filter(organization=org, is_active=True)
-    feed = []
+    # Single annotated query for the website list with online counts (was N+1)
+    websites = list(
+        Website.objects.filter(organization=org, is_active=True)
+        .annotate(online_count=Count('visitors', filter=Q(visitors__last_seen__gte=last_30_min)))
+    )
+    ws_ids = [w.id for w in websites]
 
-    for ws in websites:
-        online = Visitor.objects.filter(website=ws, last_seen__gte=last_30_min).count()
-        recent_visitors = list(
-            Visitor.objects.filter(website=ws, last_seen__gte=last_5_min)
-            .order_by('-last_seen')
-            .values('id', 'ip_address', 'browser', 'country', 'last_seen', 'device_type')[:5]
-        )
-        recent_pages = list(
-            PageView.objects.filter(visitor__website=ws, timestamp__gte=last_5_min)
-            .order_by('-timestamp')
-            .values('url', 'page_title', 'timestamp', 'visitor__ip_address', 'visitor__country')[:10]
-        )
-        # Serialize datetime
-        for v in recent_visitors:
+    # Batch-fetch recent visitors and pages across all websites in 2 queries instead of 2*N.
+    # We over-fetch then trim to top 5/10 per website in Python — bounded by len(websites)*5/10.
+    # Cap rows globally — previously each site limited to 5/10, so worst case was 5N/10N rows.
+    n = max(1, len(ws_ids))
+    visitors_by_ws = {wid: [] for wid in ws_ids}
+    for v in (Visitor.objects
+              .filter(website_id__in=ws_ids, last_seen__gte=last_5_min)
+              .order_by('-last_seen')
+              .values('id', 'website_id', 'ip_address', 'browser', 'country', 'last_seen', 'device_type')[:5 * n]):
+        bucket = visitors_by_ws[v['website_id']]
+        if len(bucket) < 5:
             v['last_seen'] = v['last_seen'].isoformat()
-        for p in recent_pages:
-            p['timestamp'] = p['timestamp'].isoformat()
+            bucket.append(v)
 
-        feed.append({
-            'id': ws.id,
-            'name': ws.name,
-            'domain': ws.domain,
-            'online': online,
-            'recent_visitors': recent_visitors,
-            'recent_pages': recent_pages,
-        })
+    pages_by_ws = {wid: [] for wid in ws_ids}
+    for p in (PageView.objects
+              .filter(visitor__website_id__in=ws_ids, timestamp__gte=last_5_min)
+              .order_by('-timestamp')
+              .values('url', 'page_title', 'timestamp', 'visitor__website_id', 'visitor__ip_address', 'visitor__country')[:10 * n]):
+        bucket = pages_by_ws[p['visitor__website_id']]
+        if len(bucket) < 10:
+            p['timestamp'] = p['timestamp'].isoformat()
+            bucket.append(p)
+
+    feed = [{
+        'id': ws.id,
+        'name': ws.name,
+        'domain': ws.domain,
+        'online': ws.online_count,
+        'recent_visitors': visitors_by_ws[ws.id],
+        'recent_pages': pages_by_ws[ws.id],
+    } for ws in websites]
 
     # Sort by online count descending
     feed.sort(key=lambda x: x['online'], reverse=True)
