@@ -4,7 +4,7 @@ from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count, Q, Avg, Sum, F, Max, Subquery, OuterRef
@@ -32,6 +32,28 @@ from tracker.core.models import WebsiteSettings, Organization, Website, WebsiteG
 from tracker.core.views import get_user_org
 
 logger = logging.getLogger(__name__)
+
+
+class _Echo:
+    """Minimal write-only file substitute that returns whatever it's handed —
+    lets `csv.writer` produce one row at a time for StreamingHttpResponse."""
+    def write(self, value):
+        return value
+
+
+def _stream_csv(rows, filename):
+    """Stream a CSV response without buffering the whole queryset in memory.
+
+    `rows` should be an iterable of lists. Pass a queryset.iterator() to keep
+    DB cursor memory bounded too.
+    """
+    writer = csv.writer(_Echo())
+    response = StreamingHttpResponse(
+        (writer.writerow(row) for row in rows),
+        content_type='text/csv',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 # ═══════ Website Filter Helper ═══════
@@ -719,8 +741,8 @@ def visitor_detail(request, visitor_id):
 @login_required
 def api_stats(request):
     org = get_user_org(request.user)
-    # Throttle stale chat cleanup
     from django.core.cache import cache
+    # Throttle stale chat cleanup
     if not cache.get(f'stale_api_{org.id if org else 0}'):
         close_stale_chats(inactive_minutes=30)
         cache.set(f'stale_api_{org.id if org else 0}', True, 30)
@@ -730,12 +752,27 @@ def api_stats(request):
             org_id=org.id,
         )
         cache.set(f'sla_api_{org.id}', True, 30)
+
+    # Short-lived cache: with N dashboard tabs polling every 10s, this drops the
+    # 7 count() queries per poll to one per ~5s window per (org, website filter).
+    # Cache key must reflect the *exact* filter or two agents with different
+    # website-access lists would share each other's counts.
+    ws_filter = get_website_filter(request, org)
+    if 'website_id' in ws_filter:
+        ws_cache_key = f'w{ws_filter["website_id"]}'
+    elif 'website_id__in' in ws_filter:
+        ws_cache_key = 'wi' + ','.join(str(i) for i in sorted(ws_filter['website_id__in']))
+    else:
+        ws_cache_key = 'all'
+    cache_key = f'api_stats:{org.id if org else 0}:{ws_cache_key}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse(cached)
+
     now = timezone.now()
     last_30_min = now - timedelta(minutes=30)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    ws_filter = get_website_filter(request, org)
-    return JsonResponse({
+    payload = {
         'online_visitors': Visitor.objects.filter(organization=org, last_seen__gte=last_30_min, **ws_filter).count(),
         'active_chats': ChatRoom.objects.filter(organization=org, status__in=['waiting', 'active'], **ws_filter).count(),
         'active_only_chats': ChatRoom.objects.filter(organization=org, status='active', **ws_filter).count(),
@@ -748,7 +785,9 @@ def api_stats(request):
         ).count(),
         'today_visitors': Visitor.objects.filter(organization=org, first_visit__gte=today_start, **ws_filter).count(),
         'today_page_views': PageView.objects.filter(visitor__organization=org, timestamp__gte=today_start).count(),
-    })
+    }
+    cache.set(cache_key, payload, 5)
+    return JsonResponse(payload)
 
 
 @login_required
@@ -972,15 +1011,10 @@ def rate_chat(request, room_id):
 
 @login_required
 def export_visitors_csv(request):
-    """Export all visitors as CSV."""
+    """Export all visitors as CSV (streamed)."""
     org = get_user_org(request.user)
     date_from = request.GET.get('from', '').strip()
     date_to = request.GET.get('to', '').strip()
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="visitors_export.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'IP Address', 'Browser', 'OS', 'Device', 'Source', 'First Visit', 'Last Seen', 'Total Visits', 'Online'])
 
     ws_filter = get_website_filter(request, org)
     visitors_qs = Visitor.objects.filter(organization=org, **ws_filter)
@@ -997,14 +1031,20 @@ def export_visitors_csv(request):
     if date_to:
         visitors_qs = visitors_qs.filter(first_visit__date__lte=date_to)
 
-    for v in visitors_qs:
-        writer.writerow([
-            v.id, v.ip_address, v.browser, v.os, v.device_type,
-            v.referrer_source, v.first_visit.strftime('%Y-%m-%d %H:%M'),
-            v.last_seen.strftime('%Y-%m-%d %H:%M'), v.total_visits, v.is_online,
-        ])
+    header = ['ID', 'IP Address', 'Browser', 'OS', 'Device', 'Source',
+              'First Visit', 'Last Seen', 'Total Visits', 'Online']
 
-    return response
+    def rows():
+        yield header
+        # iterator(chunk_size=...) keeps DB cursor + Python heap bounded
+        for v in visitors_qs.iterator(chunk_size=2000):
+            yield [
+                v.id, v.ip_address, v.browser, v.os, v.device_type,
+                v.referrer_source, v.first_visit.strftime('%Y-%m-%d %H:%M'),
+                v.last_seen.strftime('%Y-%m-%d %H:%M'), v.total_visits, v.is_online,
+            ]
+
+    return _stream_csv(rows(), 'visitors_export.csv')
 
 
 @login_required
@@ -1120,19 +1160,21 @@ def export_chats_csv(request):
         response['Content-Disposition'] = 'attachment; filename="chats_export.pdf"'
         return response
 
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="chats_export.csv"'
-    writer = csv.writer(response)
-    writer.writerow(['Room ID', 'Visitor', 'Email', 'Agent', 'Status', 'Priority', 'Subject', 'Rating', 'Tags', 'Messages', 'Unread', 'Created', 'Closed'])
-    for c in chats_qs:
-        writer.writerow([
-            c.room_id, c.visitor_name, c.visitor_email,
-            c.agent.get_full_name() if c.agent else '-',
-            c.status, c.priority, c.subject, c.rating or '-', c.tags,
-            c.message_count_db, c.unread_count, c.created_at.strftime('%Y-%m-%d %H:%M'),
-            c.closed_at.strftime('%Y-%m-%d %H:%M') if c.closed_at else '-',
-        ])
-    return response
+    header = ['Room ID', 'Visitor', 'Email', 'Agent', 'Status', 'Priority',
+              'Subject', 'Rating', 'Tags', 'Messages', 'Unread', 'Created', 'Closed']
+
+    def rows():
+        yield header
+        for c in chats_qs.iterator(chunk_size=1000):
+            yield [
+                c.room_id, c.visitor_name, c.visitor_email,
+                c.agent.get_full_name() if c.agent else '-',
+                c.status, c.priority, c.subject, c.rating or '-', c.tags,
+                c.message_count_db, c.unread_count, c.created_at.strftime('%Y-%m-%d %H:%M'),
+                c.closed_at.strftime('%Y-%m-%d %H:%M') if c.closed_at else '-',
+            ]
+
+    return _stream_csv(rows(), 'chats_export.csv')
 
 
 @login_required
@@ -1429,13 +1471,17 @@ def add_agent_view(request):
                     AgentWebsiteAccess.objects.get_or_create(agent=agent_profile, website=ws)
             created = True
 
-    agents = User.objects.filter(agent_profile__isnull=False, agent_profile__organization=org).select_related('agent_profile').order_by('username')
+    agents = list(
+        User.objects
+        .filter(agent_profile__isnull=False, agent_profile__organization=org)
+        .select_related('agent_profile')
+        .prefetch_related('agent_profile__website_access__website')
+        .order_by('username')
+    )
     websites = Website.objects.filter(organization=org)
-    # Add website access info per agent
+    # Build accessible_websites from the prefetched access objects (no extra queries)
     for agent in agents:
-        agent.accessible_websites = list(
-            AgentWebsiteAccess.objects.filter(agent=agent.agent_profile).select_related('website').values_list('website__name', flat=True)
-        )
+        agent.accessible_websites = [a.website.name for a in agent.agent_profile.website_access.all()]
     return render(request, 'dashboard/add_agent.html', {
         'created': created,
         'error': error,
@@ -3741,7 +3787,7 @@ def manage_coupons_view(request):
                 c.save(update_fields=['is_active'])
                 return JsonResponse({'status': 'ok', 'is_active': c.is_active})
 
-    coupons = Coupon.objects.all()
+    coupons = Coupon.objects.order_by('-id')[:200]
     return render(request, 'dashboard/coupons.html', {'coupons': coupons})
 
 
@@ -3793,7 +3839,7 @@ def super_admin_view(request):
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     last_30_min = now - timedelta(minutes=30)
 
-    # All orgs with stats
+    # All orgs with stats — cap at 200 so a 10k-org instance doesn't blow up the page
     orgs = Organization.objects.all().annotate(
         total_visitors=Count('visitors', distinct=True),
         monthly_visitors=Count('visitors', filter=Q(visitors__first_visit__gte=month_start), distinct=True),
@@ -3802,7 +3848,7 @@ def super_admin_view(request):
         active_chats=Count('chat_rooms', filter=Q(chat_rooms__status__in=['waiting', 'active']), distinct=True),
         total_agents=Count('agents', distinct=True),
         avg_rating=Avg('chat_rooms__rating', filter=Q(chat_rooms__rating__isnull=False)),
-    )
+    ).order_by('-total_visitors')[:200]
 
     # Global stats
     total_orgs = Organization.objects.count()
@@ -3811,10 +3857,11 @@ def super_admin_view(request):
     total_chats_global = ChatRoom.objects.count()
     online_now = Visitor.objects.filter(last_seen__gte=last_30_min).count()
 
-    # Plan distribution
-    plan_dist = {}
-    for sub in Subscription.objects.all():
-        plan_dist[sub.plan] = plan_dist.get(sub.plan, 0) + 1
+    # Plan distribution — single GROUP BY query instead of looping every Subscription row
+    from django.db.models import Count as _Count
+    plan_dist = dict(
+        Subscription.objects.values_list('plan').annotate(c=_Count('id')).values_list('plan', 'c')
+    )
 
     # Revenue
     from tracker.core.models import PaymentHistory, Coupon
@@ -3822,14 +3869,14 @@ def super_admin_view(request):
     total_revenue = PaymentHistory.objects.aggregate(total=Sum('amount'))['total'] or 0
     monthly_revenue = PaymentHistory.objects.filter(created_at__gte=month_start).aggregate(total=Sum('amount'))['total'] or 0
 
-    # All payments
+    # All payments — already capped at 50 ✓
     all_payments = PaymentHistory.objects.select_related('organization').order_by('-created_at')[:50]
 
-    # Recent signups
+    # Recent signups — already capped at 10 ✓
     recent_users = User.objects.order_by('-date_joined')[:10]
 
-    # Active coupons
-    coupons = Coupon.objects.all()
+    # Active coupons — cap at 100 most-recent
+    coupons = Coupon.objects.order_by('-id')[:100]
 
     # Messages & offline stats
     total_messages = Message.objects.count()
