@@ -14,9 +14,18 @@
     <title>{% block title %}LiveVisitorHub{% endblock %} | LiveVisitorHub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    {# Non-blocking font + icon loads — `media=print` lets the browser parse HTML #}
+    {# without waiting; onload swaps it to `all` so the styles actually apply. #}
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {# JS-disabled fallback so styles still apply if onload never fires #}
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
     <style>
         /* ===== LIGHT THEME — Apple HIG cool ===== */
         :root, [data-theme="light"] {
@@ -1037,14 +1046,17 @@
             var safetyTimer = null;
             function scheduleShow(msg) {
                 if (pending) return;
-                // 120ms grace so super-fast loads don't flash the overlay
+                // 250ms grace — most cached/lite navigations finish before this fires,
+                // so the user only ever sees the overlay for genuinely slow loads.
+                // Below ~250ms the human eye perceives a flash as "jank" rather than
+                // "progress feedback", so we'd rather show nothing.
                 pending = setTimeout(function() {
                     pending = null;
                     Loader.show(msg || 'Loading...');
                     // Safety net: auto-hide after 15s if navigation silently aborts
                     // (e.g. server triggers a file download instead of navigating).
                     safetyTimer = setTimeout(function() { Loader.hideAll(); }, 15000);
-                }, 120);
+                }, 250);
             }
 
             function cancelShow() {
