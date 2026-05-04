@@ -18,30 +18,57 @@
 
 {% block content %}
 
-<!-- Live Cursor Preview -->
-<div class="card" id="liveCursorCard" style="margin-bottom:16px;display:none;">
+<!-- Session Recordings -->
+<div class="card" style="margin-bottom:16px;">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
         <h3 style="margin:0;display:flex;align-items:center;gap:8px;font-size:15px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:var(--success);box-shadow:0 0 0 4px rgba(48,164,108,.2);animation:pulse 2s infinite;"></span>
-            Live Cursor Preview
-            <span style="font-size:11px;color:var(--text-muted);font-weight:500;" id="liveCursorMeta"></span>
+            <i class="fas fa-video" style="color:var(--accent);"></i>
+            Session Recordings
+            <span style="font-size:11px;color:var(--text-muted);font-weight:500;">· {{ recordings|length }} recorded</span>
         </h3>
-        <button onclick="toggleCursorPreview()" class="btn btn-sm btn-secondary" id="cursorPauseBtn"><i class="fas fa-pause"></i> Pause</button>
+        {% if recordings %}
+        <a href="{% url 'dashboard:session_recordings' %}" class="btn btn-sm btn-secondary">View all</a>
+        {% endif %}
     </div>
     <div class="card-body" style="padding:0;">
-        <div style="position:relative;background:#1a1a1f;height:380px;overflow:hidden;border-radius:0 0 var(--radius) var(--radius);" id="cursorStage">
-            <iframe id="cursorFrame" style="position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff;" sandbox="allow-same-origin"></iframe>
-            <div id="cursorDot" style="position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(0,113,227,.35);border:2px solid #0071e3;transform:translate(-50%,-50%);pointer-events:none;transition:left .3s ease, top .3s ease;box-shadow:0 0 0 8px rgba(0,113,227,.12);display:none;z-index:10;"></div>
-            <div id="cursorEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;flex-direction:column;gap:8px;">
-                <i class="fas fa-mouse-pointer" style="font-size:32px;opacity:.4;"></i>
-                <div>Waiting for visitor activity…</div>
-                <div style="font-size:11px;opacity:.7;">Visitor must be active in the last 30 seconds</div>
-            </div>
+        {% if recordings %}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px;">
+            {% for rec in recordings %}
+            <a href="{% url 'dashboard:session_replay' rec.session_id %}" style="text-decoration:none;color:inherit;display:block;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-card);transition:transform .15s ease, box-shadow .15s ease;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,.08)';" onmouseout="this.style.transform='';this.style.boxShadow='';">
+                <div style="position:relative;background:#1a1a1f;height:140px;display:flex;align-items:center;justify-content:center;">
+                    <i class="fas fa-play-circle" style="font-size:40px;color:rgba(255,255,255,.85);"></i>
+                    <span style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#fff;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;font-variant-numeric:tabular-nums;">
+                        {{ rec.duration }}s
+                    </span>
+                    {% if rec.has_rage_clicks or rec.has_dead_clicks or rec.has_errors %}
+                    <span style="position:absolute;top:8px;left:8px;display:flex;gap:4px;">
+                        {% if rec.has_rage_clicks %}<span title="Rage clicks" style="background:#ef4444;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;">RAGE</span>{% endif %}
+                        {% if rec.has_dead_clicks %}<span title="Dead clicks" style="background:#f59e0b;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;">DEAD</span>{% endif %}
+                        {% if rec.has_errors %}<span title="JS errors" style="background:#dc2626;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;">ERR</span>{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                <div style="padding:10px 12px;">
+                    <div style="font-size:12px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        {{ rec.start_url|default:"Session" }}
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:3px;display:flex;justify-content:space-between;">
+                        <span>{{ rec.created_at|date:"M j, H:i" }}</span>
+                        <span>{{ rec.pages_visited }} page{{ rec.pages_visited|pluralize }}</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
         </div>
+        {% else %}
+        <div style="text-align:center;padding:32px 16px;color:var(--text-muted);">
+            <i class="fas fa-video-slash" style="font-size:28px;opacity:.4;margin-bottom:8px;display:block;"></i>
+            <div style="font-size:13px;font-weight:600;">No recordings yet for this visitor</div>
+            <div style="font-size:11px;margin-top:4px;opacity:.7;">Recordings appear once the tracking script captures a session.</div>
+        </div>
+        {% endif %}
     </div>
 </div>
-
-<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}</style>
 
 <!-- Profile Card -->
 <div class="card" style="margin-bottom:16px;">
@@ -478,44 +505,5 @@ window.addEventListener('livetrack:visitor', function(e) {
     }, 5000);
 });
 
-// ===== LIVE CURSOR PREVIEW =====
-(function(){
-  var sk = "{{ visitor.session_key|escapejs }}";
-  if (!sk) return;
-  var card = document.getElementById('liveCursorCard');
-  var dot = document.getElementById('cursorDot');
-  var frame = document.getElementById('cursorFrame');
-  var empty = document.getElementById('cursorEmpty');
-  var meta = document.getElementById('liveCursorMeta');
-  var pauseBtn = document.getElementById('cursorPauseBtn');
-  var loadedUrl = null, paused = false, timer = null;
-
-  function poll(){
-    if (paused) return;
-    fetch('/api/cursor/' + encodeURIComponent(sk) + '/', { credentials: 'same-origin' })
-      .then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(data){
-        if (!data || !data.live){
-          empty.style.display = 'flex'; dot.style.display = 'none';
-          card.style.display = 'block'; meta.textContent = data && data.age_ms ? '· last seen ' + Math.round(data.age_ms/1000) + 's ago' : '';
-          return;
-        }
-        card.style.display = 'block'; empty.style.display = 'none';
-        if (data.url && data.url !== loadedUrl){ loadedUrl = data.url; frame.src = data.url; }
-        dot.style.display = 'block';
-        dot.style.left = data.x + '%';
-        dot.style.top = data.y + '%';
-        meta.textContent = '· on ' + (data.url ? new URL(data.url).pathname : '');
-      })
-      .catch(function(){});
-  }
-  window.toggleCursorPreview = function(){
-    paused = !paused;
-    pauseBtn.innerHTML = paused ? '<i class="fas fa-play"></i> Resume' : '<i class="fas fa-pause"></i> Pause';
-    if (!paused) poll();
-  };
-  poll();
-  timer = setInterval(poll, 2000);
-})();
 </script>
 {% endblock %}

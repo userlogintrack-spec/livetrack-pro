@@ -29,7 +29,7 @@ from tracker.chat.models import (
 from tracker.chat.security import create_ws_token
 from tracker.chat.utils import close_stale_chats, check_sla_breaches
 from tracker.core.models import WebsiteSettings, Organization, Website, WebsiteGroup
-from tracker.core.views import get_user_org
+from tracker.core.views import _parse_json_body, get_user_org
 
 logger = logging.getLogger(__name__)
 
@@ -719,6 +719,7 @@ def visitor_detail(request, visitor_id):
     chat_rooms = visitor.chat_rooms.order_by('-created_at')
     notes = visitor.agent_notes.order_by('-created_at')
     events_count = visitor.events.count()
+    recordings = visitor.recordings.order_by('-created_at')[:20]
     # Format visit duration
     dur = visitor.session_duration or 0
     if dur >= 3600:
@@ -734,6 +735,7 @@ def visitor_detail(request, visitor_id):
         'chat_rooms': chat_rooms,
         'notes': notes,
         'events_count': events_count,
+        'recordings': recordings,
         'visit_duration': visit_duration,
     })
 
@@ -816,7 +818,7 @@ def transfer_chat(request, room_id):
         return JsonResponse({'error': 'POST required'}, status=405)
 
     room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     target_id = data.get('agent_id')
     if not target_id:
         return JsonResponse({'error': 'agent_id required'}, status=400)
@@ -903,7 +905,7 @@ def internal_notes(request, room_id):
         })
 
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         content = data.get('content', '').strip()
         if not content:
             return JsonResponse({'error': 'Content required'}, status=400)
@@ -948,7 +950,7 @@ def add_visitor_note(request, visitor_id):
     org = get_user_org(request.user)
     if request.method == 'POST':
         visitor = get_object_or_404(Visitor, id=visitor_id, organization=org)
-        data = json.loads(request.body)
+        data = _parse_json_body(request) or {}
         note = VisitorNote.objects.create(
             visitor=visitor,
             agent=request.user,
@@ -970,7 +972,7 @@ def update_chat_tags(request, room_id):
     org = get_user_org(request.user)
     if request.method == 'POST':
         room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
-        data = json.loads(request.body)
+        data = _parse_json_body(request) or {}
         room.tags = data.get('tags', '')
         room.save(update_fields=['tags'])
         return JsonResponse({'status': 'ok', 'tags': room.tags})
@@ -983,7 +985,7 @@ def update_chat_priority(request, room_id):
     org = get_user_org(request.user)
     if request.method == 'POST':
         room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
-        data = json.loads(request.body)
+        data = _parse_json_body(request) or {}
         room.priority = data.get('priority', 'medium')
         room.save(update_fields=['priority'])
         return JsonResponse({'status': 'ok', 'priority': room.priority})
@@ -995,7 +997,7 @@ def rate_chat(request, room_id):
     """Visitor rates a chat."""
     if request.method == 'POST':
         room = get_object_or_404(ChatRoom, room_id=room_id)
-        data = json.loads(request.body)
+        data = _parse_json_body(request) or {}
         try:
             rating = int(data.get('rating', 0))
         except (TypeError, ValueError):
@@ -1211,7 +1213,7 @@ def ban_visitor(request, visitor_id):
         return JsonResponse({'error': 'POST required'}, status=405)
 
     visitor = get_object_or_404(Visitor, id=visitor_id, organization=org)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     action = (data.get('action') or 'ban').strip().lower()
     visitor.is_banned = action == 'ban'
     visitor.save(update_fields=['is_banned'])
@@ -1275,7 +1277,7 @@ def canned_responses_view(request):
     """Manage canned responses."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body)
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -1579,7 +1581,7 @@ def email_transcript(request, room_id):
     org = get_user_org(request.user)
     room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         email = data.get('email', '').strip() or room.visitor_email
         if not email:
             return JsonResponse({'error': 'No email address provided'}, status=400)
@@ -1971,7 +1973,7 @@ def chat_snooze(request, room_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     minutes = int(data.get('minutes', 15))
     room.is_snoozed = True
     room.snooze_until = timezone.now() + timedelta(minutes=minutes)
@@ -2002,7 +2004,7 @@ def chat_bulk_action(request):
     org = get_user_org(request.user)
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     action = data.get('action', '')
     room_ids = data.get('room_ids', [])
     if not room_ids:
@@ -2044,7 +2046,7 @@ def chat_bulk_action(request):
 def saved_replies_view(request):
     """Personal saved replies for agent."""
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         title = data.get('title', '').strip()
         message = data.get('message', '').strip()
         if title and message:
@@ -2074,7 +2076,7 @@ def departments_view(request):
     """Manage agent departments."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -2140,7 +2142,7 @@ def sla_policies_view(request):
     """Manage SLA policies."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -2204,7 +2206,7 @@ def surveys_view(request):
     """Manage surveys and NPS."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -2290,7 +2292,7 @@ def submit_survey_response(request, survey_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     session_key = request.session.session_key
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
@@ -2343,7 +2345,7 @@ def ai_bot_config_view(request):
     config, _ = AIBotConfig.objects.get_or_create(organization=org)
 
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'update')
 
         if action == 'update':
@@ -2388,7 +2390,7 @@ def chatbot_flows_view(request):
     """Manage chatbot flows."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -2449,7 +2451,7 @@ def kb_manage_view(request):
     """Manage knowledge base categories and articles."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', '')
 
         if action == 'create_category':
@@ -2544,7 +2546,7 @@ def kb_article_view(request, org_slug, article_slug):
 def kb_article_feedback(request, article_id):
     """Track helpful/not helpful feedback on KB articles."""
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         article = get_object_or_404(KBArticle, id=article_id)
         if data.get('helpful'):
             article.helpful_yes += 1
@@ -2566,7 +2568,7 @@ def whatsapp_config_view(request):
     config, _ = WhatsAppConfig.objects.get_or_create(organization=org)
 
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         config.is_enabled = data.get('is_enabled', config.is_enabled)
         config.phone_number_id = data.get('phone_number_id', config.phone_number_id)
         config.access_token = data.get('access_token', config.access_token)
@@ -2597,7 +2599,7 @@ def whatsapp_webhook(request):
         return HttpResponse('Forbidden', status=403)
 
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         # Process incoming WhatsApp messages
         for entry in data.get('entry', []):
             for change in entry.get('changes', []):
@@ -2640,7 +2642,7 @@ def visitor_segments_view(request):
     """Manage visitor segments."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -2970,7 +2972,7 @@ def goals_view(request):
     """Manage conversion goals."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -3010,7 +3012,7 @@ def track_event_api(request):
     """Public API: Track a custom event from visitor's browser."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
@@ -3044,7 +3046,7 @@ def track_performance_api(request):
     """Public API: Track page load performance from browser."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     session_key = request.session.session_key
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
@@ -3073,7 +3075,7 @@ def scheduled_reports_view(request):
     """Manage scheduled email reports."""
     org = get_user_org(request.user)
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -3178,7 +3180,7 @@ def track_clicks_api(request):
     """Batch receive click data for heatmaps."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
@@ -3236,7 +3238,7 @@ def track_scroll_api(request):
     """Track scroll depth."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
@@ -3259,7 +3261,7 @@ def track_js_error_api(request):
     """Track JavaScript errors."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
@@ -3287,7 +3289,7 @@ def track_session_api(request):
     """Create/update session recording data."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
@@ -3349,7 +3351,7 @@ def track_frustration_api(request):
     """Track frustration signals (quick-back, excessive scroll)."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     org, visitor, session_key = _resolve_tracking_visitor(request, data)
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
@@ -3612,7 +3614,7 @@ def create_checkout_session(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     plan = data.get('plan', 'pro')
     interval = data.get('interval', 'month')
     coupon_code = data.get('coupon', '').strip()
@@ -3710,7 +3712,7 @@ def validate_coupon(request):
     """Validate a coupon code and return discount info."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    data = json.loads(request.body) if request.body else {}
+    data = _parse_json_body(request) or {}
     code = data.get('code', '').strip()
     plan = data.get('plan', 'pro')
     interval = data.get('interval', 'month')
@@ -3752,7 +3754,7 @@ def manage_coupons_view(request):
     from tracker.core.models import Coupon
 
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -3906,7 +3908,7 @@ def super_admin_view(request):
 def set_active_website(request):
     """Set the active website filter in session (AJAX)."""
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         website_id = data.get('website_id')
         if website_id == 'all' or website_id is None:
             request.session.pop('selected_website_id', None)
@@ -3926,7 +3928,7 @@ def website_manage_view(request):
         return redirect('dashboard:home')
 
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'add')
 
         if action == 'add':
@@ -4260,7 +4262,7 @@ def website_approve(request, website_id):
 
     if request.method == 'POST':
         ws = get_object_or_404(Website, id=website_id, organization=org)
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'approve')
 
         if action == 'approve':
@@ -4295,7 +4297,7 @@ def website_notifications(request, website_id):
     ws = get_object_or_404(Website, id=website_id, organization=org)
 
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         if 'notify_new_visitor' in data:
             ws.notify_new_visitor = bool(data['notify_new_visitor'])
         if 'notify_new_chat' in data:
@@ -4389,7 +4391,7 @@ def website_groups(request):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     if request.method == 'POST':
-        data = json.loads(request.body) if request.body else {}
+        data = _parse_json_body(request) or {}
         action = data.get('action', 'create')
 
         if action == 'create':
@@ -4539,7 +4541,7 @@ def visitors_bulk_action(request):
     if not is_owner:
         return JsonResponse({'error': 'permission denied'}, status=403)
     try:
-        data = json.loads(request.body or b'{}')
+        data = _parse_json_body(request) or {}
     except (ValueError, TypeError):
         return JsonResponse({'error': 'invalid JSON'}, status=400)
     action = (data.get('action') or '').strip().lower()
