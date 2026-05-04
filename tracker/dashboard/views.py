@@ -719,6 +719,7 @@ def visitor_detail(request, visitor_id):
     chat_rooms = visitor.chat_rooms.order_by('-created_at')
     notes = visitor.agent_notes.order_by('-created_at')
     events_count = visitor.events.count()
+    recordings = visitor.recordings.order_by('-created_at')[:20]
     # Format visit duration
     dur = visitor.session_duration or 0
     if dur >= 3600:
@@ -734,6 +735,7 @@ def visitor_detail(request, visitor_id):
         'chat_rooms': chat_rooms,
         'notes': notes,
         'events_count': events_count,
+        'recordings': recordings,
         'visit_duration': visit_duration,
     })
 
