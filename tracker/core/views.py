@@ -381,7 +381,7 @@ def _resolve_room_actor(request, room):
     if not session_key:
         # Body JSON
         try:
-            body_data = json.loads(request.body) if request.body else {}
+            body_data = _parse_json_body(request) or {}
             session_key = (body_data.get('session_key') or '').strip()
         except (ValueError, AttributeError):
             session_key = ''
