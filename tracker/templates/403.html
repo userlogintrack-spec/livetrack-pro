@@ -1,28 +1,74 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Access Denied — LiveVisitorHub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <title>Access denied — LiveVisitorHub</title>
+    <meta name="theme-color" content="#fbfbfd">
+    <link rel="icon" type="image/svg+xml" href="/static/images/icon-192.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;}
-        body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f0a2e,#1a1145,#2d1b69);min-height:100vh;display:flex;align-items:center;justify-content:center;color:white;text-align:center;padding:20px;}
-        .container{max-width:500px;}
-        .code{font-size:120px;font-weight:900;background:linear-gradient(135deg,#f59e0b,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
-        h1{font-size:24px;font-weight:800;margin:16px 0 8px;}
-        p{font-size:15px;color:#a09dc4;margin-bottom:28px;line-height:1.6;}
-        .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;border-radius:12px;text-decoration:none;font-weight:700;font-size:14px;transition:all .2s;box-shadow:0 4px 16px rgba(124,58,237,0.3);}
-        .btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,58,237,0.4);}
+        :root {
+            --bg: #fbfbfd; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
+            --border: #e8e8ed; --accent: #0071e3; --accent-hover: #0077ED;
+            --warn: #c7892d; --warn-soft: rgba(199,137,45,0.1);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg: #000; --card: #1c1c1e; --text: #f5f5f7; --muted: #aeaeb2;
+                    --border: #2c2c2e; --accent: #0a84ff; --accent-hover: #409cff;
+                    --warn: #ff9f0a; --warn-soft: rgba(255,159,10,0.14); }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 24px; line-height: 1.5;
+        }
+        .card {
+            max-width: 460px; width: 100%; text-align: center;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 18px; padding: 56px 32px 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.04);
+        }
+        .code {
+            font-size: 72px; font-weight: 800; letter-spacing: -2px;
+            color: var(--warn); line-height: 1; margin-bottom: 8px;
+            font-feature-settings: "tnum";
+        }
+        h1 { font-size: 22px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.3px; }
+        p  { font-size: 15px; color: var(--muted); margin-bottom: 28px; }
+        .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 11px 22px; border-radius: 10px;
+            font-weight: 600; font-size: 14px; text-decoration: none;
+            transition: all 0.15s ease; border: 1px solid transparent;
+            font-family: inherit;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-secondary { background: transparent; color: var(--text); border-color: var(--border); }
+        .btn-secondary:hover { border-color: var(--muted); }
     </style>
+    <script>
+        (function() {
+            var t = localStorage.getItem('dashTheme');
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
 </head>
 <body>
-    <div class="container">
+    <main class="card" role="main">
         <div class="code">403</div>
-        <h1>Access Denied</h1>
-        <p>You don't have permission to access this page. Please log in with the correct account or contact your administrator.</p>
-        <a href="/accounts/login/" class="btn">Sign In</a>
-    </div>
+        <h1>Access denied</h1>
+        <p>You don't have permission to view this page. Sign in with an account that has access, or ask your organization's owner to grant it.</p>
+        <div class="actions">
+            <a href="/accounts/login/" class="btn btn-primary">Sign in</a>
+            <a href="/dashboard/" class="btn btn-secondary">Dashboard</a>
+        </div>
+    </main>
 </body>
 </html>
-

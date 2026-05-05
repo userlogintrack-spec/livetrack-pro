@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Something went wrong — LiveVisitorHub</title>
+    <title>Bad request — LiveVisitorHub</title>
     <meta name="theme-color" content="#fbfbfd">
     <link rel="icon" type="image/svg+xml" href="/static/images/icon-192.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,12 +13,10 @@
         :root {
             --bg: #fbfbfd; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
             --border: #e8e8ed; --accent: #0071e3; --accent-hover: #0077ED;
-            --danger: #d93025;
         }
         @media (prefers-color-scheme: dark) {
             :root { --bg: #000; --card: #1c1c1e; --text: #f5f5f7; --muted: #aeaeb2;
-                    --border: #2c2c2e; --accent: #0a84ff; --accent-hover: #409cff;
-                    --danger: #ff453a; }
+                    --border: #2c2c2e; --accent: #0a84ff; --accent-hover: #409cff; }
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -35,7 +33,7 @@
         }
         .code {
             font-size: 72px; font-weight: 800; letter-spacing: -2px;
-            color: var(--danger); line-height: 1; margin-bottom: 8px;
+            color: var(--text); line-height: 1; margin-bottom: 8px;
             font-feature-settings: "tnum";
         }
         h1 { font-size: 22px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.3px; }
@@ -46,16 +44,10 @@
             padding: 11px 22px; border-radius: 10px;
             font-weight: 600; font-size: 14px; text-decoration: none;
             transition: all 0.15s ease; border: 1px solid transparent;
-            cursor: pointer; font-family: inherit;
+            font-family: inherit;
         }
         .btn-primary { background: var(--accent); color: #fff; }
         .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
-        .btn-secondary { background: transparent; color: var(--text); border-color: var(--border); }
-        .btn-secondary:hover { border-color: var(--muted); }
-        .meta { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border);
-                font-size: 12px; color: var(--muted); }
-        .meta a { color: var(--accent); text-decoration: none; }
-        .meta a:hover { text-decoration: underline; }
     </style>
     <script>
         (function() {
@@ -66,15 +58,11 @@
 </head>
 <body>
     <main class="card" role="main">
-        <div class="code">500</div>
-        <h1>Something went wrong</h1>
-        <p>An unexpected error occurred on our end. Our team has been notified and we're looking into it.</p>
+        <div class="code">400</div>
+        <h1>Bad request</h1>
+        <p>The request couldn't be processed. This usually means a malformed URL or expired session — refresh and try again.</p>
         <div class="actions">
-            <button onclick="location.reload()" class="btn btn-primary">Try again</button>
-            <a href="/dashboard/" class="btn btn-secondary">Go home</a>
-        </div>
-        <div class="meta">
-            Issue persists? <a href="/contact/">Contact support</a>
+            <a href="/dashboard/" class="btn btn-primary">Go to dashboard</a>
         </div>
     </main>
 </body>
