@@ -262,35 +262,46 @@
             </div>
 
             {% if user_websites|length > 0 %}
-            <!-- ═══ Domain-wise Website Selector ═══ -->
-            <div class="ws-selector" id="wsSelector">
+            <!-- ═══ Domain-wise Website Selector (multi-select) ═══ -->
+            <div class="ws-selector" id="wsSelector"
+                 data-selected-ids="{% for i in selected_website_ids %}{{ i }}{% if not forloop.last %},{% endif %}{% endfor %}">
                 <button class="ws-selector-btn" onclick="toggleWsSelector()" type="button">
-                    <span class="ws-dot" style="background:{% if selected_website_id %}var(--success){% else %}var(--primary){% endif %};"></span>
-                    <span class="ws-name">
-                        {% if selected_website_id %}
-                            {% for ws in user_websites %}{% if ws.id == selected_website_id %}{{ ws.name }}{% endif %}{% endfor %}
-                        {% else %}
-                            All Websites
-                        {% endif %}
-                    </span>
+                    <span class="ws-dot" style="background:{% if selected_website_ids %}var(--success){% else %}var(--primary){% endif %};"></span>
+                    <span class="ws-name">{{ selected_website_label }}</span>
                     <i class="fas fa-chevron-down ws-arrow"></i>
                 </button>
                 <div class="ws-dropdown">
-                    <button class="ws-dropdown-item {% if not selected_website_id %}active{% endif %}" onclick="switchWebsite('all')">
-                        <span class="ws-item-dot" style="background:var(--primary);"></span>
-                        <span class="ws-item-name">All Websites</span>
-                        <span class="ws-item-domain">{{ user_websites|length }} sites</span>
-                        <i class="fas fa-check ws-item-check"></i>
-                    </button>
+                    <div class="ws-dropdown-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="Search websites..." id="wsSearch"
+                               oninput="filterWsRows(this.value)" autocomplete="off">
+                    </div>
+                    <label class="ws-row ws-row-all">
+                        <input type="checkbox" id="wsAllToggle"
+                               {% if not selected_website_ids %}checked{% endif %}
+                               onchange="toggleWsAll(this.checked)">
+                        <span class="ws-row-dot" style="background:var(--primary);"></span>
+                        <span class="ws-row-name">All websites</span>
+                        <span class="ws-row-meta">{{ user_websites|length }} sites</span>
+                    </label>
                     <div class="ws-dropdown-sep"></div>
-                    {% for ws in user_websites %}
-                    <button class="ws-dropdown-item {% if ws.id == selected_website_id %}active{% endif %}" onclick="switchWebsite({{ ws.id }})">
-                        <span class="ws-item-dot" style="background:{% if ws.is_active %}var(--success){% else %}var(--text-muted){% endif %};"></span>
-                        <span class="ws-item-name">{{ ws.name }}</span>
-                        <span class="ws-item-domain">{{ ws.domain }}</span>
-                        <i class="fas fa-check ws-item-check"></i>
-                    </button>
-                    {% endfor %}
+                    <div class="ws-rows-scroll">
+                        {% for ws in user_websites %}
+                        <label class="ws-row" data-ws-name="{{ ws.name|lower }}" data-ws-domain="{{ ws.domain|lower }}">
+                            <input type="checkbox" class="ws-cb" value="{{ ws.id }}"
+                                   {% if ws.id in selected_website_ids %}checked{% endif %}
+                                   onchange="onWsCbChange()">
+                            <span class="ws-row-dot" style="background:{% if ws.is_active %}var(--success){% else %}var(--text-muted){% endif %};"></span>
+                            <span class="ws-row-name" title="{{ ws.domain }}">{{ ws.name }}</span>
+                            <span class="ws-row-meta">{{ ws.domain }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div class="ws-dropdown-actions">
+                        <span class="ws-selected-count" id="wsSelectedCount"></span>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="closeWsSelector()">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="applyWsSelection()" id="wsApplyBtn">Apply</button>
+                    </div>
                 </div>
             </div>
             {% endif %}
@@ -800,25 +811,93 @@
         // Start polling as fallback until WebSocket connects
         window._statsPollInterval = setInterval(refreshStats, 10000);
 
-        // ===== WEBSITE SELECTOR =====
+        // ===== WEBSITE SELECTOR (multi-select) =====
         function toggleWsSelector() {
             var sel = document.getElementById('wsSelector');
-            if (sel) sel.classList.toggle('open');
+            if (!sel) return;
+            sel.classList.toggle('open');
+            if (sel.classList.contains('open')) {
+                updateWsSelectionUI();
+                var s = document.getElementById('wsSearch');
+                if (s) { s.value = ''; filterWsRows(''); setTimeout(function(){ s.focus(); }, 50); }
+            }
         }
-        // Close dropdown on outside click
+        function closeWsSelector() {
+            var sel = document.getElementById('wsSelector');
+            if (sel) sel.classList.remove('open');
+        }
+        // Close on outside click — but ignore clicks on our own checkboxes/labels
         document.addEventListener('click', function(e) {
             var sel = document.getElementById('wsSelector');
             if (sel && !sel.contains(e.target)) sel.classList.remove('open');
         });
-        function switchWebsite(id) {
-            var sel = document.getElementById('wsSelector');
-            if (sel) sel.classList.remove('open');
+
+        function _wsCheckboxes() {
+            return Array.prototype.slice.call(document.querySelectorAll('.ws-cb'));
+        }
+        function _wsCheckedIds() {
+            return _wsCheckboxes().filter(function(cb){ return cb.checked; })
+                .map(function(cb){ return parseInt(cb.value, 10); });
+        }
+        function toggleWsAll(checked) {
+            // "All" checkbox is just a clear-selection toggle
+            if (checked) {
+                _wsCheckboxes().forEach(function(cb){ cb.checked = false; });
+            }
+            updateWsSelectionUI();
+        }
+        function onWsCbChange() {
+            var anySelected = _wsCheckedIds().length > 0;
+            var all = document.getElementById('wsAllToggle');
+            if (all) all.checked = !anySelected;
+            updateWsSelectionUI();
+        }
+        function updateWsSelectionUI() {
+            var n = _wsCheckedIds().length;
+            var label = document.getElementById('wsSelectedCount');
+            if (label) label.textContent = n === 0 ? 'All websites' : (n + ' selected');
+            var btn = document.getElementById('wsApplyBtn');
+            if (btn) btn.textContent = n > 0 ? ('Apply (' + n + ')') : 'Apply';
+        }
+        function filterWsRows(q) {
+            q = (q || '').trim().toLowerCase();
+            var rows = document.querySelectorAll('.ws-rows-scroll .ws-row');
+            rows.forEach(function(r) {
+                if (!q) { r.style.display = ''; return; }
+                var name = r.getAttribute('data-ws-name') || '';
+                var domain = r.getAttribute('data-ws-domain') || '';
+                r.style.display = (name.indexOf(q) >= 0 || domain.indexOf(q) >= 0) ? '' : 'none';
+            });
+        }
+        function applyWsSelection() {
+            var ids = _wsCheckedIds();
+            var btn = document.getElementById('wsApplyBtn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Applying...'; }
             fetch('{% url "dashboard:set_website" %}', {
                 method: 'POST',
                 headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
-                body: JSON.stringify({website_id: id === 'all' ? 'all' : id}),
+                body: JSON.stringify({website_ids: ids}),
             }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.status === 'ok') location.reload();
+                if (data && data.status === 'ok') location.reload();
+                else { if (btn) { btn.disabled = false; btn.textContent = 'Apply'; } }
+            }).catch(function() {
+                if (btn) { btn.disabled = false; btn.textContent = 'Apply'; }
+            });
+        }
+        // Initial label sync (applies after DOM is up)
+        document.addEventListener('DOMContentLoaded', updateWsSelectionUI);
+
+        // Backward-compat: top-of-file <select> still calls switchWebsite(id)
+        function switchWebsite(val) {
+            var body = (val === 'all' || val == null || val === '')
+                ? { website_ids: [] }
+                : { website_ids: [parseInt(val, 10)] };
+            fetch('{% url "dashboard:set_website" %}', {
+                method: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+                body: JSON.stringify(body),
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                if (data && data.status === 'ok') location.reload();
             });
         }
 

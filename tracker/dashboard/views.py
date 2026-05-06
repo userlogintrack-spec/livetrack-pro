@@ -57,43 +57,76 @@ def _stream_csv(rows, filename):
 
 
 # ═══════ Website Filter Helper ═══════
+def _read_selected_ids(request):
+    """Read the session's selected website IDs as a list of ints.
+
+    Supports two storage shapes for backward compat:
+    - selected_website_ids: [1, 2, 3]  (new — multi-select)
+    - selected_website_id: 1           (old — single-select; auto-migrated)
+    Empty list = "All websites".
+    """
+    raw = request.session.get('selected_website_ids')
+    if isinstance(raw, list):
+        out = []
+        for v in raw:
+            try:
+                out.append(int(v))
+            except (TypeError, ValueError):
+                continue
+        return out
+    legacy = request.session.get('selected_website_id')
+    if legacy:
+        try:
+            return [int(legacy)]
+        except (TypeError, ValueError):
+            pass
+    return []
+
+
 def get_website_filter(request, org):
     """Return a dict filter for website-scoping dashboard queries.
-    Owner/admin: selected website or all. Agent: only accessible websites."""
+    Owner/admin: selected websites (one, many, or all). Agent: only accessible websites."""
     profile = getattr(request.user, 'agent_profile', None)
     is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
 
-    selected_id = request.session.get('selected_website_id')
-    if selected_id:
-        try:
-            selected_id = int(selected_id)
-        except (ValueError, TypeError):
-            selected_id = None
+    selected_ids = _read_selected_ids(request)
 
     if is_owner:
-        if selected_id:
-            ws = Website.objects.filter(id=selected_id, organization=org).first()
-            if ws:
-                return {'website_id': ws.id}
-        return {}  # All websites
-    else:
-        # Agent: only accessible websites
-        accessible_ids = list(
-            AgentWebsiteAccess.objects.filter(agent=profile).values_list('website_id', flat=True)
+        if not selected_ids:
+            return {}  # All websites
+        # Validate selection against this org so a stale session can't read another org's data
+        valid_ids = list(
+            Website.objects.filter(id__in=selected_ids, organization=org).values_list('id', flat=True)
         )
-        if not accessible_ids:
-            # Backward compat: agent with no access rows sees all (legacy agents)
+        if not valid_ids:
             return {}
-        if selected_id and selected_id in accessible_ids:
-            return {'website_id': selected_id}
-        return {'website_id__in': accessible_ids}
+        if len(valid_ids) == 1:
+            return {'website_id': valid_ids[0]}
+        return {'website_id__in': valid_ids}
+
+    # Agent: only accessible websites
+    accessible_ids = list(
+        AgentWebsiteAccess.objects.filter(agent=profile).values_list('website_id', flat=True)
+    )
+    if not accessible_ids:
+        # Backward compat: agent with no access rows sees all (legacy agents)
+        return {}
+    # Intersect selection with what the agent can actually access
+    if selected_ids:
+        scoped = [i for i in selected_ids if i in accessible_ids]
+        if len(scoped) == 1:
+            return {'website_id': scoped[0]}
+        if scoped:
+            return {'website_id__in': scoped}
+    return {'website_id__in': accessible_ids}
 
 
 def get_selected_website(request, org):
-    """Return the currently selected Website object or None (all)."""
-    selected_id = request.session.get('selected_website_id')
-    if selected_id:
-        return Website.objects.filter(id=selected_id, organization=org).first()
+    """Return a single selected Website object when exactly one is selected, else None.
+    For multi-select or 'all', callers should use get_website_filter() directly."""
+    ids = _read_selected_ids(request)
+    if len(ids) == 1:
+        return Website.objects.filter(id=ids[0], organization=org).first()
     return None
 
 
@@ -3906,16 +3939,45 @@ def super_admin_view(request):
 
 @login_required
 def set_active_website(request):
-    """Set the active website filter in session (AJAX)."""
-    if request.method == 'POST':
-        data = _parse_json_body(request) or {}
-        website_id = data.get('website_id')
-        if website_id == 'all' or website_id is None:
-            request.session.pop('selected_website_id', None)
+    """Set the active website filter in session (AJAX).
+
+    Accepts any of:
+      {"website_ids": [1, 2, 3]}  — multi-select (empty list = all)
+      {"website_id": 1}           — single-select shortcut
+      {"website_id": "all"}       — clear filter
+    Old single-select callers keep working unchanged.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    data = _parse_json_body(request) or {}
+
+    # Always clear the legacy single-int key so it can't shadow the list
+    request.session.pop('selected_website_id', None)
+
+    ids_raw = data.get('website_ids')
+    if isinstance(ids_raw, list):
+        ids = []
+        for v in ids_raw:
+            try:
+                ids.append(int(v))
+            except (TypeError, ValueError):
+                continue
+        if ids:
+            request.session['selected_website_ids'] = ids
         else:
-            request.session['selected_website_id'] = int(website_id)
-        return JsonResponse({'status': 'ok'})
-    return JsonResponse({'error': 'POST required'}, status=405)
+            request.session.pop('selected_website_ids', None)
+        return JsonResponse({'status': 'ok', 'selected_count': len(ids)})
+
+    # Single-id fallback (legacy callers + quick-switch UI)
+    single = data.get('website_id')
+    if single in (None, '', 'all'):
+        request.session.pop('selected_website_ids', None)
+        return JsonResponse({'status': 'ok', 'selected_count': 0})
+    try:
+        request.session['selected_website_ids'] = [int(single)]
+        return JsonResponse({'status': 'ok', 'selected_count': 1})
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'invalid website_id'}, status=400)
 
 
 @login_required

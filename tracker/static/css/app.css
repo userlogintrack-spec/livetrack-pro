@@ -446,6 +446,43 @@
         .ws-dropdown-item.active .ws-item-check { display: inline; }
         .ws-dropdown-sep { height: 1px; background: var(--border); margin: 4px 8px; }
 
+        /* Multi-select dropdown rows */
+        .ws-dropdown-search {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 10px; border-bottom: 1px solid var(--border-subtle);
+            margin: -6px -6px 6px;
+        }
+        .ws-dropdown-search i { color: var(--text-muted); font-size: 11px; }
+        .ws-dropdown-search input {
+            flex: 1; border: none; outline: none; background: transparent;
+            color: var(--text-primary); font-size: 12px; font-family: inherit;
+        }
+        .ws-rows-scroll { max-height: 240px; overflow-y: auto; }
+        .ws-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 10px; border-radius: 8px; cursor: pointer;
+            font-size: 12px; color: var(--text-primary); transition: background .12s;
+            -webkit-user-select: none; user-select: none;
+        }
+        .ws-row:hover { background: var(--bg-hover); }
+        .ws-row input[type=checkbox] {
+            width: 14px; height: 14px; flex-shrink: 0;
+            accent-color: var(--accent); cursor: pointer;
+        }
+        .ws-row .ws-row-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .ws-row .ws-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+        .ws-row .ws-row-meta { font-size: 10px; color: var(--text-muted); flex-shrink: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ws-row-all { font-weight: 600; }
+        .ws-dropdown-actions {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 4px 2px; border-top: 1px solid var(--border-subtle);
+            margin-top: 6px;
+        }
+        .ws-dropdown-actions .ws-selected-count {
+            flex: 1; font-size: 11px; color: var(--text-muted); font-weight: 500;
+        }
+        .ws-dropdown-actions .btn { padding: 6px 14px; font-size: 12px; }
+
         /* ===== BUTTONS ===== */
         .btn {
             display: inline-flex; align-items: center; gap: 6px;
