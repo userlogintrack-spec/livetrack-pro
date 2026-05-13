@@ -11,15 +11,54 @@ from tracker.dashboard import views as dashboard_views
 
 @never_cache
 def healthz(request):
-    """Liveness + readiness probe for Render / k8s. Pings the DB so a dead
-    Postgres / network split shows up as a 503 instead of a fake 200."""
+    """Liveness + readiness probe. Touches every external dependency so a
+    misconfig (bad Redis URL, dead Postgres, missing channel layer) shows up
+    as a structured 503 instead of a fake 200 or an obscure 500 elsewhere."""
+    checks = {'db': 'unknown', 'cache': 'unknown', 'channel_layer': 'unknown'}
+    errors = {}
+
+    # Postgres
     try:
         with connection.cursor() as c:
             c.execute('SELECT 1')
             c.fetchone()
-        return JsonResponse({'status': 'ok'})
+        checks['db'] = 'ok'
     except Exception as e:
-        return JsonResponse({'status': 'error', 'error': str(e)[:200]}, status=503)
+        checks['db'] = 'error'
+        errors['db'] = str(e)[:200]
+
+    # Redis (via Django cache — same backend the rest of the app uses)
+    try:
+        from django.core.cache import cache
+        token = f'healthz:{timezone.now().timestamp()}'
+        cache.set('healthz:probe', token, 5)
+        if cache.get('healthz:probe') == token:
+            checks['cache'] = 'ok'
+        else:
+            checks['cache'] = 'error'
+            errors['cache'] = 'set/get round-trip mismatch (cache not persisting)'
+    except Exception as e:
+        checks['cache'] = 'error'
+        errors['cache'] = str(e)[:200]
+
+    # Channels layer (separate Redis pool in some configs)
+    try:
+        from channels.layers import get_channel_layer
+        layer = get_channel_layer()
+        if layer is None:
+            checks['channel_layer'] = 'missing'
+        else:
+            checks['channel_layer'] = type(layer).__name__
+    except Exception as e:
+        checks['channel_layer'] = 'error'
+        errors['channel_layer'] = str(e)[:200]
+
+    overall_ok = checks['db'] == 'ok' and checks['cache'] == 'ok'
+    status_code = 200 if overall_ok else 503
+    payload = {'status': 'ok' if overall_ok else 'error', 'checks': checks}
+    if errors:
+        payload['errors'] = errors
+    return JsonResponse(payload, status=status_code)
 
 
 def robots_txt(request):
