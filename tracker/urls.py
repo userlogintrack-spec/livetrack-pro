@@ -11,13 +11,31 @@ from tracker.dashboard import views as dashboard_views
 
 @never_cache
 def healthz(request):
-    """Liveness + readiness probe. Touches every external dependency so a
-    misconfig (bad Redis URL, dead Postgres, missing channel layer) shows up
-    as a structured 503 instead of a fake 200 or an obscure 500 elsewhere."""
+    """Cheap liveness probe — DB only, no Redis. Render polls this every
+    ~30s; we used to also poke the cache here which burned ~80k Redis
+    commands/month for zero benefit (a Redis outage shows up immediately
+    on real requests). Use /healthz/full/ for deep dependency checks.
+
+    Returns 200 if Postgres is reachable, 503 otherwise.
+    """
+    try:
+        with connection.cursor() as c:
+            c.execute('SELECT 1')
+            c.fetchone()
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'error': str(e)[:200]}, status=503)
+
+
+@never_cache
+def healthz_full(request):
+    """Deep probe — DB + cache + channel layer. Intentionally not the
+    target of Render's auto-probe because each call costs a couple of
+    Redis ops. Hit this manually when debugging a fresh deploy.
+    """
     checks = {'db': 'unknown', 'cache': 'unknown', 'channel_layer': 'unknown'}
     errors = {}
 
-    # Postgres
     try:
         with connection.cursor() as c:
             c.execute('SELECT 1')
@@ -27,7 +45,6 @@ def healthz(request):
         checks['db'] = 'error'
         errors['db'] = str(e)[:200]
 
-    # Redis (via Django cache — same backend the rest of the app uses)
     try:
         from django.core.cache import cache
         token = f'healthz:{timezone.now().timestamp()}'
@@ -41,7 +58,6 @@ def healthz(request):
         checks['cache'] = 'error'
         errors['cache'] = str(e)[:200]
 
-    # Channels layer (separate Redis pool in some configs)
     try:
         from channels.layers import get_channel_layer
         layer = get_channel_layer()
@@ -73,6 +89,7 @@ def robots_txt(request):
         "Disallow: /accounts/\n"
         "Disallow: /api/\n"
         "Disallow: /healthz/\n"
+        "Disallow: /healthz/full/\n"
         f"\nSitemap: {scheme}://{host}/sitemap.xml\n"
     )
     return HttpResponse(body, content_type='text/plain')
@@ -133,6 +150,7 @@ def sitemap_xml(request):
 
 urlpatterns = [
     path('healthz/', healthz, name='healthz'),
+    path('healthz/full/', healthz_full, name='healthz_full'),
     path('robots.txt', robots_txt, name='robots_txt'),
     path('sitemap.xml', sitemap_xml, name='sitemap_xml'),
     path('manifest.json', manifest_json, name='manifest_json'),
