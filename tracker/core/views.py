@@ -878,10 +878,12 @@ def widget_track_pageview(request):
         is_exit=True,
     )
 
-    # Real-time broadcast to dashboard (throttled)
-    cache_key = f'ws_broadcast_{visitor.id}'
-    if visitor.organization_id and not cache.get(cache_key):
-        cache.set(cache_key, True, 2)
+    # Real-time broadcast to dashboard (throttled). Per-worker throttle is
+    # fine here — at most N broadcasts/2s instead of 1, which the dashboard
+    # ignores via its own animation debounce. Was burning ~1 Redis op per
+    # pageview before.
+    from tracker.core import process_throttle
+    if visitor.organization_id and process_throttle.should_run(f'ws_broadcast:{visitor.id}', 2):
         try:
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(

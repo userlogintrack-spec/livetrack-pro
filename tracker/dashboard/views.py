@@ -148,11 +148,11 @@ def dashboard_home(request):
             'is_owner': is_owner,
         })
 
-    # Close stale chats only once per minute (cached)
-    from django.core.cache import cache
-    if not cache.get(f'stale_check_{org.id if org else 0}'):
+    # Close stale chats only once per minute (in-process gate — per-worker
+    # firing is fine, cleanup is idempotent).
+    from tracker.core import process_throttle
+    if process_throttle.should_run(f'stale_check:{org.id if org else 0}', 60):
         close_stale_chats()
-        cache.set(f'stale_check_{org.id if org else 0}', True, 60)
     now = timezone.now()
     sla_minutes = int(getattr(settings, 'CHAT_SLA_MINUTES', 5))
     sla_cutoff = now - timedelta(minutes=sla_minutes)
@@ -827,16 +827,17 @@ def visitor_detail(request, visitor_id):
 def api_stats(request):
     org = get_user_org(request.user)
     from django.core.cache import cache
-    # Throttle stale chat cleanup
-    if not cache.get(f'stale_api_{org.id if org else 0}'):
+    from tracker.core import process_throttle
+    # Throttle stale chat cleanup + SLA check (in-process gates — dashboards
+    # poll this every 10s, N tabs × M workers used to push N×M Redis ops per
+    # poll just to decide whether to skip the work).
+    if process_throttle.should_run(f'stale_api:{org.id if org else 0}', 30):
         close_stale_chats()
-        cache.set(f'stale_api_{org.id if org else 0}', True, 30)
-    if org and not cache.get(f'sla_api_{org.id}'):
+    if org and process_throttle.should_run(f'sla_api:{org.id}', 30):
         check_sla_breaches(
             sla_minutes=int(getattr(settings, 'CHAT_SLA_MINUTES', 5)),
             org_id=org.id,
         )
-        cache.set(f'sla_api_{org.id}', True, 30)
 
     # Short-lived cache: with N dashboard tabs polling every 10s, this drops the
     # 7 count() queries per poll to one per ~5s window per (org, website filter).

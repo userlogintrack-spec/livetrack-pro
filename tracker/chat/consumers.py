@@ -555,14 +555,16 @@ class DashboardConsumer(AsyncWebsocketConsumer):
     def _run_sla_check(self):
         if not self.org_id:
             return
-        from django.core.cache import cache
         from tracker.chat.utils import check_sla_breaches
+        from tracker.core import process_throttle
 
-        cache_key = f'sla_ws_{self.org_id}'
-        if cache.get(cache_key):
+        # In-process gate. WS pings fire this often — every dashboard tab,
+        # every heartbeat. Using a Redis-backed cache to dedupe burned ~1
+        # op per heartbeat. Per-worker firing is fine because
+        # `check_sla_breaches` is idempotent (skips chats already notified).
+        if not process_throttle.should_run(f'sla_ws:{self.org_id}', 30):
             return
         check_sla_breaches(
             sla_minutes=int(getattr(settings, 'CHAT_SLA_MINUTES', 5)),
             org_id=self.org_id,
         )
-        cache.set(cache_key, True, 30)
