@@ -434,7 +434,11 @@ function insertEmoji(e) { document.getElementById('msgInput').value += e; docume
 
 function post(path, data) {
     data = data || {}; data.key = KEY; data.session_key = SESSION; data.parent_domain = PARENT_DOMAIN; data.fingerprint = FINGERPRINT;
-    return fetch(BASE + path, {method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(data)})
+    // Cross-origin (iframe lives on customer domain). Auth is via `key` +
+    // `session_key` in the body; we cannot use cookies because the server
+    // replies with `Access-Control-Allow-Origin: *` and browsers refuse
+    // wildcard + credentials together.
+    return fetch(BASE + path, {method:'POST',headers:{'Content-Type':'application/json'},credentials:'omit',body:JSON.stringify(data)})
         .then(parseApiResponse)
         .then(function(j){
             // Persist any session_key the server sends back so we stay the same visitor
@@ -633,7 +637,8 @@ function uploadFile(input) {
     fd.append('session_key', SESSION);   // for cross-origin where the cookie may be blocked
     fd.append('key', KEY);
     var url = BASE + '/api/chat/upload/' + encodeURIComponent(roomId) + '/?sk=' + encodeURIComponent(SESSION);
-    fetch(url, {method:'POST', body:fd, credentials:'include'})
+    // Cross-origin: omit cookies. session_key is in form data + URL.
+    fetch(url, {method:'POST', body:fd, credentials:'omit'})
     .then(parseApiResponse)
     .then(function(data) {
         if (data.file_url) {
@@ -805,7 +810,7 @@ function showSurvey(surveyId) {
         render(SURVEY_PRESET);
         return;
     }
-    fetch(BASE + '/dashboard/api/widget/survey/' + surveyId + '/', {credentials: 'include'})
+    fetch(BASE + '/dashboard/api/widget/survey/' + surveyId + '/', {credentials: 'omit'})
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(s) { if (s && !s.error) render(s); })
         .catch(function(){});
@@ -826,7 +831,7 @@ function submitSurvey() {
         answers.push({question_id: parseInt(qid, 10), text: a.text || '', rating: a.rating});
     });
     fetch(BASE + '/api/survey/' + sid + '/submit/', {
-        method: 'POST', credentials: 'include',
+        method: 'POST', credentials: 'omit',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({room_id: rid, score: rating, answers: answers, session_key: SESSION}),
     }).then(function(){ closeSurvey(true); }).catch(function(){ closeSurvey(false); });
@@ -841,7 +846,7 @@ function sendOfflineMessage() {
         showToast('Please fill in all fields', 'warning'); return;
     }
     fetch(BASE + '/api/chat/offline-message/', {
-        method: 'POST', credentials: 'include',
+        method: 'POST', credentials: 'omit',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name: name, email: email, message: msg, key: KEY, session_key: SESSION}),
     }).then(function(r){ return r.json(); })
@@ -862,7 +867,7 @@ function fetchKbSuggest(query) {
         return;
     }
     fetch(BASE + '/dashboard/api/kb-suggest/', {
-        method: 'POST', credentials: 'include',
+        method: 'POST', credentials: 'omit',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({query: query, tracking_key: KB_TRACKING_KEY}),
     }).then(function(r){ return r.ok ? r.json() : {results: []}; })

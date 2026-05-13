@@ -1021,10 +1021,14 @@ def widget_script(request):
       referrer: document.referrer || ""
     };
     try {
+      // Cross-origin from customer sites: NEVER send cookies. The server replies
+      // with `Access-Control-Allow-Origin: *` (intentional — widget runs on any
+      // customer domain), and browsers refuse to combine `*` with credentials.
+      // Auth is by `tracking_key` in the body, not by session cookie.
       fetch(BASE + "/api/widget/track/", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        credentials: "include",
+        credentials: "omit",
         body: JSON.stringify(payload),
         keepalive: true
       }).then(function(r){ return r.json(); }).then(function(d){
@@ -1071,10 +1075,11 @@ def widget_script(request):
 
   function recPost(path, body, keepalive) {
     try {
+      // Cross-origin: never send cookies (see comment on /api/widget/track/).
       return fetch(BASE + path, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        credentials: "include",
+        credentials: "omit",
         keepalive: !!keepalive,
         body: JSON.stringify(body)
       }).then(function(r) {

@@ -395,7 +395,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 sender_name=sender_name,
                 content=content,
             )
-            room.save(update_fields=['updated_at'])
+            # An agent reply in a 'waiting' room is a clear signal that this
+            # chat is now being handled — promote it so it shows up under the
+            # Active tab and stops showing as Waiting on every other dashboard.
+            # Also backfill `agent` if it wasn't set (covers manual-mode rooms
+            # where the agent jumped in without clicking the explicit Join link).
+            update_fields = ['updated_at']
+            if sender_type == 'agent' and room.status == 'waiting':
+                room.status = 'active'
+                update_fields.append('status')
+                user_id = self.scope.get('user', None) and getattr(self.scope['user'], 'id', None)
+                if not room.agent_id and user_id:
+                    room.agent_id = user_id
+                    update_fields.append('agent')
+            room.save(update_fields=update_fields)
             return message
         except ChatRoom.DoesNotExist:
             return None

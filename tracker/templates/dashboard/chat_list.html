@@ -137,7 +137,11 @@
         white-space: nowrap; transition: all 0.15s; text-decoration: none;
         display: inline-flex; align-items: center; gap: 4px;
     }
-    .cr-action.join { background: var(--primary); color: white; }
+    .cr-action.join {
+        background: var(--primary); color: white; padding: 7px 16px;
+        font-weight: 700; font-size: 12px; box-shadow: 0 2px 10px rgba(99,102,241,0.3);
+    }
+    .cr-action.join:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(99,102,241,0.45); filter: brightness(1.05); }
     .cr-action.view { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border); }
     .cr-action.view:hover { border-color: var(--primary); color: var(--primary); }
 

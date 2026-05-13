@@ -31,7 +31,7 @@ from tracker.chat.security import create_ws_token
 from tracker.chat.utils import close_stale_chats, check_sla_breaches
 from tracker.core.models import WebsiteSettings, Organization, Website, WebsiteGroup
 from tracker.core.plan_gating import requires_feature
-from tracker.core.views import _parse_json_body, get_user_org
+from tracker.core.views import _parse_json_body, get_user_org, _monthly_visitor_limit_state
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ def dashboard_home(request):
     # Close stale chats only once per minute (cached)
     from django.core.cache import cache
     if not cache.get(f'stale_check_{org.id if org else 0}'):
-        close_stale_chats(inactive_minutes=30)
+        close_stale_chats()
         cache.set(f'stale_check_{org.id if org else 0}', True, 60)
     now = timezone.now()
     sla_minutes = int(getattr(settings, 'CHAT_SLA_MINUTES', 5))
@@ -342,11 +342,22 @@ def dashboard_home(request):
 @login_required
 def chat_list(request):
     org = get_user_org(request.user)
-    close_stale_chats(inactive_minutes=30)
+    close_stale_chats()
     now = timezone.now()
     sla_minutes = int(getattr(settings, 'CHAT_SLA_MINUTES', 5))
     sla_cutoff = now - timedelta(minutes=sla_minutes)
-    status_filter = request.GET.get('status', 'all')
+    # If the agent didn't ask for a specific tab, default to whichever bucket
+    # has rows that need attention: Waiting first, then Active, else All.
+    status_filter = request.GET.get('status') or ''
+    if not status_filter:
+        ws_filter_default = get_website_filter(request, org)
+        base_for_default = ChatRoom.objects.filter(organization=org, **ws_filter_default)
+        if base_for_default.filter(status='waiting').exists():
+            status_filter = 'waiting'
+        elif base_for_default.filter(status='active').exists():
+            status_filter = 'active'
+        else:
+            status_filter = 'all'
     search_q = request.GET.get('q', '').strip()
     tag_filter = request.GET.get('tag', '').strip()
     priority_filter = request.GET.get('priority', 'all').strip()
@@ -665,8 +676,11 @@ def visitor_list(request):
     if filter_type == 'online':
         visitors = visitors.filter(last_seen__gte=last_30_min)
     elif filter_type == 'today':
+        # "Today" = anyone *active* today. Using first_visit__gte hid returning
+        # visitors who came back today but first arrived on an earlier day,
+        # which made the tab look empty even on busy days.
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        visitors = visitors.filter(first_visit__gte=today_start)
+        visitors = visitors.filter(last_seen__gte=today_start)
 
     if search_q:
         visitors = visitors.filter(
@@ -736,6 +750,20 @@ def visitor_list(request):
 
     group_by_label = dict(group_options).get(group_by, 'Activity')
 
+    # Tracking-health diagnostics — gives the empty state real signal instead
+    # of always saying "No visitors yet" even when historical data exists or
+    # the widget is being actively blocked by configuration.
+    org_total_visitors = Visitor.objects.filter(organization=org).count()
+    has_other_filter_match = bool(visitor_list_data) and filter_type != 'all'
+    free_limit_state = _monthly_visitor_limit_state(org) if org else {'allowed': True, 'limit': None, 'count': 0, 'plan': 'free'}
+    visitor_limit_reached = (
+        free_limit_state.get('plan') == 'free'
+        and free_limit_state.get('count', 0) >= (free_limit_state.get('limit') or 100)
+    )
+    allowed_domains_blocking = bool(
+        org and getattr(org, 'allowed_domains_enabled', False) and (org.allowed_domains or '').strip()
+    )
+
     return render(request, 'dashboard/visitor_list.html', {
         'visitors': visitor_list_data[:100],
         'current_filter': filter_type,
@@ -746,6 +774,14 @@ def visitor_list(request):
         'group_by': group_by,
         'group_by_label': group_by_label,
         'group_options': group_options,
+        # Empty-state context — used by the template to show the right message:
+        'org_total_visitors': org_total_visitors,
+        'has_any_filter_active': filter_type != 'all' or bool(search_q or date_from or date_to),
+        'has_other_filter_match': has_other_filter_match,
+        'visitor_limit_reached': visitor_limit_reached,
+        'visitor_limit_count': free_limit_state.get('count', 0),
+        'visitor_limit_max': free_limit_state.get('limit') or 100,
+        'allowed_domains_blocking': allowed_domains_blocking,
     })
 
 
@@ -793,7 +829,7 @@ def api_stats(request):
     from django.core.cache import cache
     # Throttle stale chat cleanup
     if not cache.get(f'stale_api_{org.id if org else 0}'):
-        close_stale_chats(inactive_minutes=30)
+        close_stale_chats()
         cache.set(f'stale_api_{org.id if org else 0}', True, 30)
     if org and not cache.get(f'sla_api_{org.id}'):
         check_sla_breaches(

@@ -206,10 +206,29 @@
 </script>
 
 <div class="filter-tabs">
-    <a href="?filter=all&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'all' %}active{% endif %}"><i class="fas fa-users"></i> All Visitors</a>
+    <a href="?filter=all&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'all' %}active{% endif %}"><i class="fas fa-users"></i> All Visitors{% if org_total_visitors %} <span style="font-size:11px;opacity:.7;">({{ org_total_visitors }})</span>{% endif %}</a>
     <a href="?filter=online&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'online' %}active{% endif %}"><i class="fas fa-circle" style="font-size:8px;color:#10b981;"></i> Online Now</a>
     <a href="?filter=today&group_by={{ group_by }}" class="filter-tab {% if current_filter == 'today' %}active{% endif %}"><i class="fas fa-calendar-day"></i> Today</a>
 </div>
+
+{# Tracking-health banners — surface silent failures the agent can't otherwise see. #}
+{% if visitor_limit_reached %}
+<div style="margin:12px 0;padding:14px 18px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;display:flex;align-items:center;gap:12px;">
+    <i class="fas fa-exclamation-triangle" style="color:#ef4444;font-size:18px;"></i>
+    <div style="flex:1;font-size:13px;color:var(--text-primary);">
+        <strong>Visitor limit reached.</strong> Your Free plan has tracked {{ visitor_limit_count }} of {{ visitor_limit_max }} visitors this month — new visitors are not being recorded until you upgrade or the month resets.
+    </div>
+    <a href="/dashboard/billing/?upgrade=pro" style="padding:8px 16px;background:#ef4444;color:white;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;">Upgrade to Pro</a>
+</div>
+{% endif %}
+{% if allowed_domains_blocking %}
+<div style="margin:12px 0;padding:12px 16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:12px;display:flex;align-items:center;gap:10px;">
+    <i class="fas fa-shield-alt" style="color:#f59e0b;font-size:16px;"></i>
+    <div style="flex:1;font-size:12.5px;color:var(--text-primary);">
+        <strong>Allowed-domains restriction is on.</strong> Visitors from any domain not in your allow-list are silently rejected. <a href="/dashboard/settings/website/" style="color:var(--primary);text-decoration:underline;font-weight:600;">Review allowed domains</a> if you expect more traffic.
+    </div>
+</div>
+{% endif %}
 
 {% if visitors %}
     {% regroup visitors by group_value as grouped_visitors %}
@@ -319,6 +338,16 @@
     })();
     </script>
 {% else %}
-{% include 'partials/empty_state.html' with icon='fa-users' title='No visitors yet' subtitle='Visitors appear here as soon as your tracking script loads on a page. Make sure the widget is installed on your site.' cta_label='Configure widget' cta_url='/dashboard/website/' cta_icon='fa-globe' secondary_label='Read the install guide' secondary_url='/dashboard/tour/' %}
+    {% if org_total_visitors and current_filter == 'today' %}
+        {# Org has visitors, just nobody active today — don't suggest reinstalling the widget. #}
+        {% include 'partials/empty_state.html' with icon='fa-calendar-day' title='No visitors today' subtitle='Nobody has loaded a tracked page yet today. Switch to All Visitors to see your historical data.' cta_label='View all visitors' cta_url='?filter=all' cta_icon='fa-users' %}
+    {% elif org_total_visitors and current_filter == 'online' %}
+        {% include 'partials/empty_state.html' with icon='fa-wifi' title='No one online right now' subtitle='No visitors have been active in the last 30 minutes. They\'ll appear here in real time when they land on a tracked page.' cta_label='View all visitors' cta_url='?filter=all' cta_icon='fa-users' %}
+    {% elif org_total_visitors and has_any_filter_active %}
+        {% include 'partials/empty_state.html' with icon='fa-filter' title='No visitors match this filter' subtitle='Try clearing the filters or widening the date range.' cta_label='Clear filters' cta_url='?filter=all' cta_icon='fa-times' %}
+    {% else %}
+        {# Truly zero visitors ever — the widget really isn't tracking. #}
+        {% include 'partials/empty_state.html' with icon='fa-users' title='No visitors yet' subtitle='Visitors appear here as soon as your tracking script loads on a page. Make sure the widget is installed on your site.' cta_label='Configure widget' cta_url='/dashboard/website/' cta_icon='fa-globe' secondary_label='Read the install guide' secondary_url='/dashboard/tour/' %}
+    {% endif %}
 {% endif %}
 {% endblock %}
