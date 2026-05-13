@@ -169,11 +169,11 @@
 <nav class="navbar" id="navbar">
     <a class="nav-brand" href="/"><div class="logo-icon"><i class="fas fa-bolt"></i></div><h1>Live<em>Track</em> Pro</h1></a>
     <ul class="nav-links" id="navLinks">
-        <li><a href="/#features">Features</a></li>
+        <li><a href="{% url 'pages:features' %}">Features</a></li>
         <li><a href="{% url 'pages:compare' %}" class="active">Compare</a></li>
-        <li><a href="/#integrations">Integrations</a></li>
-        <li><a href="/#pricing">Pricing</a></li>
-        <li><a href="/#faq">FAQ</a></li>
+        <li><a href="{% url 'pages:integrations' %}">Integrations</a></li>
+        <li><a href="{% url 'pages:pricing' %}">Pricing</a></li>
+        <li><a href="{% url 'pages:faq' %}">FAQ</a></li>
         <li><a href="{% url 'pages:about' %}">About</a></li>
         <li><a href="{% url 'pages:contact' %}">Contact</a></li>
     </ul>

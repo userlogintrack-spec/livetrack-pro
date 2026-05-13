@@ -1,0 +1,248 @@
+{% extends 'pages/base_public.html' %}
+{% block title %}Integrations — Works with WordPress, Shopify, Slack &amp; More{% endblock %}
+{% block meta_desc %}LiveVisitorHub integrations — WordPress, Shopify, React, Vue, Slack, Discord, WhatsApp. One line of code or native webhooks. No Zapier required.{% endblock %}
+
+{% block hero %}
+<section class="page-hero">
+    <div class="grid-bg"></div>
+    <div class="breadcrumb"><a href="/">Home</a> <span>/</span> <span>Integrations</span></div>
+    <h1>Works With Your <span>Whole Stack</span></h1>
+    <p>One embed line for any site. Native webhooks for tools your team already lives in. No Zapier middle-man, no per-task fees.</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<style>
+    .int-wrap { max-width: 1100px; margin: 0 auto; }
+    .int-section { margin-bottom: 64px; }
+    .int-section h2 { font-size: 22px; font-weight: 800; color: var(--text-dark); margin-bottom: 6px; letter-spacing: -0.5px; }
+    .int-section p.lede { font-size: 14px; color: var(--text-muted); margin-bottom: 22px; max-width: 600px; }
+
+    .int-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .int-card {
+        background: white; border: 1px solid var(--border-light); border-radius: 14px;
+        padding: 20px; display: flex; align-items: center; gap: 14px;
+        transition: transform .2s, box-shadow .2s, border-color .2s;
+        text-decoration: none; color: inherit;
+    }
+    .int-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(0,0,0,0.06); border-color: var(--primary-soft); }
+    .int-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .int-meta { display: flex; flex-direction: column; gap: 2px; }
+    .int-meta .name { font-size: 14px; font-weight: 700; color: var(--text-dark); }
+    .int-meta .tag { font-size: 11px; color: var(--text-muted); }
+    .int-badge { font-size: 9px; padding: 2px 7px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+    .badge-native { background: rgba(16,185,129,0.15); color: #059669; }
+    .badge-snippet { background: rgba(124,58,237,0.12); color: var(--primary); }
+    .badge-webhook { background: rgba(59,130,246,0.12); color: #2563eb; }
+    .badge-soon { background: rgba(148,163,184,0.18); color: #475569; }
+
+    .install-strip { background: white; border: 1px solid var(--border-light); border-radius: 18px; padding: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; margin-bottom: 60px; }
+    .install-strip h3 { font-size: 20px; font-weight: 800; color: var(--text-dark); margin-bottom: 6px; }
+    .install-strip p { font-size: 13.5px; color: var(--text-muted); margin-bottom: 16px; }
+    .install-strip .steps { display: flex; flex-direction: column; gap: 8px; }
+    .install-strip .step { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-body); }
+    .install-strip .step .num { width: 22px; height: 22px; border-radius: 50%; background: var(--gradient-primary); color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .code-block {
+        background: #0f0a2e; border-radius: 12px; padding: 18px 20px;
+        font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: #c084fc; line-height: 1.7;
+        position: relative; overflow-x: auto;
+    }
+    .code-block .tag { color: #f0abfc; }
+    .code-block .attr { color: #a78bfa; }
+    .code-block .str { color: #facc15; }
+    .copy-btn {
+        position: absolute; top: 10px; right: 10px;
+        background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+        color: white; font-size: 11px; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-family: inherit;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.16); }
+
+    .api-strip { background: linear-gradient(135deg, #0f0a2e 0%, #2d1b69 100%); border-radius: 22px; padding: 40px; color: white; text-align: center; margin-top: 30px; }
+    .api-strip h2 { color: white; font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+    .api-strip p { color: var(--text-muted-on-dark); font-size: 14px; max-width: 540px; margin: 0 auto 20px; }
+    .api-strip .btn { display: inline-flex; align-items: center; gap: 8px; }
+
+    @media (max-width: 768px) {
+        .int-section h2 { font-size: 19px; }
+        .install-strip { grid-template-columns: 1fr; padding: 22px; }
+        .api-strip { padding: 28px 22px; border-radius: 16px; }
+        .api-strip h2 { font-size: 20px; }
+    }
+</style>
+
+<div class="int-wrap">
+
+    <!-- Install snippet -->
+    <div class="install-strip">
+        <div>
+            <h3>Install in 2 minutes</h3>
+            <p>Drop one script tag before <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px;">&lt;/body&gt;</code>. Works on every CMS, framework, and hand-rolled site.</p>
+            <div class="steps">
+                <div class="step"><span class="num">1</span> Sign up for free → grab your widget key</div>
+                <div class="step"><span class="num">2</span> Paste the snippet on any page</div>
+                <div class="step"><span class="num">3</span> Start tracking visitors instantly</div>
+            </div>
+        </div>
+        <div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copySnippet(this)">Copy</button>
+<span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="str">"https://livevisitorhub.com/api/widget/script.js?key=YOUR_KEY"</span> <span class="attr">defer</span><span class="tag">&gt;&lt;/script&gt;</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CMS / Builders -->
+    <div class="int-section">
+        <h2>CMS &amp; Site Builders</h2>
+        <p class="lede">Paste the embed once — works on every popular platform without plugins.</p>
+        <div class="int-grid">
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(33,117,155,0.1);color:#21759b;"><i class="fab fa-wordpress"></i></div>
+                <div class="int-meta"><span class="name">WordPress</span><span class="tag">Header/Footer Scripts plugin or theme</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(122,181,92,0.1);color:#7ab55c;"><i class="fab fa-shopify"></i></div>
+                <div class="int-meta"><span class="name">Shopify</span><span class="tag">theme.liquid before &lt;/body&gt;</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(0,0,0,0.06);color:#000;"><i class="fab fa-wix"></i></div>
+                <div class="int-meta"><span class="name">Wix</span><span class="tag">Custom Code in Site → Settings</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(0,0,0,0.06);color:#000;"><i class="fas fa-cube"></i></div>
+                <div class="int-meta"><span class="name">Squarespace</span><span class="tag">Code Injection → Footer</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(255,107,0,0.1);color:#ff6b00;"><i class="fas fa-shopping-bag"></i></div>
+                <div class="int-meta"><span class="name">WooCommerce</span><span class="tag">WordPress + WooCommerce stores</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(96,108,243,0.1);color:#606cf3;"><i class="fas fa-store"></i></div>
+                <div class="int-meta"><span class="name">BigCommerce</span><span class="tag">Script Manager → Footer</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(0,118,255,0.1);color:#0076ff;"><i class="fas fa-globe"></i></div>
+                <div class="int-meta"><span class="name">Webflow</span><span class="tag">Project Settings → Custom Code</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(120,135,151,0.1);color:#788697;"><i class="fab fa-ghost"></i></div>
+                <div class="int-meta"><span class="name">Ghost</span><span class="tag">Code Injection → Site Footer</span></div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Frameworks -->
+    <div class="int-section">
+        <h2>Frameworks &amp; Code</h2>
+        <p class="lede">First-class snippet support for SPAs and SSR frameworks.</p>
+        <div class="int-grid">
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(97,218,251,0.1);color:#61dafb;"><i class="fab fa-react"></i></div>
+                <div class="int-meta"><span class="name">React / Next.js</span><span class="tag">Drop in _app.js or layout</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(66,184,131,0.1);color:#42b883;"><i class="fab fa-vuejs"></i></div>
+                <div class="int-meta"><span class="name">Vue / Nuxt</span><span class="tag">Nuxt plugin or app.vue</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(221,0,49,0.1);color:#dd0031;"><i class="fab fa-angular"></i></div>
+                <div class="int-meta"><span class="name">Angular</span><span class="tag">index.html or Renderer2</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(255,62,0,0.1);color:#ff3e00;"><i class="fas fa-bolt"></i></div>
+                <div class="int-meta"><span class="name">Svelte / SvelteKit</span><span class="tag">+layout.svelte</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(0,0,0,0.06);color:#000;"><i class="fas fa-leaf"></i></div>
+                <div class="int-meta"><span class="name">Astro</span><span class="tag">BaseLayout.astro</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(228,79,38,0.1);color:#e44f26;"><i class="fab fa-html5"></i></div>
+                <div class="int-meta"><span class="name">Plain HTML</span><span class="tag">Just paste before &lt;/body&gt;</span></div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="int-section">
+        <h2>Notifications &amp; Routing</h2>
+        <p class="lede">Push chat events to where your team already works.</p>
+        <div class="int-grid">
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(74,21,75,0.1);color:#4a154b;"><i class="fab fa-slack"></i></div>
+                <div class="int-meta"><span class="name">Slack <span class="int-badge badge-native">Native</span></span><span class="tag">Incoming webhook URL</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(88,101,242,0.1);color:#5865f2;"><i class="fab fa-discord"></i></div>
+                <div class="int-meta"><span class="name">Discord <span class="int-badge badge-native">Native</span></span><span class="tag">Channel webhook</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(37,211,102,0.1);color:#25d366;"><i class="fab fa-whatsapp"></i></div>
+                <div class="int-meta"><span class="name">WhatsApp Business <span class="int-badge badge-native">Native</span></span><span class="tag">Meta Business API</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(99,102,241,0.1);color:#6366f1;"><i class="fas fa-envelope"></i></div>
+                <div class="int-meta"><span class="name">Email Notifications <span class="int-badge badge-native">Native</span></span><span class="tag">SMTP, SES, Mailgun</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b;"><i class="fas fa-bell"></i></div>
+                <div class="int-meta"><span class="name">Web Push <span class="int-badge badge-native">Native</span></span><span class="tag">Browser notifications for agents</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(124,58,237,0.1);color:var(--primary);"><i class="fas fa-code-branch"></i></div>
+                <div class="int-meta"><span class="name">Custom Webhooks <span class="int-badge badge-webhook">Generic</span></span><span class="tag">POST any URL with JSON</span></div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Analytics & Marketing -->
+    <div class="int-section">
+        <h2>Analytics &amp; Marketing</h2>
+        <p class="lede">Tag managers, attribution and warehouses you already use.</p>
+        <div class="int-grid">
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(232,98,21,0.1);color:#e86215;"><i class="fab fa-google"></i></div>
+                <div class="int-meta"><span class="name">Google Analytics 4 <span class="int-badge badge-snippet">Snippet</span></span><span class="tag">Event tracking</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(0,150,219,0.1);color:#0096db;"><i class="fas fa-tag"></i></div>
+                <div class="int-meta"><span class="name">Google Tag Manager <span class="int-badge badge-snippet">Snippet</span></span><span class="tag">Add via custom HTML tag</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(7,193,96,0.1);color:#07c160;"><i class="fas fa-chart-line"></i></div>
+                <div class="int-meta"><span class="name">Mixpanel <span class="int-badge badge-webhook">Webhook</span></span><span class="tag">Forward chat events</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(255,109,69,0.1);color:#ff6d45;"><i class="fas fa-bolt"></i></div>
+                <div class="int-meta"><span class="name">Segment <span class="int-badge badge-soon">Soon</span></span><span class="tag">Source destination</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(0,165,124,0.1);color:#00a57c;"><i class="fas fa-database"></i></div>
+                <div class="int-meta"><span class="name">PostHog <span class="int-badge badge-webhook">Webhook</span></span><span class="tag">Capture events via API</span></div>
+            </a>
+            <a class="int-card" href="#" onclick="return false;">
+                <div class="int-icon" style="background:rgba(254,87,33,0.1);color:#fe5721;"><i class="fas fa-bullseye"></i></div>
+                <div class="int-meta"><span class="name">HubSpot <span class="int-badge badge-soon">Soon</span></span><span class="tag">Contact sync</span></div>
+            </a>
+        </div>
+    </div>
+
+    <!-- API CTA -->
+    <div class="api-strip">
+        <h2>Need something custom?</h2>
+        <p>Every chat event ships to your endpoint as signed JSON. Pull visitors, chats, agents and stats via REST. Build whatever you want on top.</p>
+        <a href="{% url 'pages:contact' %}" class="btn btn-primary"><i class="fas fa-code"></i> Talk to engineering</a>
+    </div>
+
+</div>
+
+<script>
+    function copySnippet(btn) {
+        const code = btn.parentElement.innerText.replace(/^Copy\s*/, '').trim();
+        navigator.clipboard.writeText(code).then(() => {
+            const old = btn.innerText; btn.innerText = 'Copied!';
+            setTimeout(() => btn.innerText = old, 1500);
+        });
+    }
+</script>
+{% endblock %}

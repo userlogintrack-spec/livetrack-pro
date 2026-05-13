@@ -1,0 +1,70 @@
+{% extends "pages/base_public.html" %}
+{% block title %}LiveTrack Pro vs {{ data.name }} — A Better, Cheaper Alternative{% endblock %}
+{% block meta_desc %}{{ data.meta_desc }}{% endblock %}
+
+{% block hero %}
+<section class="page-hero"><div class="grid-bg"></div>
+    <div class="breadcrumb"><a href="/">Home</a> / <a href="{% url 'pages:alternatives_index' %}">Alternatives</a> / vs {{ data.name }}</div>
+    <h1>The best <span>{{ data.name }} alternative</span></h1>
+    <p>{{ data.tagline }}</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="content-card">
+    <h2 style="margin-top:0;">Quick comparison</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:18px 0 28px;">
+        <div style="padding:18px;background:#fef2f2;border:1px solid #fecaca;border-radius:14px;">
+            <div style="font-size:11px;font-weight:700;color:#991b1b;text-transform:uppercase;margin-bottom:6px;">{{ data.name }}</div>
+            <div style="font-size:22px;font-weight:800;color:#1e1b4b;margin-bottom:14px;">{{ data.price_them }}</div>
+            <div style="font-size:13px;color:#7f1d1d;font-weight:600;margin-bottom:6px;">Pros</div>
+            <ul style="margin:0 0 12px 18px;padding:0;font-size:13px;color:#4b5563;">
+                {% for p in data.pros %}<li>{{ p }}</li>{% endfor %}
+            </ul>
+            <div style="font-size:13px;color:#7f1d1d;font-weight:600;margin-bottom:6px;">Cons</div>
+            <ul style="margin:0 0 0 18px;padding:0;font-size:13px;color:#4b5563;">
+                {% for c in data.cons %}<li>{{ c }}</li>{% endfor %}
+            </ul>
+        </div>
+        <div style="padding:18px;background:#f0fdf4;border:1px solid #86efac;border-radius:14px;">
+            <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:6px;">LiveTrack Pro</div>
+            <div style="font-size:22px;font-weight:800;color:#1e1b4b;margin-bottom:14px;">{{ data.price_us }}</div>
+            <div style="font-size:13px;color:#166534;font-weight:600;margin-bottom:6px;">Why teams switch</div>
+            <ul style="margin:0 0 0 18px;padding:0;font-size:13px;color:#4b5563;">
+                {% for w in data.why_us %}<li>{{ w }}</li>{% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <h2>What you get with LiveTrack Pro</h2>
+    <p>Everything {{ data.name }} offers, plus:</p>
+    <ul>
+        <li>Real-time visitor tracking with geo-IP, device, page-views and referrer</li>
+        <li>Built-in heatmaps, session recordings and frustration-signal detection</li>
+        <li>AI auto-reply bot powered by Anthropic Claude — bring your own API key</li>
+        <li>Native Slack &amp; Discord webhooks (no Zapier required)</li>
+        <li>Pre-chat forms, post-chat NPS/CSAT surveys, knowledge base auto-suggest</li>
+        <li>Department routing, SLA policies, agent performance dashboards</li>
+        <li>Multi-website support — one account, unlimited tracked sites</li>
+    </ul>
+
+    <h2>Migrate in under 10 minutes</h2>
+    <p>Drop one line of JavaScript on your site, import your existing canned replies, invite your agents — done.</p>
+
+    <div style="text-align:center;margin:32px 0 8px;">
+        <a href="{% url 'core:register' %}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;text-decoration:none;border-radius:12px;font-weight:700;font-size:15px;box-shadow:0 8px 24px rgba(124,58,237,0.3);">
+            Try LiveTrack Pro free →
+        </a>
+    </div>
+    <p style="text-align:center;font-size:12px;color:#6b7280;">Free forever plan · No credit card · 2-minute setup</p>
+
+    <h2>Other comparisons</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        {% for s, alt in all_alternatives.items %}
+            {% if s != slug %}
+            <a href="{% url 'pages:alternative_detail' s %}" style="padding:8px 16px;border-radius:999px;background:#f1f0ff;color:#5b21b6;font-size:13px;font-weight:600;text-decoration:none;">vs {{ alt.name }}</a>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

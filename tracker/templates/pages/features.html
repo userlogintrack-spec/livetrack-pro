@@ -409,9 +409,9 @@
     <ul class="nav-links" id="featNavLinks">
         <li><a href="{% url 'pages:features' %}" class="active">Features</a></li>
         <li><a href="{% url 'pages:compare' %}">Compare</a></li>
-        <li><a href="/#integrations">Integrations</a></li>
-        <li><a href="/#pricing">Pricing</a></li>
-        <li><a href="/#faq">FAQ</a></li>
+        <li><a href="{% url 'pages:integrations' %}">Integrations</a></li>
+        <li><a href="{% url 'pages:pricing' %}">Pricing</a></li>
+        <li><a href="{% url 'pages:faq' %}">FAQ</a></li>
         <li><a href="{% url 'pages:about' %}">About</a></li>
         <li><a href="{% url 'pages:contact' %}">Contact</a></li>
     </ul>

@@ -1,0 +1,24 @@
+{% extends "pages/base_public.html" %}
+{% block title %}Alternatives — Compared Side-by-Side{% endblock %}
+{% block meta_desc %}Compare LiveTrack Pro to Intercom, Tawk.to, Crisp and Drift. See pricing, feature gaps, and why teams switch.{% endblock %}
+
+{% block hero %}
+<section class="page-hero"><div class="grid-bg"></div>
+    <div class="breadcrumb"><a href="/">Home</a> / Alternatives</div>
+    <h1>Looking for an <span>alternative</span>?</h1>
+    <p>Honest, side-by-side comparisons with the most popular live chat tools.</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;">
+    {% for slug, alt in alternatives.items %}
+    <a href="{% url 'pages:alternative_detail' slug %}" style="display:block;padding:24px;background:white;border:1px solid #e5e2ff;border-radius:18px;text-decoration:none;color:inherit;transition:all .2s;box-shadow:0 4px 24px rgba(0,0,0,0.04);">
+        <div style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">vs</div>
+        <div style="font-size:22px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">{{ alt.name }}</div>
+        <p style="font-size:13px;color:#6b7280;line-height:1.6;margin-bottom:14px;">{{ alt.tagline }}</p>
+        <div style="font-size:12px;color:#7c3aed;font-weight:700;">Read comparison →</div>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
