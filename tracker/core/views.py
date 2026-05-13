@@ -161,54 +161,74 @@ def _spam_score(text):
 
 
 def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None, visitor_fingerprint='', website=None):
-    """Centralised dedup: returns the canonical Visitor row for this device+website.
+    """Centralised dedup: returns the canonical Visitor row for this device.
+
+    The DB unique constraint is (session_key, organization_id) — NOT website-
+    scoped. So we always match on that pair first, regardless of which website
+    the visitor is currently on. If the website differs, we update it on the
+    existing row so analytics still attribute the latest hit correctly.
 
     Match priority:
-        1. existing row with session_key + org + website -> exact match
-        2. fingerprint + org + website -> returning visitor on same domain
-        3. brand new row
-
-    Visitors are scoped per-website so the same user on two different domains
-    gets two separate Visitor rows. This keeps analytics domain-isolated.
+        1. (session_key, org) match → return, update website if it changed
+        2. fingerprint + org match (within 30 days) → returning visitor
+        3. brand new row, with IntegrityError-safe race fallback
     """
+    from django.db import IntegrityError, transaction
     from tracker.visitors.models import Visitor
     if not session_key:
         session_key = uuid.uuid4().hex
 
-    # Build website filter — match same website (or both NULL)
-    ws_match = {'website': website} if website else {'website__isnull': True}
-
-    # 1. Exact session + website match
+    # 1. Session-key match (the constraint key — never miss this)
     if session_key:
-        v = Visitor.objects.filter(organization=org, session_key=session_key, **ws_match).first()
+        v = Visitor.objects.filter(organization=org, session_key=session_key).first()
         if v:
-            return v, False
-
-    # 2. Fingerprint fallback (per-website)
-    if visitor_fingerprint:
-        cutoff = timezone.now() - timedelta(days=30)
-        v = (Visitor.objects.filter(
-            organization=org, visitor_fingerprint=visitor_fingerprint, last_seen__gte=cutoff, **ws_match
-        ).order_by('-last_seen').first())
-        if v:
-            if session_key and v.session_key != session_key:
-                v.session_key = session_key
+            updates = []
+            if website and v.website_id != website.id:
+                v.website = website
+                updates.append('website')
             if ip and not v.ip_address:
                 v.ip_address = ip
+                updates.append('ip_address')
             if ua and not v.user_agent:
                 v.user_agent = ua
-            updates = []
-            if session_key and v.session_key == session_key:
-                updates.append('session_key')
-            if ip and v.ip_address == ip:
-                updates.append('ip_address')
-            if ua and v.user_agent == ua:
                 updates.append('user_agent')
             if updates:
                 v.save(update_fields=updates)
             return v, False
 
-    # 3. Create new — one visitor per session per website
+    # 2. Fingerprint fallback (returning visitor with new session)
+    if visitor_fingerprint:
+        cutoff = timezone.now() - timedelta(days=30)
+        v = (Visitor.objects.filter(
+            organization=org, visitor_fingerprint=visitor_fingerprint, last_seen__gte=cutoff,
+        ).order_by('-last_seen').first())
+        if v:
+            updates = []
+            if session_key and v.session_key != session_key:
+                v.session_key = session_key
+                updates.append('session_key')
+            if website and v.website_id != website.id:
+                v.website = website
+                updates.append('website')
+            if ip and not v.ip_address:
+                v.ip_address = ip
+                updates.append('ip_address')
+            if ua and not v.user_agent:
+                v.user_agent = ua
+                updates.append('user_agent')
+            if updates:
+                # If we collide on (session_key, org) here, fall through to
+                # fetch the conflicting row instead of crashing the request.
+                try:
+                    with transaction.atomic():
+                        v.save(update_fields=updates)
+                except IntegrityError:
+                    v = Visitor.objects.filter(organization=org, session_key=session_key).first()
+                    if v:
+                        return v, False
+            return v, False
+
+    # 3. Create new — race-safe against parallel requests for the same session
     create_kwargs = {
         'organization': org,
         'website': website,
@@ -219,8 +239,16 @@ def _resolve_or_create_visitor(org, ip, ua, session_key, defaults=None, visitor_
     }
     if defaults:
         create_kwargs.update(defaults)
-    v = Visitor.objects.create(**create_kwargs)
-    return v, True
+    try:
+        with transaction.atomic():
+            v = Visitor.objects.create(**create_kwargs)
+        return v, True
+    except IntegrityError:
+        # Another request created the row first — fetch and return it.
+        v = Visitor.objects.filter(organization=org, session_key=session_key).first()
+        if v:
+            return v, False
+        raise
 
 
 def _split_multiline_csv(value):
@@ -438,11 +466,20 @@ def login_view(request):
         if form.is_valid():
             cache.delete(rl_key)
             user = form.get_user()
-            login(request, user)
-            # Ensure agent profile exists with org
+            # 2FA gate: if the user has TOTP enabled, defer auth_login until
+            # they pass the verification challenge.
             profile = AgentProfile.objects.filter(user=user).select_related('organization').first()
+            if profile and profile.totp_enabled:
+                # Rotate session id before stashing pending_2fa — otherwise an
+                # attacker who pre-set the user's session cookie could replay
+                # it at /2fa/verify with a stolen TOTP code.
+                request.session.cycle_key()
+                request.session['pending_2fa_user_id'] = user.id
+                return redirect('core:totp_verify')
+            login(request, user)
+            # Defeat session fixation: rotate session id at the auth boundary.
+            request.session.cycle_key()
             if not profile:
-                # Find org where user is owner, or first available org
                 from tracker.core.models import Organization
                 org = Organization.objects.filter(owner=user).first() or Organization.objects.first()
                 AgentProfile.objects.create(user=user, organization=org, role='agent')
@@ -526,6 +563,7 @@ def register_view(request):
                 dashboard_url=request.build_absolute_uri('/dashboard/'),
             )
         login(request, user)
+        request.session.cycle_key()
         # If paid plan selected, redirect to billing to complete payment
         if selected_plan in ('pro', 'enterprise'):
             return redirect(f'/dashboard/billing/?upgrade={selected_plan}')
@@ -696,11 +734,55 @@ def widget_init(request):
             visitor.city = visitor.city or city_name
             visitor.save(update_fields=['country', 'city'])
 
+        from tracker.core.business_hours import is_organization_open
+        from tracker.chat.models import Survey
+
+        is_open = is_organization_open(org) if org else True
+        offline_message = (
+            (website.offline_message if website and website.offline_message else None)
+            or (org.offline_message if org else 'We are currently offline. Please leave a message.')
+        )
+        prechat = None
+        if org and org.prechat_enabled:
+            prechat = {
+                'intro': org.prechat_intro,
+                'require_name': org.prechat_require_name,
+                'require_email': org.prechat_require_email,
+                'require_phone': org.prechat_require_phone,
+                'require_subject': org.prechat_require_subject,
+            }
+        post_chat_survey = None
+        if org:
+            survey = Survey.objects.filter(
+                organization=org, is_active=True, show_after_chat=True,
+            ).prefetch_related('questions').order_by('-created_at').first()
+            if survey:
+                post_chat_survey = {
+                    'id': survey.id,
+                    'title': survey.title,
+                    'description': survey.description,
+                    'type': survey.survey_type,
+                    'questions': [
+                        {
+                            'id': q.id,
+                            'text': q.question_text,
+                            'type': q.question_type,
+                            'choices': q.choices_list,
+                            'required': q.is_required,
+                        }
+                        for q in survey.questions.all().order_by('order')
+                    ],
+                }
+
         return JsonResponse({
             'session_key': visitor.session_key or session_key,
             'visitor_id': visitor.id,
             'welcome_message': (website.welcome_message if website and website.welcome_message else None) or (org.welcome_message if org else 'Hi! How can we help you?'),
             'widget_color': (website.widget_color if website and website.widget_color else None) or (org.widget_color if org else '#7c3aed'),
+            'is_offline': not is_open,
+            'offline_message': offline_message,
+            'prechat': prechat,
+            'post_chat_survey': post_chat_survey,
         })
     return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -1127,6 +1209,11 @@ def widget_script(request):
     }), false).catch(function(){});
   }), 1500);
 
+  // Tracking-only mode: skip everything below (button, iframe, proactive chat).
+  // Page-view tracking + session recording above remain active, so the org
+  // still gets analytics; the visitor just never sees a chat bubble.
+  if ("__CHAT_HIDDEN__" === "true") { return; }
+
   var style = document.createElement("style");
   style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:transform .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-btn:focus-visible{outline:3px solid rgba(59,130,246,.5);outline-offset:2px}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}@keyframes ltw-pulse{0%,100%{transform:scale(1);box-shadow:0 8px 24px rgba(0,0,0,.2)}50%{transform:scale(1.12);box-shadow:0 12px 36px rgba(0,0,0,.35)}}@media(prefers-reduced-motion:reduce){.ltw-btn,.ltw-btn:hover{transition:none;transform:none}.ltw-btn[style*=\"animation\"]{animation:none!important}}";
   document.head.appendChild(style);
@@ -1226,6 +1313,8 @@ def widget_script(request):
     proactive_msg = org.proactive_message if org else 'Need help? Chat with us!'
     proactive_delay = str(org.proactive_delay if org else 30)
 
+    chat_hidden = 'true' if (org and getattr(org, 'chat_widget_hidden', False)) else 'false'
+
     js = js.replace("__BASE__", base_url)
     js = js.replace("__WIDGET_KEY__", widget_key)
     js = js.replace("__WIDGET_COLOR__", widget_color)
@@ -1235,6 +1324,7 @@ def widget_script(request):
     js = js.replace("__PROACTIVE__", proactive_enabled)
     js = js.replace("__PROACTIVE_MSG__", proactive_msg.replace('"', '\\"'))
     js = js.replace("__PROACTIVE_DELAY__", proactive_delay)
+    js = js.replace("__CHAT_HIDDEN__", chat_hidden)
 
     # ─── Browser/CDN caching so host sites don't re-download on every page view ───
     import hashlib, gzip
@@ -1370,6 +1460,12 @@ def _get_time_greeting(name):
 def widget_start_chat(request):
     """Start a new chat from the widget."""
     if request.method == 'POST':
+        # Per-IP throttle: 10 chat starts/min is generous for a real user
+        # (re-restoring a chat is also covered by this) but stops bot floods.
+        from tracker.core.throttle import check as throttle_check
+        ts = throttle_check(request, action='start_chat', limit=10, window=60)
+        if ts.blocked:
+            return JsonResponse({'error': 'Too many chat starts. Please wait a moment.'}, status=429)
         data = _parse_json_body(request)
         if data is None:
             return JsonResponse({'error': 'Invalid JSON body'}, status=400)
@@ -1822,6 +1918,12 @@ def widget_embed_page(request):
     org = Organization.objects.filter(widget_key=widget_key).first() if widget_key else Organization.objects.first()
     parent_domain = _extract_parent_domain(request, {})
 
+    # Defense in depth — if the org has chat hidden, refuse to render the
+    # embed even when accessed directly. The loader script already skips
+    # injecting the iframe, but a curious visitor could otherwise hit this URL.
+    if org and getattr(org, 'chat_widget_hidden', False):
+        return HttpResponse('Chat is disabled for this site.', status=404)
+
     # Show a clear setup error when the key is invalid (instead of a blank panel).
     if widget_key and not org:
         html = f"""<!DOCTYPE html>
@@ -1874,27 +1976,86 @@ def widget_embed_page(request):
         if not request.session.session_key:
             request.session.create()
         session_key = request.session.session_key
+    # Server-side compute of dynamic widget config so the embed template can
+    # render the right surface (offline mode, survey modal, prechat fields)
+    # on first paint — no extra client round-trip needed.
+    from tracker.core.business_hours import is_organization_open
+    from tracker.chat.models import Survey
+    is_offline = bool(org and not is_organization_open(org))
+    survey_payload = None
+    if org:
+        srv = (
+            Survey.objects.filter(organization=org, is_active=True, show_after_chat=True)
+            .prefetch_related('questions')
+            .order_by('-created_at')
+            .first()
+        )
+        if srv:
+            survey_payload = {
+                'id': srv.id,
+                'title': srv.title,
+                'description': srv.description,
+                'type': srv.survey_type,
+                'questions': [
+                    {
+                        'id': q.id,
+                        'text': q.question_text,
+                        'type': q.question_type,
+                        'choices': q.choices_list,
+                        'required': q.is_required,
+                    }
+                    for q in srv.questions.all().order_by('order')
+                ],
+            }
+    # Default org domain (used for KB suggest tracking_key lookup) — pick the
+    # first active website so the widget can call /dashboard/api/kb-suggest/.
+    tracking_key = ''
+    if org:
+        first_site = org.websites.filter(is_active=True).first()
+        if first_site:
+            tracking_key = first_site.tracking_key
+
     return render(request, 'core/widget_embed.html', {
         'org': org,
         'widget_key': widget_key,
         'session_key': session_key,
         'parent_domain': parent_domain,
+        'is_offline': is_offline,
+        'post_chat_survey': survey_payload,
+        'tracking_key': tracking_key,
     })
 
 
 def landing_page(request):
-    """Demo landing page to test the chat widget."""
+    """Marketing landing page (also doubles as widget demo).
+
+    Anonymous renders are cached for 5 min to absorb traffic spikes — landing
+    pages are the highest-volume URL on a SaaS site and the HTML is identical
+    for every signed-out visitor. Authenticated users bypass the cache because
+    the navbar shows account-specific links.
+    """
     status = request.GET.get('status', '').strip().lower()
     if status in {'active', 'waiting'}:
         return redirect(f'/dashboard/chats/?status={status}')
-    # Ensure session exists so chat restore works on page load
-    if not request.session.session_key:
-        request.session.create()
-    # Get default org widget key for the demo landing page
+
+    if request.user.is_authenticated:
+        if not request.session.session_key:
+            request.session.create()
+        from tracker.core.models import Organization
+        org = Organization.objects.first()
+        widget_key = org.widget_key if org else ''
+        return render(request, 'core/landing.html', {'widget_key': widget_key})
+
+    cache_key = 'landing_anon_v2'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return HttpResponse(cached, content_type='text/html; charset=utf-8')
     from tracker.core.models import Organization
     org = Organization.objects.first()
     widget_key = org.widget_key if org else ''
-    return render(request, 'core/landing.html', {'widget_key': widget_key})
+    response = render(request, 'core/landing.html', {'widget_key': widget_key})
+    cache.set(cache_key, response.content, timeout=300)
+    return response
 
 
 def home_redirect(request):

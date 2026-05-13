@@ -1,0 +1,15 @@
+{% extends "pages/base_public.html" %}
+{% block title %}Link expired{% endblock %}
+{% block hero %}
+<section class="page-hero"><div class="grid-bg"></div>
+    <h1>This link <span>has expired</span></h1>
+    <p>Magic links work once and only for 30 minutes.</p>
+</section>
+{% endblock %}
+{% block content %}
+<div class="content-card" style="max-width:480px;margin:0 auto;text-align:center;">
+    <a href="{% url 'core:magic_link_request' %}" style="display:inline-block;padding:12px 24px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;text-decoration:none;border-radius:10px;font-weight:700;">
+        Request a new link
+    </a>
+</div>
+{% endblock %}

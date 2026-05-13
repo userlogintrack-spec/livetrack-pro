@@ -1,10 +1,11 @@
 from django.contrib import admin
 from django.db import connection
-from django.http import JsonResponse
-from django.urls import path, include
+from django.http import JsonResponse, HttpResponse
+from django.urls import path, include, reverse
 from django.conf import settings
 from django.conf.urls.static import static
-from django.views.decorators.cache import never_cache
+from django.views.decorators.cache import never_cache, cache_page
+from django.utils import timezone
 from tracker.dashboard import views as dashboard_views
 
 
@@ -21,8 +22,81 @@ def healthz(request):
         return JsonResponse({'status': 'error', 'error': str(e)[:200]}, status=503)
 
 
+def robots_txt(request):
+    """Production-friendly robots.txt — block dashboard/admin, allow marketing pages."""
+    host = request.get_host()
+    scheme = 'https' if request.is_secure() else 'http'
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /dashboard/\n"
+        "Disallow: /admin/\n"
+        "Disallow: /accounts/\n"
+        "Disallow: /api/\n"
+        "Disallow: /healthz/\n"
+        f"\nSitemap: {scheme}://{host}/sitemap.xml\n"
+    )
+    return HttpResponse(body, content_type='text/plain')
+
+
+def manifest_json(request):
+    """PWA manifest so the dashboard can be installed as an app."""
+    return JsonResponse({
+        'name': 'LiveTrack Pro',
+        'short_name': 'LiveTrack',
+        'description': 'Real-time visitor tracking, live chat & AI customer support.',
+        'start_url': '/dashboard/',
+        'display': 'standalone',
+        'background_color': '#fafbff',
+        'theme_color': '#7c3aed',
+        'orientation': 'portrait-primary',
+        'icons': [
+            {'src': '/static/icon-192.png', 'sizes': '192x192', 'type': 'image/png'},
+            {'src': '/static/icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
+        ],
+    })
+
+
+@cache_page(60 * 60)
+def sitemap_xml(request):
+    """Hand-written sitemap of public marketing routes — small, cacheable."""
+    scheme = 'https' if request.is_secure() else 'http'
+    host = request.get_host()
+    today = timezone.now().date().isoformat()
+    routes = [
+        ('/', '1.0', 'weekly'),
+        ('/features/', '0.9', 'monthly'),
+        ('/compare/', '0.8', 'monthly'),
+        ('/alternatives/', '0.8', 'monthly'),
+        ('/alternatives/intercom/', '0.8', 'monthly'),
+        ('/alternatives/tawk/', '0.8', 'monthly'),
+        ('/alternatives/crisp/', '0.8', 'monthly'),
+        ('/alternatives/drift/', '0.8', 'monthly'),
+        ('/changelog/', '0.7', 'weekly'),
+        ('/about/', '0.6', 'monthly'),
+        ('/contact/', '0.6', 'monthly'),
+        ('/privacy/', '0.3', 'yearly'),
+        ('/terms/', '0.3', 'yearly'),
+        ('/refund/', '0.3', 'yearly'),
+    ]
+    items = ''.join(
+        f'<url><loc>{scheme}://{host}{path}</loc><lastmod>{today}</lastmod>'
+        f'<changefreq>{freq}</changefreq><priority>{prio}</priority></url>'
+        for path, prio, freq in routes
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f'{items}</urlset>'
+    )
+    return HttpResponse(body, content_type='application/xml')
+
+
 urlpatterns = [
     path('healthz/', healthz, name='healthz'),
+    path('robots.txt', robots_txt, name='robots_txt'),
+    path('sitemap.xml', sitemap_xml, name='sitemap_xml'),
+    path('manifest.json', manifest_json, name='manifest_json'),
     path('admin/', admin.site.urls),
     path('accounts/', include('tracker.core.urls')),
     path('dashboard/', include('tracker.dashboard.urls')),

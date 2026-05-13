@@ -1,0 +1,23 @@
+{% extends "pages/base_public.html" %}
+{% block title %}Sign in by email{% endblock %}
+{% block hero %}
+<section class="page-hero"><div class="grid-bg"></div>
+    <div class="breadcrumb"><a href="/">Home</a> / Sign in</div>
+    <h1>Sign in <span>without a password</span></h1>
+    <p>Enter your email — we'll send you a one-tap sign-in link.</p>
+</section>
+{% endblock %}
+{% block content %}
+<div class="content-card" style="max-width:480px;margin:0 auto;">
+    {% if messages %}{% for m in messages %}<div style="padding:12px;background:#fef2f2;border-radius:8px;color:#991b1b;font-size:13px;margin-bottom:14px;">{{ m }}</div>{% endfor %}{% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <label style="display:block;font-weight:600;margin-bottom:6px;color:#1e1b4b;">Email address</label>
+        <input type="email" name="email" required placeholder="you@company.com" style="width:100%;padding:12px 14px;border:1.5px solid #e5e2ff;border-radius:10px;font-size:14px;font-family:inherit;outline:none;margin-bottom:14px;">
+        <button type="submit" style="width:100%;padding:12px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">Email me a sign-in link</button>
+    </form>
+    <p style="margin-top:18px;font-size:13px;color:#6b7280;text-align:center;">
+        Prefer a password? <a href="{% url 'core:login' %}" style="color:#7c3aed;font-weight:600;">Sign in with password</a>
+    </p>
+</div>
+{% endblock %}

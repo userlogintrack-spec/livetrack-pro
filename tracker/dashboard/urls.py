@@ -31,6 +31,11 @@ urlpatterns = [
     path('offline-messages/<int:msg_id>/read/', views.mark_offline_read, name='mark_offline_read'),
     # Agent Stats
     path('agent-stats/', views.agent_stats, name='agent_stats'),
+    path('agent-performance/', views.agent_performance_view, name='agent_performance'),
+    # Knowledge Base auto-suggest (public widget endpoint, JSON)
+    path('api/kb-suggest/', views.kb_suggest_api, name='kb_suggest_api'),
+    # Public widget endpoint to fetch a survey definition by id
+    path('api/widget/survey/<int:survey_id>/', views.widget_survey_detail, name='widget_survey_detail'),
     # Canned Responses
     path('canned-responses/', views.canned_responses_view, name='canned_responses'),
     # Settings
@@ -41,6 +46,8 @@ urlpatterns = [
     path('settings/webhooks/', views.webhook_list, name='webhooks'),
     path('settings/webhooks/<int:webhook_id>/delete/', views.webhook_delete, name='webhook_delete'),
     path('settings/webhooks/<int:webhook_id>/toggle/', views.webhook_toggle, name='webhook_toggle'),
+    path('settings/webhooks/<int:webhook_id>/log/', views.webhook_delivery_log, name='webhook_log'),
+    path('settings/webhooks/delivery/<int:delivery_id>/retry/', views.webhook_delivery_retry, name='webhook_retry'),
     path('settings/labels/', views.chat_labels_view, name='chat_labels'),
     path('settings/labels/<int:label_id>/delete/', views.delete_label, name='delete_label'),
     # Website Management

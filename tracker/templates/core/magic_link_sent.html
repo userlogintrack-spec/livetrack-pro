@@ -1,0 +1,19 @@
+{% extends "pages/base_public.html" %}
+{% block title %}Check your email{% endblock %}
+{% block hero %}
+<section class="page-hero"><div class="grid-bg"></div>
+    <h1>Check your <span>inbox</span></h1>
+    <p>If an account exists for {{ email }}, a sign-in link is on the way.</p>
+</section>
+{% endblock %}
+{% block content %}
+<div class="content-card" style="max-width:480px;margin:0 auto;text-align:center;">
+    <div style="width:64px;height:64px;border-radius:50%;background:rgba(124,58,237,0.1);display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;">
+        <i class="fas fa-envelope-open" style="font-size:24px;color:#7c3aed;"></i>
+    </div>
+    <p style="font-size:14px;color:#4b5563;line-height:1.7;">
+        The link expires in <strong>30 minutes</strong> and only works once.<br>
+        Didn't get it? Check spam, or <a href="{% url 'core:magic_link_request' %}" style="color:#7c3aed;font-weight:600;">request a new one</a>.
+    </p>
+</div>
+{% endblock %}

@@ -17,6 +17,14 @@ SECRET_KEY = os.getenv('SECRET_KEY', _default_key)
 
 DEBUG = os.getenv('DEBUG', 'True').lower() in {'1', 'true', 'yes', 'on'}
 
+# Refuse to boot with DEBUG=True on a known production host. DEBUG leaks stack
+# traces, the random per-restart SECRET_KEY logs everyone out, and ALLOWED_HOSTS
+# falls back to '*'. Set DEBUG=False explicitly in the production environment.
+if DEBUG and os.getenv('RENDER_EXTERNAL_HOSTNAME'):
+    raise RuntimeError(
+        "DEBUG=True is not allowed on Render. Set DEBUG=False in the service environment."
+    )
+
 # Production validation
 if not DEBUG:
     if not os.getenv('SECRET_KEY'):
@@ -101,8 +109,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'tracker.wsgi.application'
 ASGI_APPLICATION = 'tracker.asgi.application'
 
-# Channel layers - Redis for production, InMemory for dev
+# Channel layers — Redis required in production.
+# InMemoryChannelLayer is **single-process only**; with multiple workers a
+# message published from worker A never reaches a WebSocket on worker B,
+# silently breaking live chat. Refuse to boot prod without Redis to catch
+# this misconfiguration early instead of debugging it at 2am.
 REDIS_URL = os.getenv('REDIS_URL', '').strip()
+if not REDIS_URL and not DEBUG:
+    raise RuntimeError(
+        'REDIS_URL is required in production. The InMemory channel layer only '
+        'works with a single worker — multi-worker deploys silently lose '
+        'WebSocket messages between workers. Provision Redis (or Render Key '
+        'Value) and set REDIS_URL.'
+    )
 if REDIS_URL:
     CHANNEL_LAYERS = {
         'default': {
@@ -246,9 +265,15 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
-# Database connection pooling
-if not DEBUG and os.getenv('DATABASE_URL'):
-    DATABASES.get('default', {})['CONN_MAX_AGE'] = 600  # 10 minutes
+# Database connection pooling — keep Postgres connections warm across requests
+# in every environment. Without this each request opens a new connection
+# (~5-20ms TCP handshake + auth), which wastes CPU and fills up Postgres'
+# `max_connections` limit on busy deploys. 10 min strikes a balance between
+# pool warmth and freeing idle connections during quiet periods.
+DATABASES.get('default', {})['CONN_MAX_AGE'] = 600
+# Ping the connection on borrow — drops dead sockets after a network blip
+# instead of returning a stale handle to the application.
+DATABASES.get('default', {})['CONN_HEALTH_CHECKS'] = True
 
 # Logging
 LOG_DIR = BASE_DIR / 'logs'

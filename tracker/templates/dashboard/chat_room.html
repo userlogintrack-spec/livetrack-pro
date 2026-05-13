@@ -1691,6 +1691,34 @@
                 </div>
                 {% endif %}
             </div>
+
+            {# AI summary surface — only relevant after the chat closes. Shows a #}
+            {# pending badge while the background summarize thread runs, or the #}
+            {# rendered summary + topic chips once it lands. #}
+            {% if room.status == 'closed' %}
+                {% if room.summary %}
+                <div style="padding:10px 14px;background:linear-gradient(135deg,rgba(124,58,237,0.06),rgba(168,85,247,0.04));border-top:1px solid var(--border);font-size:12px;color:var(--text-primary);line-height:1.6;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+                        <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:6px;background:rgba(124,58,237,0.12);color:#5b21b6;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">
+                            <i class="fas fa-sparkles" style="font-size:10px;"></i> AI Summary
+                        </span>
+                        {% if summary_topic_list %}
+                            {% for tag in summary_topic_list %}
+                            <span style="padding:2px 8px;border-radius:6px;background:rgba(99,102,241,0.08);color:#4f46e5;font-size:10px;font-weight:600;">#{{ tag }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    {{ room.summary }}
+                </div>
+                {% elif ai_summary_pending %}
+                <div style="padding:8px 14px;background:rgba(245,158,11,0.06);border-top:1px solid var(--border);font-size:11px;color:#a16207;display:flex;align-items:center;gap:8px;">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;animation:summarizingPulse 1.4s infinite;"></span>
+                    AI is summarizing this chat — refresh in a moment.
+                </div>
+                <style>@keyframes summarizingPulse{0%,100%{opacity:0.4}50%{opacity:1}}</style>
+                {% endif %}
+            {% endif %}
+
             <!-- Header Row 2: Action Buttons (compact) -->
             <div class="chat-header-row2">
                 <div class="chat-actions">
