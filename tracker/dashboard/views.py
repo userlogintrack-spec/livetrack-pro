@@ -8,6 +8,7 @@ from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count, Q, Avg, Sum, F, Max, Subquery, OuterRef
+from django.db.models.functions import TruncDate
 from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime, timedelta
 import json
@@ -19,17 +20,18 @@ from tracker.visitors.models import (
 )
 from tracker.chat.models import (
     ChatRoom, Message, AgentProfile, OfflineMessage, CannedResponse, VisitorNote,
-    InternalNote, Webhook, ActivityLog, ChatLabel, SavedReply,
+    InternalNote, Webhook, WebhookDelivery, ActivityLog, ChatLabel, SavedReply,
     Department, DepartmentMember, SLAPolicy, SLABreach,
     Survey, SurveyQuestion, SurveyResponse, SurveyAnswer,
     AIBotConfig, AIBotKnowledge, ChatbotFlow,
     KBCategory, KBArticle, WhatsAppConfig, WhatsAppMessage, VisitorSegment,
-    AgentWebsiteAccess,
+    AgentWebsiteAccess, ChangelogEntry,
 )
 from tracker.chat.security import create_ws_token
 from tracker.chat.utils import close_stale_chats, check_sla_breaches
 from tracker.core.models import WebsiteSettings, Organization, Website, WebsiteGroup
-from tracker.core.views import _parse_json_body, get_user_org
+from tracker.core.plan_gating import requires_feature
+from tracker.core.views import _parse_json_body, get_user_org, _monthly_visitor_limit_state
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +151,7 @@ def dashboard_home(request):
     # Close stale chats only once per minute (cached)
     from django.core.cache import cache
     if not cache.get(f'stale_check_{org.id if org else 0}'):
-        close_stale_chats(inactive_minutes=30)
+        close_stale_chats()
         cache.set(f'stale_check_{org.id if org else 0}', True, 60)
     now = timezone.now()
     sla_minutes = int(getattr(settings, 'CHAT_SLA_MINUTES', 5))
@@ -340,11 +342,22 @@ def dashboard_home(request):
 @login_required
 def chat_list(request):
     org = get_user_org(request.user)
-    close_stale_chats(inactive_minutes=30)
+    close_stale_chats()
     now = timezone.now()
     sla_minutes = int(getattr(settings, 'CHAT_SLA_MINUTES', 5))
     sla_cutoff = now - timedelta(minutes=sla_minutes)
-    status_filter = request.GET.get('status', 'all')
+    # If the agent didn't ask for a specific tab, default to whichever bucket
+    # has rows that need attention: Waiting first, then Active, else All.
+    status_filter = request.GET.get('status') or ''
+    if not status_filter:
+        ws_filter_default = get_website_filter(request, org)
+        base_for_default = ChatRoom.objects.filter(organization=org, **ws_filter_default)
+        if base_for_default.filter(status='waiting').exists():
+            status_filter = 'waiting'
+        elif base_for_default.filter(status='active').exists():
+            status_filter = 'active'
+        else:
+            status_filter = 'all'
     search_q = request.GET.get('q', '').strip()
     tag_filter = request.GET.get('tag', '').strip()
     priority_filter = request.GET.get('priority', 'all').strip()
@@ -592,6 +605,16 @@ def chat_room_view(request, room_id):
     ).exclude(id=request.user.id)
     internal_notes_list = room.internal_notes.select_related('agent').all()
 
+    # AI summary surface flags — used by chat_room.html to show a "Summarizing…"
+    # badge while the background thread runs, then the actual summary once it lands.
+    ai_summary_pending = False
+    if room.status == 'closed' and not room.summary:
+        ai_cfg = AIBotConfig.objects.filter(
+            organization=org, auto_summarize=True, is_enabled=True, provider='anthropic',
+        ).first()
+        ai_summary_pending = bool(ai_cfg and ai_cfg.api_key)
+    summary_topic_list = [t.strip() for t in (room.summary_topics or '').split(',') if t.strip()]
+
     return render(request, 'dashboard/chat_room.html', {
         'room': room,
         'messages': messages_list,
@@ -604,6 +627,8 @@ def chat_room_view(request, room_id):
         'internal_notes': internal_notes_list,
         'sla_minutes': int(getattr(settings, 'CHAT_SLA_MINUTES', 5)),
         'manual_assign': manual_only,
+        'ai_summary_pending': ai_summary_pending,
+        'summary_topic_list': summary_topic_list,
     })
 
 
@@ -651,8 +676,11 @@ def visitor_list(request):
     if filter_type == 'online':
         visitors = visitors.filter(last_seen__gte=last_30_min)
     elif filter_type == 'today':
+        # "Today" = anyone *active* today. Using first_visit__gte hid returning
+        # visitors who came back today but first arrived on an earlier day,
+        # which made the tab look empty even on busy days.
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        visitors = visitors.filter(first_visit__gte=today_start)
+        visitors = visitors.filter(last_seen__gte=today_start)
 
     if search_q:
         visitors = visitors.filter(
@@ -722,6 +750,20 @@ def visitor_list(request):
 
     group_by_label = dict(group_options).get(group_by, 'Activity')
 
+    # Tracking-health diagnostics — gives the empty state real signal instead
+    # of always saying "No visitors yet" even when historical data exists or
+    # the widget is being actively blocked by configuration.
+    org_total_visitors = Visitor.objects.filter(organization=org).count()
+    has_other_filter_match = bool(visitor_list_data) and filter_type != 'all'
+    free_limit_state = _monthly_visitor_limit_state(org) if org else {'allowed': True, 'limit': None, 'count': 0, 'plan': 'free'}
+    visitor_limit_reached = (
+        free_limit_state.get('plan') == 'free'
+        and free_limit_state.get('count', 0) >= (free_limit_state.get('limit') or 100)
+    )
+    allowed_domains_blocking = bool(
+        org and getattr(org, 'allowed_domains_enabled', False) and (org.allowed_domains or '').strip()
+    )
+
     return render(request, 'dashboard/visitor_list.html', {
         'visitors': visitor_list_data[:100],
         'current_filter': filter_type,
@@ -732,6 +774,14 @@ def visitor_list(request):
         'group_by': group_by,
         'group_by_label': group_by_label,
         'group_options': group_options,
+        # Empty-state context — used by the template to show the right message:
+        'org_total_visitors': org_total_visitors,
+        'has_any_filter_active': filter_type != 'all' or bool(search_q or date_from or date_to),
+        'has_other_filter_match': has_other_filter_match,
+        'visitor_limit_reached': visitor_limit_reached,
+        'visitor_limit_count': free_limit_state.get('count', 0),
+        'visitor_limit_max': free_limit_state.get('limit') or 100,
+        'allowed_domains_blocking': allowed_domains_blocking,
     })
 
 
@@ -779,7 +829,7 @@ def api_stats(request):
     from django.core.cache import cache
     # Throttle stale chat cleanup
     if not cache.get(f'stale_api_{org.id if org else 0}'):
-        close_stale_chats(inactive_minutes=30)
+        close_stale_chats()
         cache.set(f'stale_api_{org.id if org else 0}', True, 30)
     if org and not cache.get(f'sla_api_{org.id}'):
         check_sla_breaches(
@@ -839,7 +889,57 @@ def close_chat(request, room_id):
             'visitor_name': room.visitor_name, 'duration': str(room.duration),
         })
         _log_activity(org, request.user, 'chat.closed', f'Closed chat #{room_id} with {room.visitor_name}', 'chat', room_id)
-        return JsonResponse({'status': 'closed'})
+
+        # AI auto-summary — async via thread so the agent UI doesn't block on
+        # the LLM call. Org pays for their own usage via api_key on AIBotConfig.
+        ai_cfg = AIBotConfig.objects.filter(organization=org, auto_summarize=True, is_enabled=True).first()
+        if ai_cfg and ai_cfg.provider == 'anthropic' and ai_cfg.api_key:
+            def _summarize(rid, cfg_id):
+                from django.db import close_old_connections
+                from tracker.chat.ai import summarize_chat
+                from tracker.chat.models import ChatRoom as _CR, AIBotConfig as _AC
+                try:
+                    cfg = _AC.objects.get(id=cfg_id)
+                    r = _CR.objects.get(id=rid)
+                    out = summarize_chat(cfg, r)
+                    if out and out.get('summary'):
+                        _CR.objects.filter(id=rid).update(
+                            summary=out['summary'],
+                            summary_topics=out.get('topics', ''),
+                            summary_at=timezone.now(),
+                        )
+                except Exception:
+                    logger.warning('auto-summary thread failed', exc_info=True)
+                finally:
+                    close_old_connections()
+            try:
+                _AI_POOL.submit(_summarize, room.id, ai_cfg.id)
+            except RuntimeError:
+                pass
+
+        # Push survey prompt to the visitor side via WebSocket so the widget
+        # can render the post-chat survey modal without polling.
+        survey = Survey.objects.filter(
+            organization=org, is_active=True, show_after_chat=True,
+        ).order_by('-created_at').first()
+        if survey:
+            try:
+                from asgiref.sync import async_to_sync
+                from channels.layers import get_channel_layer
+                async_to_sync(get_channel_layer().group_send)(
+                    f'chat_{room_id}',
+                    {
+                        'type': 'survey_prompt',
+                        'survey_id': survey.id,
+                        'survey_title': survey.title,
+                    },
+                )
+            except Exception:
+                logger.warning('failed to push survey prompt for room=%s', room_id, exc_info=True)
+        return JsonResponse({
+            'status': 'closed',
+            'survey_id': survey.id if survey else None,
+        })
     return JsonResponse({'error': 'POST required'}, status=405)
 
 
@@ -1272,27 +1372,46 @@ def agent_stats(request):
         total_messages=Count('chat_rooms__messages', filter=Q(chat_rooms__messages__sender_type='agent')),
     )
 
-    # Overall stats
+    # Overall stats — collapse 4 sequential queries into one aggregate.
     chats_qs = ChatRoom.objects.filter(organization=org)
-    total_chats = chats_qs.count()
-    avg_rating = chats_qs.filter(rating__isnull=False).aggregate(avg=Avg('rating'))['avg']
-    total_closed = chats_qs.filter(status='closed').count()
-    today_total = chats_qs.filter(created_at__gte=today_start).count()
+    overall = chats_qs.aggregate(
+        total=Count('id'),
+        avg_rating=Avg('rating', filter=Q(rating__isnull=False)),
+        total_closed=Count('id', filter=Q(status='closed')),
+        today_total=Count('id', filter=Q(created_at__gte=today_start)),
+    )
+    total_chats = overall['total'] or 0
+    avg_rating = overall['avg_rating']
+    total_closed = overall['total_closed'] or 0
+    today_total = overall['today_total'] or 0
 
-    # Chats per day (last 7 days)
+    # Chats per day (last 7 days) — group at the DB instead of looping 7 counts.
+    week_start = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+    by_date = {
+        row['d']: row['c']
+        for row in (
+            chats_qs.filter(created_at__gte=week_start)
+            .annotate(d=TruncDate('created_at'))
+            .values('d')
+            .annotate(c=Count('id'))
+        )
+    }
     daily_chats = []
     for i in range(7):
-        day = now - timedelta(days=6-i)
-        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
-        count = chats_qs.filter(created_at__gte=day_start, created_at__lt=day_end).count()
-        daily_chats.append({'day': day_start.strftime('%a'), 'count': count})
+        day_start = (now - timedelta(days=6 - i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        daily_chats.append({
+            'day': day_start.strftime('%a'),
+            'count': by_date.get(day_start.date(), 0),
+        })
 
-    # Rating distribution
-    rating_dist = []
-    for r in range(1, 6):
-        count = chats_qs.filter(rating=r).count()
-        rating_dist.append({'rating': r, 'count': count})
+    # Rating distribution — single GROUP BY rating instead of 5 counts.
+    rating_rows = (
+        chats_qs.filter(rating__isnull=False, rating__gte=1, rating__lte=5)
+        .values('rating')
+        .annotate(c=Count('id'))
+    )
+    by_rating = {row['rating']: row['c'] for row in rating_rows}
+    rating_dist = [{'rating': r, 'count': by_rating.get(r, 0)} for r in range(1, 6)]
 
     return render(request, 'dashboard/agent_stats.html', {
         'agents': agents,
@@ -1302,6 +1421,188 @@ def agent_stats(request):
         'today_total': today_total,
         'daily_chats': daily_chats,
         'rating_dist': rating_dist,
+    })
+
+
+@login_required
+@requires_feature('advanced_analytics', plan_label='Pro')
+def agent_performance_view(request):
+    """Premium per-agent performance dashboard.
+
+    Adds depth that the free `agent_stats` view doesn't:
+      - First-response time per agent (avg seconds)
+      - Average resolution duration
+      - SLA breaches per agent
+      - Online/availability status
+      - 30-day trend per agent (chats handled, CSAT)
+    """
+    org = get_user_org(request.user)
+    now = timezone.now()
+    last_30 = now - timedelta(days=30)
+
+    # Single annotated query over ChatRoom — aggregate everything per agent in
+    # the database. Previous version ran 5+ queries per agent in a Python loop,
+    # which became O(agents²) when annotations also pulled chat counts.
+    from django.db.models import (
+        Avg, Count, ExpressionWrapper, F, IntegerField, Q, Subquery,
+    )
+    first_agent_msg = (
+        Message.objects
+        .filter(room=OuterRef('pk'), sender_type='agent')
+        .order_by('timestamp')
+        .values('timestamp')[:1]
+    )
+    # Per-chat duration in seconds (closed) and first-response delta in seconds.
+    chats_30 = (
+        ChatRoom.objects
+        .filter(organization=org, agent__isnull=False, created_at__gte=last_30)
+        .annotate(_first_resp_at=Subquery(first_agent_msg))
+    )
+    # Aggregate per agent in one go. We use AVG over the per-chat extracts.
+    # Postgres EPOCH gives float seconds for an interval — that's what we want.
+    from django.db.models.functions import Extract
+    per_agent_qs = (
+        chats_30
+        .values('agent_id')
+        .annotate(
+            total_chats_30d=Count('id'),
+            closed_30d=Count('id', filter=Q(status='closed')),
+            avg_first_response_seconds=Avg(
+                Extract(F('_first_resp_at') - F('created_at'), 'epoch'),
+                filter=Q(_first_resp_at__isnull=False),
+            ),
+            avg_duration_seconds=Avg(
+                Extract(F('closed_at') - F('created_at'), 'epoch'),
+                filter=Q(closed_at__isnull=False),
+            ),
+            avg_rating=Avg('rating', filter=Q(rating__isnull=False)),
+        )
+    )
+    by_agent = {row['agent_id']: row for row in per_agent_qs}
+
+    # SLA breaches per agent (single query).
+    breach_counts = dict(
+        SLABreach.objects
+        .filter(organization=org, chat__agent__isnull=False, breached_at__gte=last_30)
+        .values_list('chat__agent_id')
+        .annotate(c=Count('id'))
+        .values_list('chat__agent_id', 'c')
+    )
+
+    agents_qs = (
+        AgentProfile.objects
+        .filter(organization=org)
+        .select_related('user')
+    )
+
+    rows = []
+    for profile in agents_qs:
+        user = profile.user
+        agg = by_agent.get(user.id, {})
+        total_chats = agg.get('total_chats_30d', 0) or 0
+        closed = agg.get('closed_30d', 0) or 0
+        resolution_rate = (closed / total_chats * 100) if total_chats else 0
+        rows.append({
+            'agent': user,
+            'profile': profile,
+            'total_chats_30d': total_chats,
+            'closed_30d': closed,
+            'avg_first_response_seconds': agg.get('avg_first_response_seconds'),
+            'avg_duration_seconds': agg.get('avg_duration_seconds'),
+            'avg_rating': agg.get('avg_rating'),
+            'sla_breach_count': breach_counts.get(user.id, 0),
+            'resolution_rate': round(resolution_rate, 1),
+            'is_online': profile.is_available,
+            'active_chats': profile.active_chats_count,
+        })
+
+    rows.sort(key=lambda r: (r['total_chats_30d'] or 0), reverse=True)
+
+    return render(request, 'dashboard/agent_performance.html', {
+        'rows': rows,
+        'period_label': 'Last 30 days',
+    })
+
+
+@csrf_exempt
+def kb_suggest_api(request):
+    """Public endpoint: given a query (visitor message), return matching KB articles.
+
+    Used by the widget's auto-suggest panel to deflect repetitive questions
+    without an agent reply. Scoped to the org behind the tracking_key.
+
+    Rate-limited per (IP, tracking_key) to prevent KB scraping by bots.
+    """
+    from django.core.cache import cache
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    data = _parse_json_body(request) or {}
+    query = (data.get('query') or '').strip()
+    tracking_key = (data.get('tracking_key') or '').strip()
+    if not query or len(query) < 3:
+        return JsonResponse({'results': []})
+    if not tracking_key:
+        return JsonResponse({'error': 'tracking_key required'}, status=400)
+
+    # Cheap per-IP throttle: 30 requests / minute should comfortably cover
+    # a real visitor typing into the widget but stop scraper bots cold.
+    ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or request.META.get('REMOTE_ADDR', 'unknown')
+    rl_key = f'kb_suggest_rl:{ip}:{tracking_key[:32]}'
+    count = cache.get(rl_key, 0)
+    if count >= 30:
+        return JsonResponse({'error': 'Too many requests', 'results': []}, status=429)
+    cache.set(rl_key, count + 1, timeout=60)
+
+    website = Website.objects.filter(tracking_key=tracking_key, is_active=True).select_related('organization').first()
+    if not website:
+        return JsonResponse({'error': 'invalid tracking_key'}, status=404)
+    org = website.organization
+
+    # Simple title/content match — good enough for v1, can swap for full-text
+    # search later. Public articles only, capped to 5 results.
+    matches = (
+        KBArticle.objects
+        .filter(organization=org, is_published=True)
+        .filter(Q(title__icontains=query) | Q(content__icontains=query))
+        .select_related('category')
+        .order_by('-views_count', '-helpful_yes')[:5]
+    )
+    results = [{
+        'id': a.id,
+        'title': a.title,
+        'snippet': a.content[:160],
+        'category': a.category.name if a.category else '',
+        'helpful_yes': a.helpful_yes,
+        'helpful_no': a.helpful_no,
+    } for a in matches]
+    return JsonResponse({'results': results})
+
+
+@csrf_exempt
+def widget_survey_detail(request, survey_id):
+    """Public endpoint: fetch a survey definition for the widget to render.
+
+    Used after `survey_prompt` is pushed over WebSocket — the widget calls
+    this to load the questions before rendering the modal.
+    """
+    survey = Survey.objects.filter(id=survey_id, is_active=True).prefetch_related('questions').first()
+    if not survey:
+        return JsonResponse({'error': 'survey not found'}, status=404)
+    return JsonResponse({
+        'id': survey.id,
+        'title': survey.title,
+        'description': survey.description,
+        'type': survey.survey_type,
+        'questions': [
+            {
+                'id': q.id,
+                'text': q.question_text,
+                'type': q.question_type,
+                'choices': q.choices_list,
+                'required': q.is_required,
+            }
+            for q in survey.questions.all().order_by('order')
+        ],
     })
 
 
@@ -1351,6 +1652,7 @@ def website_settings_view(request):
             'allowed_domains': org.allowed_domains,
             'attack_mode_enabled': getattr(org, 'attack_mode_enabled', False),
             'attack_mode_message': getattr(org, 'attack_mode_message', ''),
+            'chat_widget_hidden': getattr(org, 'chat_widget_hidden', False),
         }
         site_name = request.POST.get('site_name', '').strip()
         welcome_message = request.POST.get('welcome_message', '').strip()
@@ -1361,6 +1663,7 @@ def website_settings_view(request):
         require_email = request.POST.get('require_email') == 'on'
         widget_title = request.POST.get('widget_title', '').strip()
         widget_position = request.POST.get('widget_position', '').strip()
+        chat_widget_hidden = request.POST.get('chat_widget_hidden') == 'on'
 
         if not site_name:
             error = 'Site name is required.'
@@ -1369,6 +1672,7 @@ def website_settings_view(request):
             org.widget_title = widget_title or org.widget_title
             org.widget_color = widget_color
             org.widget_position = widget_position or org.widget_position
+            org.chat_widget_hidden = chat_widget_hidden
             org.welcome_message = welcome_message or 'Hi! How can we help you today?'
             org.offline_message = offline_message or 'We are currently offline. Please leave a message.'
             org.auto_reply_enabled = auto_reply_enabled
@@ -1741,21 +2045,31 @@ def chat_search_view(request):
 # ===== WEBHOOK MANAGEMENT =====
 
 @login_required
+@requires_feature('api_access', plan_label='Enterprise')
 def webhook_list(request):
     """Manage webhooks for chat events."""
     org = get_user_org(request.user)
     if request.method == 'POST':
         url = request.POST.get('url', '').strip()
+        provider = request.POST.get('provider', 'generic').strip()
         events = ','.join(request.POST.getlist('events'))
         secret = request.POST.get('secret', '').strip()
         if url:
-            Webhook.objects.create(organization=org, url=url, events=events, secret=secret)
-            _log_activity(org, request.user, 'webhook.created', f'Webhook created: {url[:50]}')
+            allowed_providers = {p[0] for p in Webhook.PROVIDER_CHOICES}
+            if provider not in allowed_providers:
+                provider = 'generic'
+            wh = Webhook(organization=org, url=url, provider=provider, events=events)
+            # Round-trip the HMAC secret through the encrypted setter.
+            wh.secret_plain = secret
+            wh.save()
+            _log_activity(org, request.user, 'webhook.created', f'Webhook created: {url[:50]} ({provider})')
     webhooks = Webhook.objects.filter(organization=org)
     event_choices = Webhook.EVENT_CHOICES
+    provider_choices = Webhook.PROVIDER_CHOICES
     return render(request, 'dashboard/webhooks.html', {
         'webhooks': webhooks,
         'event_choices': event_choices,
+        'provider_choices': provider_choices,
     })
 
 
@@ -1780,34 +2094,202 @@ def webhook_toggle(request, webhook_id):
     return JsonResponse({'error': 'POST required'}, status=405)
 
 
-def fire_webhook(org, event, payload):
-    """Fire webhooks for an event (non-blocking)."""
-    import threading
+@login_required
+def webhook_delivery_log(request, webhook_id):
+    """Per-webhook delivery audit trail — last 100 attempts with status + retry button."""
+    org = get_user_org(request.user)
+    wh = get_object_or_404(Webhook, id=webhook_id, organization=org)
+    deliveries = wh.deliveries.order_by('-created_at')[:100]
+    # Single GROUP BY pass instead of 4 separate counts (each was hitting the DB).
+    agg = wh.deliveries.aggregate(
+        total=Count('id'),
+        success=Count('id', filter=Q(status='success')),
+        pending=Count('id', filter=Q(status='pending')),
+        failed=Count('id', filter=Q(status='failed')),
+    )
+    counts = {
+        'total': agg['total'] or 0,
+        'success': agg['success'] or 0,
+        'pending': agg['pending'] or 0,
+        'failed': agg['failed'] or 0,
+    }
+    return render(request, 'dashboard/webhook_log.html', {
+        'webhook': wh,
+        'deliveries': deliveries,
+        'counts': counts,
+    })
+
+
+@login_required
+def webhook_delivery_retry(request, delivery_id):
+    """Manually re-fire a single failed/pending delivery from the dashboard."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    delivery = get_object_or_404(
+        WebhookDelivery.objects.select_related('webhook'),
+        id=delivery_id, webhook__organization=org,
+    )
+    # Reset for a fresh attempt — the existing attempt_count is preserved as
+    # history; we just clear the next_retry gate so process_webhook_retries
+    # (or this synchronous call) picks it up.
+    delivery.status = 'pending'
+    delivery.next_retry_at = None
+    delivery.save(update_fields=['status', 'next_retry_at'])
+    ok = _attempt_webhook_delivery(delivery)
+    return JsonResponse({'status': 'ok' if ok else 'failed', 'response_status': delivery.response_status})
+
+
+def _format_slack_payload(event, payload, org_name):
+    """Render a chat event as a Slack/Discord-compatible message block."""
+    title_map = {
+        'chat.created': ':speech_balloon: New chat started',
+        'chat.assigned': ':bust_in_silhouette: Chat assigned',
+        'chat.transferred': ':twisted_rightwards_arrows: Chat transferred',
+        'chat.closed': ':white_check_mark: Chat closed',
+        'chat.rated': ':star: Chat rated',
+        'message.new': ':envelope: New message',
+        'visitor.new': ':wave: New visitor',
+        'agent.joined': ':office: Agent joined',
+        'offline.message': ':inbox_tray: Offline message received',
+        'sla.breached': ':rotating_light: SLA breached',
+    }
+    title = title_map.get(event, f':bell: {event}')
+    fields = []
+    for label, key in (
+        ('Visitor', 'visitor_name'),
+        ('Email', 'visitor_email'),
+        ('Room', 'room_id'),
+        ('Agent', 'agent_name'),
+        ('Duration', 'duration'),
+        ('Rating', 'rating'),
+    ):
+        val = payload.get(key)
+        if val:
+            fields.append({'title': label, 'value': str(val), 'short': True})
+    text_lines = [f"*{title}* — _{org_name}_"]
+    for f in fields:
+        text_lines.append(f"• *{f['title']}*: {f['value']}")
+    return {
+        'text': '\n'.join(text_lines),
+        'username': 'LiveTrack',
+        'attachments': [{
+            'color': '#7c3aed',
+            'fields': fields,
+            'footer': 'LiveTrack',
+        }] if fields else [],
+    }
+
+
+def _attempt_webhook_delivery(delivery):
+    """Single delivery attempt — returns True on success, False otherwise.
+
+    Updates the delivery row in place with status/response data so the admin
+    UI and retry command can track lifecycle without extra round-trips.
+
+    Designed to be safe to call from background threads: any DB connection it
+    opens is closed before returning so the pool doesn't leak.
+    """
+    import hashlib
+    import hmac
     import urllib.request
+    from django.db import close_old_connections
 
-    def _send(url, data, secret):
+    wh = delivery.webhook
+    payload = delivery.payload or {}
+    org_name = wh.organization.name if wh.organization_id else ''
+    if wh.provider in ('slack', 'discord'):
+        body = json.dumps(_format_slack_payload(delivery.event, payload, org_name)).encode()
+        headers = {'Content-Type': 'application/json'}
+    else:
+        body = json.dumps(payload).encode()
+        headers = {
+            'Content-Type': 'application/json',
+            'X-LiveTrack-Event': delivery.event,
+        }
+    secret_plain = wh.secret_plain
+    if secret_plain:
+        sig = hmac.new(secret_plain.encode(), body, hashlib.sha256).hexdigest()
+        headers['X-LiveTrack-Signature'] = sig
+
+    delivery.attempt_count = (delivery.attempt_count or 0) + 1
+    try:
         try:
-            import hashlib, hmac
-            body = json.dumps(data).encode()
-            req = urllib.request.Request(url, data=body, headers={
-                'Content-Type': 'application/json',
-                'X-LiveTrack-Event': data.get('event', ''),
-            })
-            if secret:
-                sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-                req.add_header('X-LiveTrack-Signature', sig)
-            urllib.request.urlopen(req, timeout=5)
-        except Exception:
-            logger.warning('webhook delivery failed url=%s', url, exc_info=True)
+            req = urllib.request.Request(wh.url, data=body, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                delivery.response_status = resp.status
+                delivery.status = 'success'
+                delivery.completed_at = timezone.now()
+                delivery.last_error = ''
+                delivery.next_retry_at = None
+                delivery.save(update_fields=['attempt_count', 'response_status', 'status', 'completed_at', 'last_error', 'next_retry_at'])
+                return True
+        except urllib.request.HTTPError as exc:
+            # 4xx is a permanent client error — don't waste retries on it.
+            permanent = 400 <= exc.code < 500
+            delivery.response_status = exc.code
+            delivery.last_error = f'HTTP {exc.code}'
+            if permanent or delivery.attempt_count >= 4:
+                delivery.status = 'failed'
+                delivery.completed_at = timezone.now()
+                delivery.next_retry_at = None
+            else:
+                delays = [60, 300, 1500]
+                delivery.next_retry_at = timezone.now() + timedelta(seconds=delays[min(delivery.attempt_count - 1, len(delays) - 1)])
+                delivery.status = 'pending'
+            delivery.save(update_fields=['attempt_count', 'response_status', 'last_error', 'next_retry_at', 'status', 'completed_at'])
+            return False
+        except Exception as exc:
+            # Network / timeout / DNS — transient, retry.
+            delivery.last_error = str(exc)[:500]
+            delays = [60, 300, 1500]
+            if delivery.attempt_count < 4:
+                delivery.next_retry_at = timezone.now() + timedelta(seconds=delays[min(delivery.attempt_count - 1, len(delays) - 1)])
+                delivery.status = 'pending'
+            else:
+                delivery.status = 'failed'
+                delivery.completed_at = timezone.now()
+                delivery.next_retry_at = None
+            delivery.save(update_fields=['attempt_count', 'last_error', 'next_retry_at', 'status', 'completed_at'])
+            return False
+    finally:
+        # Critical for thread-pool safety: hand the connection back so we
+        # don't exhaust Postgres' max_connections under load.
+        close_old_connections()
 
+
+# Process-wide bounded thread pools for background work. Without this, a
+# spike in chat closes (each firing N webhooks) would spawn unbounded threads
+# and exhaust Postgres' connection limit + the OS thread cap. 16 workers is
+# enough headroom for normal traffic without hammering the DB.
+import concurrent.futures as _cf
+_WEBHOOK_POOL = _cf.ThreadPoolExecutor(max_workers=16, thread_name_prefix='wh')
+_AI_POOL = _cf.ThreadPoolExecutor(max_workers=4, thread_name_prefix='ai')
+
+
+def fire_webhook(org, event, payload):
+    """Enqueue webhooks for an event (non-blocking, via bounded thread pool).
+
+    Each subscribing webhook gets a WebhookDelivery row. First attempt is
+    submitted to a 16-thread pool; if the pool is saturated the row stays
+    'pending' and the `process_webhook_retries` cron picks it up next minute.
+    """
     if not org:
         return
+    enriched = dict(payload)
+    enriched.setdefault('event', event)
     webhooks = Webhook.objects.filter(organization=org, is_active=True)
     for wh in webhooks:
-        if event in wh.events:
-            t = threading.Thread(target=_send, args=(wh.url, payload, wh.secret))
-            t.daemon = True
-            t.start()
+        subscribed = [e.strip() for e in wh.events.split(',') if e.strip()]
+        if event not in subscribed:
+            continue
+        delivery = WebhookDelivery.objects.create(webhook=wh, event=event, payload=enriched)
+        try:
+            _WEBHOOK_POOL.submit(_attempt_webhook_delivery, delivery)
+        except RuntimeError:
+            # Pool shutting down (interpreter teardown) — leave the row as
+            # pending so the retry cron handles it.
+            pass
 
 
 # ===== ACTIVITY LOG =====
@@ -2325,8 +2807,16 @@ def submit_survey_response(request, survey_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
+    # 1 submission per visitor per minute is plenty — surveys are once per chat.
+    from tracker.core.throttle import check as throttle_check
+    ts = throttle_check(request, action=f'survey_submit_{survey_id}', limit=2, window=60)
+    if ts.blocked:
+        return JsonResponse({'error': 'Too many submissions. Please wait.'}, status=429)
+
     data = _parse_json_body(request) or {}
-    session_key = request.session.session_key
+    # Cross-origin embed: cookies are blocked by SameSite, so the widget passes
+    # session_key in the body. Cookie session_key is the fallback for same-origin.
+    session_key = (data.get('session_key') or '').strip() or request.session.session_key
     if not session_key:
         return JsonResponse({'error': 'No session'}, status=400)
 
@@ -2367,14 +2857,10 @@ def submit_survey_response(request, survey_id):
 # ═══════════════════════════════════════════════════════════
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_bot_config_view(request):
     """Configure AI auto-reply bot."""
     org = get_user_org(request.user)
-    # Plan check
-    from tracker.core.views import check_plan_feature
-    if not request.user.is_superuser and not check_plan_feature(org, 'ai_bot'):
-        return render(request, 'dashboard/plan_required.html', {'feature': 'AI Auto-Reply Bot', 'required_plan': 'Enterprise'})
-
     config, _ = AIBotConfig.objects.get_or_create(organization=org)
 
     if request.method == 'POST':
@@ -2419,6 +2905,7 @@ def ai_bot_config_view(request):
 # ═══════════════════════════════════════════════════════════
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def chatbot_flows_view(request):
     """Manage chatbot flows."""
     org = get_user_org(request.user)
@@ -2595,6 +3082,7 @@ def kb_article_feedback(request, article_id):
 # ═══════════════════════════════════════════════════════════
 
 @login_required
+@requires_feature('api_access', plan_label='Enterprise')
 def whatsapp_config_view(request):
     """Configure WhatsApp Business API integration."""
     org = get_user_org(request.user)
@@ -2604,7 +3092,15 @@ def whatsapp_config_view(request):
         data = _parse_json_body(request) or {}
         config.is_enabled = data.get('is_enabled', config.is_enabled)
         config.phone_number_id = data.get('phone_number_id', config.phone_number_id)
-        config.access_token = data.get('access_token', config.access_token)
+        # access_token round-trips through `_plain` so it lands encrypted.
+        # Treat empty string as "no change" (form re-submit won't wipe the
+        # stored token). To explicitly clear, send `null`.
+        new_token = data.get('access_token')
+        if new_token:
+            config.access_token_plain = new_token
+        elif new_token is None:
+            config.access_token_plain = ''
+        # verify_token stays plaintext (used as a Meta-handshake lookup key).
         config.verify_token = data.get('verify_token', config.verify_token)
         config.save()
         _log_activity(org, request.user, 'whatsapp.updated', 'Updated WhatsApp configuration')
@@ -2749,6 +3245,7 @@ def _get_prev_period(start, end):
 
 
 @login_required
+@requires_feature('advanced_analytics', plan_label='Pro')
 def advanced_analytics_view(request):
     """Google Analytics-style advanced analytics dashboard."""
     org = get_user_org(request.user)
@@ -3104,6 +3601,7 @@ def track_performance_api(request):
 # ─── Scheduled Reports ───
 
 @login_required
+@requires_feature('email_notifications', plan_label='Pro')
 def scheduled_reports_view(request):
     """Manage scheduled email reports."""
     org = get_user_org(request.user)

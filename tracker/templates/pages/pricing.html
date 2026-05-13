@@ -1,0 +1,261 @@
+{% extends 'pages/base_public.html' %}
+{% block title %}Pricing — Simple, Transparent Plans{% endblock %}
+{% block meta_desc %}LiveVisitorHub pricing — Free forever plan, Pro $19/mo, Enterprise $79/mo. Visitor tracking, AI chat, session recording — no per-seat tax, no hidden fees.{% endblock %}
+
+{% block hero %}
+<section class="page-hero">
+    <div class="grid-bg"></div>
+    <div class="breadcrumb"><a href="/">Home</a> <span>/</span> <span>Pricing</span></div>
+    <h1>Simple, <span>Transparent</span> Pricing</h1>
+    <p>Start free. Upgrade when you outgrow it. Cancel anytime. No credit card to begin.</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<style>
+    .pricing-wrap { max-width: 1100px; margin: 0 auto; }
+    .billing-toggle { display: inline-flex; background: white; border: 1px solid var(--border-light); border-radius: 999px; padding: 4px; margin: 0 auto 28px; gap: 4px; }
+    .billing-toggle button { background: transparent; border: 0; padding: 8px 22px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; font-family: inherit; transition: all .2s; }
+    .billing-toggle button.active { background: var(--gradient-primary); color: white; box-shadow: 0 4px 14px rgba(124,58,237,0.3); }
+    .save-pill { font-size: 10px; background: rgba(16,185,129,0.15); color: #059669; padding: 2px 8px; border-radius: 999px; font-weight: 700; margin-left: 6px; }
+    .center-row { text-align: center; }
+
+    .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 16px; }
+    .price-card {
+        background: white; border: 1.5px solid var(--border-light); border-radius: 20px;
+        padding: 32px 28px; display: flex; flex-direction: column; gap: 14px;
+        transition: transform .25s, box-shadow .25s, border-color .25s;
+    }
+    .price-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(124,58,237,0.10); }
+    .price-card.featured { border-color: var(--primary); position: relative; box-shadow: 0 20px 50px rgba(124,58,237,0.18); }
+    .price-card.featured::before {
+        content: 'Most Popular';
+        position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+        background: var(--gradient-primary); color: white;
+        font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+        padding: 5px 14px; border-radius: 999px;
+        text-transform: uppercase;
+    }
+    .plan-name { font-size: 14px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+    .plan-tag { font-size: 13px; color: var(--text-muted); }
+    .plan-price { display: flex; align-items: baseline; gap: 4px; margin: 2px 0 4px; }
+    .plan-price .amt { font-size: 44px; font-weight: 900; color: var(--text-dark); letter-spacing: -1.5px; }
+    .plan-price .per { font-size: 14px; color: var(--text-muted); font-weight: 500; }
+    .plan-price .strike { font-size: 16px; color: #9ca3af; text-decoration: line-through; margin-left: 8px; }
+
+    .plan-cta { width: 100%; justify-content: center; padding: 12px 16px; font-size: 14px; }
+    .btn-outline { background: white; color: var(--text-dark); border: 1.5px solid var(--border-light); box-shadow: none; }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: var(--bg-soft); }
+
+    .plan-divider { height: 1px; background: var(--border-light); margin: 6px 0; }
+    .feature-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .feature-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--text-body); line-height: 1.5; }
+    .feature-list li i { color: #10b981; font-size: 12px; margin-top: 4px; flex-shrink: 0; }
+    .feature-list li.muted { color: #9ca3af; }
+    .feature-list li.muted i { color: #d1d5db; }
+
+    .comparison { margin: 80px 0 40px; }
+    .comparison h2 { text-align: center; font-size: 30px; font-weight: 800; color: var(--text-dark); letter-spacing: -0.8px; margin-bottom: 8px; }
+    .comparison p.sub { text-align: center; color: var(--text-muted); margin-bottom: 28px; font-size: 14px; }
+    .cmp-table { width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.05); border: 1px solid var(--border-light); }
+    .cmp-table th { padding: 16px 20px; font-size: 13px; font-weight: 700; text-align: left; color: var(--text-dark); background: #fafbff; border-bottom: 1px solid var(--border-light); }
+    .cmp-table th:not(:first-child) { text-align: center; }
+    .cmp-table td { padding: 14px 20px; font-size: 13px; color: var(--text-body); border-bottom: 1px solid #f3f4f6; }
+    .cmp-table td:not(:first-child) { text-align: center; }
+    .cmp-table tr:last-child td { border-bottom: 0; }
+    .cmp-yes { color: #059669; font-weight: 700; }
+    .cmp-no { color: #d1d5db; }
+    .cmp-table tr.spotlight td { background: rgba(124,58,237,0.04); }
+
+    .faq-mini { max-width: 760px; margin: 70px auto 0; }
+    .faq-mini h2 { text-align: center; font-size: 26px; font-weight: 800; color: var(--text-dark); margin-bottom: 24px; }
+    .faq-mini details { background: white; border: 1px solid var(--border-light); border-radius: 14px; padding: 16px 22px; margin-bottom: 12px; cursor: pointer; transition: border-color .2s; }
+    .faq-mini details:hover { border-color: var(--primary-soft); }
+    .faq-mini summary { font-size: 14px; font-weight: 600; color: var(--text-dark); list-style: none; display: flex; justify-content: space-between; align-items: center; }
+    .faq-mini summary::after { content: '+'; color: var(--primary); font-size: 20px; font-weight: 400; transition: transform .2s; }
+    .faq-mini details[open] summary::after { transform: rotate(45deg); }
+    .faq-mini details > p { font-size: 13.5px; color: var(--text-body); margin-top: 10px; line-height: 1.7; }
+
+    .cta-bottom { background: var(--gradient-primary); color: white; border-radius: 24px; padding: 48px 40px; text-align: center; margin: 70px 0 0; }
+    .cta-bottom h2 { font-size: 30px; font-weight: 800; margin-bottom: 10px; letter-spacing: -0.6px; }
+    .cta-bottom p { font-size: 15px; color: rgba(255,255,255,0.85); margin-bottom: 22px; }
+    .cta-bottom .btn { background: white; color: var(--primary-dark); font-weight: 700; }
+    .cta-bottom .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,0.2); }
+
+    @media (max-width: 768px) {
+        .price-grid { grid-template-columns: 1fr; gap: 16px; }
+        .price-card { padding: 26px 22px; }
+        .plan-price .amt { font-size: 38px; }
+        .comparison h2, .cta-bottom h2 { font-size: 22px; }
+        .cmp-table th, .cmp-table td { padding: 10px 12px; font-size: 12px; }
+        .cta-bottom { padding: 32px 22px; border-radius: 18px; }
+    }
+</style>
+
+<div class="pricing-wrap">
+
+    <div class="center-row">
+        <div class="billing-toggle">
+            <button class="active" data-billing="monthly">Monthly</button>
+            <button data-billing="annual">Annual <span class="save-pill">SAVE 20%</span></button>
+        </div>
+    </div>
+
+    <div class="price-grid">
+        <!-- FREE -->
+        <div class="price-card">
+            <div class="plan-name">Free</div>
+            <div class="plan-tag">For side projects &amp; small sites.</div>
+            <div class="plan-price"><span class="amt">$0</span><span class="per">/forever</span></div>
+            <a href="{% url 'core:register' %}?plan=free" class="btn btn-outline plan-cta">Get Started Free</a>
+            <div class="plan-divider"></div>
+            <ul class="feature-list">
+                <li><i class="fas fa-check"></i> Up to 100 visitors/month</li>
+                <li><i class="fas fa-check"></i> 1 Agent seat</li>
+                <li><i class="fas fa-check"></i> Live chat widget</li>
+                <li><i class="fas fa-check"></i> Real-time visitor tracking</li>
+                <li><i class="fas fa-check"></i> 30-day chat history</li>
+                <li><i class="fas fa-check"></i> Basic analytics</li>
+                <li class="muted"><i class="fas fa-times"></i> AI bot replies</li>
+                <li class="muted"><i class="fas fa-times"></i> Session recordings</li>
+            </ul>
+        </div>
+
+        <!-- PRO -->
+        <div class="price-card featured">
+            <div class="plan-name" style="color: var(--primary);">Pro</div>
+            <div class="plan-tag">For growing teams &amp; busy stores.</div>
+            <div class="plan-price">
+                <span class="amt" data-monthly="$19" data-annual="$15">$19</span>
+                <span class="per">/mo</span>
+                <span class="strike" data-monthly="" data-annual="$19" style="display:none;">$19</span>
+            </div>
+            <a href="{% url 'core:register' %}?plan=pro" class="btn btn-primary plan-cta">Start Pro Free 14 Days</a>
+            <div class="plan-divider"></div>
+            <ul class="feature-list">
+                <li><i class="fas fa-check"></i> <strong style="color:var(--text-dark);">Everything in Free</strong></li>
+                <li><i class="fas fa-check"></i> Unlimited visitors</li>
+                <li><i class="fas fa-check"></i> 5 Agent seats</li>
+                <li><i class="fas fa-check"></i> Session recordings &amp; heatmaps</li>
+                <li><i class="fas fa-check"></i> Unlimited chat history</li>
+                <li><i class="fas fa-check"></i> Custom widget branding</li>
+                <li><i class="fas fa-check"></i> Email + Slack notifications</li>
+                <li><i class="fas fa-check"></i> Webhooks + integrations</li>
+                <li><i class="fas fa-check"></i> Priority email support</li>
+            </ul>
+        </div>
+
+        <!-- ENTERPRISE -->
+        <div class="price-card">
+            <div class="plan-name">Enterprise</div>
+            <div class="plan-tag">For scale &amp; compliance teams.</div>
+            <div class="plan-price">
+                <span class="amt" data-monthly="$79" data-annual="$63">$79</span>
+                <span class="per">/mo</span>
+                <span class="strike" data-monthly="" data-annual="$79" style="display:none;">$79</span>
+            </div>
+            <a href="{% url 'core:register' %}?plan=enterprise" class="btn btn-outline plan-cta">Start Enterprise</a>
+            <div class="plan-divider"></div>
+            <ul class="feature-list">
+                <li><i class="fas fa-check"></i> <strong style="color:var(--text-dark);">Everything in Pro</strong></li>
+                <li><i class="fas fa-check"></i> Unlimited agent seats</li>
+                <li><i class="fas fa-check"></i> AI bot (bring your own Claude key)</li>
+                <li><i class="fas fa-check"></i> WhatsApp + multi-channel inbox</li>
+                <li><i class="fas fa-check"></i> SLA management &amp; surveys</li>
+                <li><i class="fas fa-check"></i> White-label widget</li>
+                <li><i class="fas fa-check"></i> API access &amp; webhooks</li>
+                <li><i class="fas fa-check"></i> SSO + audit logs</li>
+                <li><i class="fas fa-check"></i> 24/7 priority support</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- COMPARISON TABLE -->
+    <div class="comparison">
+        <h2>What's in each plan</h2>
+        <p class="sub">Quick side-by-side of the features that matter most.</p>
+        <table class="cmp-table">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Free</th>
+                    <th>Pro</th>
+                    <th>Enterprise</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Monthly visitors</td><td>100</td><td>Unlimited</td><td>Unlimited</td></tr>
+                <tr><td>Agent seats</td><td>1</td><td>5</td><td>Unlimited</td></tr>
+                <tr><td>Live chat widget</td><td class="cmp-yes">✓</td><td class="cmp-yes">✓</td><td class="cmp-yes">✓</td></tr>
+                <tr><td>Real-time visitor tracking</td><td class="cmp-yes">✓</td><td class="cmp-yes">✓</td><td class="cmp-yes">✓</td></tr>
+                <tr class="spotlight"><td>Session recordings &amp; heatmaps</td><td class="cmp-no">—</td><td class="cmp-yes">✓</td><td class="cmp-yes">✓</td></tr>
+                <tr><td>Chat history retention</td><td>30 days</td><td>Unlimited</td><td>Unlimited</td></tr>
+                <tr><td>Widget branding control</td><td class="cmp-no">—</td><td class="cmp-yes">Custom</td><td class="cmp-yes">White-label</td></tr>
+                <tr class="spotlight"><td>AI auto-reply bot (BYO key)</td><td class="cmp-no">—</td><td class="cmp-no">—</td><td class="cmp-yes">✓</td></tr>
+                <tr><td>WhatsApp / Multi-channel</td><td class="cmp-no">—</td><td class="cmp-no">—</td><td class="cmp-yes">✓</td></tr>
+                <tr><td>SLA management + surveys</td><td class="cmp-no">—</td><td class="cmp-no">—</td><td class="cmp-yes">✓</td></tr>
+                <tr><td>Webhooks &amp; API access</td><td class="cmp-no">—</td><td class="cmp-yes">Webhooks</td><td class="cmp-yes">Full API</td></tr>
+                <tr><td>SSO + audit logs</td><td class="cmp-no">—</td><td class="cmp-no">—</td><td class="cmp-yes">✓</td></tr>
+                <tr><td>Support</td><td>Email</td><td>Priority email</td><td>24/7 phone</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- PRICING FAQ -->
+    <div class="faq-mini">
+        <h2>Pricing FAQ</h2>
+        <details>
+            <summary>Is there really a free plan?</summary>
+            <p>Yes — Free is genuinely free forever, no credit card. It caps at 100 visitors/month and 1 agent. Upgrade only when you outgrow that.</p>
+        </details>
+        <details>
+            <summary>Can I switch plans later?</summary>
+            <p>Anytime. Upgrades take effect immediately, downgrades take effect at the end of your current billing cycle. No prorated charges to worry about.</p>
+        </details>
+        <details>
+            <summary>What's your refund policy?</summary>
+            <p>14-day money-back guarantee on any paid plan. Email us within 14 days and we'll refund — no questions asked. See <a href="{% url 'pages:refund' %}">Refund Policy</a>.</p>
+        </details>
+        <details>
+            <summary>Do you offer annual billing?</summary>
+            <p>Yes. Switch the toggle above to annual and save 20% on Pro and Enterprise — billed once a year.</p>
+        </details>
+        <details>
+            <summary>Are there setup or hidden fees?</summary>
+            <p>None. The price you see is the price you pay. No per-seat surcharges, no message overages, no "AI add-on" tax.</p>
+        </details>
+        <details>
+            <summary>How does the AI bot cost work?</summary>
+            <p>The Enterprise plan ships with an AI bot, but you bring your own Anthropic API key — so you pay Anthropic directly for your usage, with no markup from us.</p>
+        </details>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-bottom">
+        <h2>Try Pro free for 14 days</h2>
+        <p>No credit card required. Cancel anytime with one click.</p>
+        <a href="{% url 'core:register' %}?plan=pro" class="btn"><i class="fas fa-rocket"></i> Start Free Trial</a>
+    </div>
+
+</div>
+
+<script>
+    // Monthly / Annual toggle — swaps amounts + reveals strike-through on annual.
+    document.querySelectorAll('.billing-toggle button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.billing-toggle button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const mode = btn.dataset.billing;
+            document.querySelectorAll('.plan-price .amt').forEach(el => {
+                el.textContent = el.dataset[mode] || el.textContent;
+            });
+            document.querySelectorAll('.plan-price .strike').forEach(el => {
+                el.style.display = (mode === 'annual' && el.dataset.annual) ? 'inline' : 'none';
+            });
+            document.querySelectorAll('.plan-price .per').forEach(el => {
+                el.textContent = mode === 'annual' ? '/mo, billed annually' : '/mo';
+            });
+        });
+    });
+</script>
+{% endblock %}

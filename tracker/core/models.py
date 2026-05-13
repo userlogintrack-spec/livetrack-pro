@@ -16,6 +16,13 @@ class Organization(models.Model):
     widget_color = models.CharField(max_length=7, default='#7c3aed')
     widget_position = models.CharField(max_length=20, default='bottom-right',
         choices=[('bottom-right', 'Bottom Right'), ('bottom-left', 'Bottom Left')])
+    # Tracking-only mode: keep page-view + session recording, suppress the chat
+    # bubble/iframe entirely. Useful for analytics-only customers, while a
+    # support team trials chat internally, or during incidents.
+    chat_widget_hidden = models.BooleanField(
+        default=False,
+        help_text='Hide the chat bubble on customer sites. Visitor tracking and recordings stay active.',
+    )
     welcome_message = models.TextField(default='Hi! How can we help you today?')
     offline_message = models.TextField(default='We are currently offline. Please leave a message.')
     auto_reply_enabled = models.BooleanField(default=True)
@@ -45,6 +52,14 @@ class Organization(models.Model):
     proactive_enabled = models.BooleanField(default=False)
     proactive_delay = models.PositiveIntegerField(default=30, help_text='Seconds before showing proactive message')
     proactive_message = models.CharField(max_length=200, default='Need help? Chat with us!')
+
+    # Pre-chat form (collected before the visitor opens a chat)
+    prechat_enabled = models.BooleanField(default=False)
+    prechat_intro = models.CharField(max_length=300, default='Tell us a bit about yourself before we begin.')
+    prechat_require_name = models.BooleanField(default=True)
+    prechat_require_email = models.BooleanField(default=True)
+    prechat_require_phone = models.BooleanField(default=False)
+    prechat_require_subject = models.BooleanField(default=False)
     # Access control
     blocked_countries_enabled = models.BooleanField(default=False)
     blocked_countries = models.TextField(

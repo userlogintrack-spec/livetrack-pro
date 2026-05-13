@@ -63,6 +63,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if data.get('sender_type') == 'system' and self.is_agent:
                 sender_type = 'system'
                 sender_name = 'System'
+
+            # Per-sender flood guard. A normal human types ~1 msg/sec at most;
+            # 30/min is generous for power users but stops a malicious script
+            # spamming thousands of messages and DoSing the channel layer.
+            from django.core.cache import cache
+            who = 'agent' if self.is_agent else 'visitor'
+            bucket_key = f'wsmsg:{self.room_id}:{who}:{sender_name}'
+            count = cache.get(bucket_key, 0) + 1
+            cache.set(bucket_key, count, timeout=60)
+            if count > 30:
+                # Silently drop — we don't want to leak the limit to abusers
+                # but we also don't disconnect, so legit users recover next minute.
+                return
+
             msg_type = data.get('msg_type', 'text')
             file_url = data.get('file_url', '')
             file_name = data.get('file_name', '')
@@ -157,6 +171,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'file_url': event.get('file_url', ''),
             'file_name': event.get('file_name', ''),
             'timestamp': event['timestamp'],
+        }))
+
+    async def survey_prompt(self, event):
+        # Triggered by close_chat: tells the visitor widget to render the
+        # post-chat survey modal. Widget should fetch full survey JSON via
+        # /api/widget/survey/<id>/ if it doesn't already have it cached.
+        await self.send(text_data=json.dumps({
+            'type': 'survey_prompt',
+            'survey_id': event['survey_id'],
+            'survey_title': event.get('survey_title', ''),
         }))
 
     async def typing_indicator(self, event):
@@ -301,7 +325,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'delay': config.response_delay_seconds,
                 }
 
-        # Search knowledge base for matching answer
+        # Try the LLM first when configured. If it returns None (no key, SDK
+        # missing, or transient error) we fall back to keyword-overlap matching
+        # below — keeps the bot useful even when AI is misconfigured.
+        if config.provider == 'anthropic' and config.api_key:
+            from tracker.chat.ai import generate_bot_reply
+            transcript_tail = [
+                {'role': 'visitor' if m.sender_type == 'visitor' else 'assistant', 'content': m.content}
+                for m in Message.objects.filter(room=room).order_by('-timestamp')[:6][::-1]
+            ]
+            ai_reply = generate_bot_reply(config, room, visitor_message, transcript_tail)
+            if ai_reply:
+                return {
+                    'content': ai_reply,
+                    'bot_name': config.bot_name,
+                    'delay': config.response_delay_seconds,
+                }
+
+        # Search knowledge base for matching answer (keyword fallback)
         knowledge_entries = AIBotKnowledge.objects.filter(
             organization=org, is_active=True
         ).order_by('-priority')
@@ -311,11 +352,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         for entry in knowledge_entries:
             score = 0
-            # Check keywords match
             for kw in entry.keywords_list:
                 if kw in msg_lower:
                     score += 2
-            # Check question text similarity (simple word overlap)
             q_words = set(entry.question.lower().split())
             m_words = set(msg_lower.split())
             overlap = len(q_words & m_words)
@@ -332,7 +371,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'delay': config.response_delay_seconds,
             }
 
-        # First message: send greeting, otherwise fallback
         if bot_reply_count == 0:
             return {
                 'content': config.greeting_message,
@@ -357,7 +395,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 sender_name=sender_name,
                 content=content,
             )
-            room.save(update_fields=['updated_at'])
+            # An agent reply in a 'waiting' room is a clear signal that this
+            # chat is now being handled — promote it so it shows up under the
+            # Active tab and stops showing as Waiting on every other dashboard.
+            # Also backfill `agent` if it wasn't set (covers manual-mode rooms
+            # where the agent jumped in without clicking the explicit Join link).
+            update_fields = ['updated_at']
+            if sender_type == 'agent' and room.status == 'waiting':
+                room.status = 'active'
+                update_fields.append('status')
+                user_id = self.scope.get('user', None) and getattr(self.scope['user'], 'id', None)
+                if not room.agent_id and user_id:
+                    room.agent_id = user_id
+                    update_fields.append('agent')
+            room.save(update_fields=update_fields)
             return message
         except ChatRoom.DoesNotExist:
             return None

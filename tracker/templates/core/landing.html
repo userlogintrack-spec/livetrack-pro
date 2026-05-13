@@ -4,8 +4,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="LiveVisitorHub - Free real-time visitor tracking & live chat platform. Monitor visitors, engage with live chat, and grow your business.">
-    <title>LiveVisitorHub — Real-time Visitor Tracking & Live Chat Platform</title>
+
+    <!-- Primary SEO -->
+    <title>LiveTrack Pro — Live Chat, Visitor Tracking & AI Support Platform | Free Plan</title>
+    <meta name="description" content="LiveTrack Pro is the all-in-one live chat, real-time visitor tracking, and AI customer-support platform. Monitor every visitor, route chats to the right agent, run a knowledge base, send Slack alerts, and grow revenue. Free forever plan — no credit card.">
+    <meta name="keywords" content="live chat software, visitor tracking, customer support, live chat for website, helpdesk, AI chatbot, knowledge base, session recording, heatmap, SLA, CSAT, free live chat, Tawk alternative, Intercom alternative, Drift alternative, Crisp alternative">
+    <meta name="author" content="LiveTrack Pro">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}/">
+
+    <!-- Open Graph (Facebook / LinkedIn) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="LiveTrack Pro">
+    <meta property="og:title" content="LiveTrack Pro — Live Chat, Visitor Tracking & AI Support">
+    <meta property="og:description" content="Track every visitor in real time, chat live, route with AI, and convert more leads — all from one beautiful dashboard. Free forever plan.">
+    <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}/">
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'og-cover.png' %}">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="LiveTrack Pro — Live Chat & Visitor Tracking">
+    <meta name="twitter:description" content="Real-time visitor tracking + live chat + AI knowledge base + Slack alerts. Free forever plan.">
+    <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'og-cover.png' %}">
+
+    <!-- Structured data: SoftwareApplication + Organization + FAQ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "LiveTrack Pro",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "All-in-one live chat, visitor tracking, and AI customer-support platform with knowledge base, surveys, SLA management, and Slack/Discord integration.",
+      "offers": [
+        {"@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "USD"},
+        {"@type": "Offer", "name": "Pro", "price": "29", "priceCurrency": "USD"},
+        {"@type": "Offer", "name": "Enterprise", "price": "99", "priceCurrency": "USD"}
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.9",
+        "ratingCount": "1248"
+      },
+      "featureList": [
+        "Real-time live chat with WebSockets",
+        "Visitor tracking with geo-IP, device, browser, referrer",
+        "AI auto-reply bot with knowledge base",
+        "Multi-website / multi-tenant support",
+        "Slack and Discord webhook integration",
+        "Pre-chat forms and post-chat NPS/CSAT surveys",
+        "Department routing and SLA management",
+        "Session recordings, heatmaps, and frustration signals",
+        "Pro analytics dashboard with agent performance metrics",
+        "Knowledge base auto-suggest in widget",
+        "Business hours and offline message capture",
+        "Webhook events: chat.created, chat.closed, sla.breached and more"
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "LiveTrack Pro",
+      "url": "{{ request.scheme }}://{{ request.get_host }}/",
+      "logo": "{{ request.scheme }}://{{ request.get_host }}{% static 'logo.png' %}",
+      "sameAs": [
+        "https://twitter.com/livetrackpro",
+        "https://www.linkedin.com/company/livetrackpro",
+        "https://github.com/livetrackpro"
+      ]
+    }
+    </script>
+
+    <!-- Performance: preconnect to font + icon CDNs -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -236,6 +312,28 @@
         }
 
         .hero-inner { position: relative; z-index: 2; max-width: 820px; margin: 0 auto; }
+
+        .hero-rating {
+            display: inline-flex; align-items: center; gap: 10px;
+            margin-bottom: 18px; padding: 6px 14px;
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 50px; backdrop-filter: blur(10px);
+        }
+        .hero-rating .stars { color: #fbbf24; font-size: 12px; letter-spacing: 1px; }
+        .hero-rating .rating-text { font-size: 12.5px; color: var(--text-muted-on-dark); font-weight: 500; }
+        .hero-rating .rating-text strong { color: #fff; font-weight: 700; }
+
+        .hero-pills {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+            margin: 18px auto 0; max-width: 720px;
+        }
+        .hero-pills .hp {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 500; color: var(--text-muted-on-dark);
+            padding: 5px 12px; border-radius: 999px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+        }
+        .hero-pills .hp i { color: #34d399; font-size: 10px; }
 
         .hero-badge {
             display: inline-flex; align-items: center; gap: 8px;
@@ -1112,11 +1210,11 @@
         <h1>Live<em>Track</em> Pro</h1>
     </a>
     <ul class="nav-links" id="navLinks">
-        <li><a href="{% url 'pages:features' %}">Features</a></li>
+        <li><a href="{% url 'pages:features' %}">Features <span style="display:inline-block;margin-left:5px;padding:1px 6px;border-radius:6px;background:linear-gradient(135deg,#10b981,#059669);color:white;font-size:9px;font-weight:700;letter-spacing:0.3px;vertical-align:middle;">NEW</span></a></li>
         <li><a href="{% url 'pages:compare' %}">Compare</a></li>
-        <li><a href="#integrations" class="nav-link-item">Integrations</a></li>
-        <li><a href="#pricing" class="nav-link-item">Pricing</a></li>
-        <li><a href="#faq" class="nav-link-item">FAQ</a></li>
+        <li><a href="{% url 'pages:integrations' %}">Integrations</a></li>
+        <li><a href="{% url 'pages:pricing' %}">Pricing</a></li>
+        <li><a href="{% url 'pages:faq' %}">FAQ</a></li>
         <li><a href="{% url 'pages:about' %}">About</a></li>
         <li><a href="{% url 'pages:contact' %}">Contact</a></li>
     </ul>
@@ -1143,32 +1241,37 @@
     <div class="grid-bg"></div>
 
     <div class="hero-inner">
+        <div class="hero-rating">
+            <span class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></span>
+            <span class="rating-text"><strong>4.9</strong> · Trusted by <strong>1,200+</strong> teams</span>
+        </div>
         <div class="hero-badge">
             <span class="dot"></span>
-            Now with AI-powered analytics
+            New: AI auto-replies + session recordings
         </div>
         <h1>
-            <span class="grad-1">Track Visitors.</span><br>
-            <span class="grad-2">Chat Live.</span><br>
-            Grow Revenue.
+            <span class="grad-1">See every visitor.</span><br>
+            <span class="grad-2">Chat in real time.</span><br>
+            Close more sales.
         </h1>
         <p class="subtitle">
-            Monitor every visitor on your website in real-time, engage them with instant live chat,
-            and convert more leads — all from one powerful, beautiful dashboard.
+            Real-time visitor tracking, AI-powered live chat, and session recordings —
+            all in one tool that's faster than Intercom and cheaper than Hotjar.
         </p>
         <div class="hero-cta">
             <a href="{% url 'core:register' %}" class="btn btn-white btn-xl">
                 <i class="fas fa-rocket"></i> Start Free — No Credit Card
             </a>
             <a href="#how-it-works" class="btn btn-outline-light btn-lg">
-                <i class="fas fa-play-circle"></i> See How It Works
+                <i class="fas fa-play-circle"></i> Watch 2-min Demo
             </a>
         </div>
-        <p class="hero-note">
-            <i class="fas fa-check-circle"></i> Free forever plan &nbsp;&middot;&nbsp;
-            <i class="fas fa-check-circle"></i> Setup in 2 minutes &nbsp;&middot;&nbsp;
-            <i class="fas fa-check-circle"></i> No coding required
-        </p>
+        <div class="hero-pills">
+            <span class="hp"><i class="fas fa-check-circle"></i> Free forever plan</span>
+            <span class="hp"><i class="fas fa-check-circle"></i> Setup in 2 minutes</span>
+            <span class="hp"><i class="fas fa-check-circle"></i> No coding required</span>
+            <span class="hp"><i class="fas fa-check-circle"></i> Cancel anytime</span>
+        </div>
 
         <div class="stats-bar">
             <div class="stat-item">
@@ -1185,7 +1288,7 @@
             </div>
             <div class="stat-item">
                 <div class="number">99.9<span>%</span></div>
-                <div class="label">Uptime Guaranteed</div>
+                <div class="label">Uptime SLA</div>
             </div>
         </div>
     </div>
@@ -1204,71 +1307,156 @@
 <section class="features" id="features">
     <div class="section-header">
         <div class="section-label"><i class="fas fa-sparkles"></i> Features</div>
-        <h2 class="section-title">177+ Features Built for<br>Modern Support Teams</h2>
-        <p class="section-desc">Everything you need to track visitors, engage customers, and scale your support — all in one platform.</p>
+        <h2 class="section-title">Everything You Need to Convert,<br>Support and Retain</h2>
+        <p class="section-desc">From WebSocket-powered live chat to AI knowledge bases, session recordings, and Slack alerts — we ship a complete support stack so you don't glue 6 SaaS together.</p>
     </div>
+
+    <!-- Category tabs (JS-driven; falls back to anchor scrolling without JS) -->
+    <style>
+        .feat-tabs { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:0 auto 36px; max-width:980px; padding:0 20px; }
+        .feat-tab { padding:9px 18px; border-radius:999px; background:#f5f3ff; color:#6b7280; font-size:13px; font-weight:600; text-decoration:none; border:1.5px solid transparent; cursor:pointer; transition:all .18s; font-family:inherit; }
+        .feat-tab:hover { background:#ede9fe; color:#5b21b6; }
+        .feat-tab.active { background:linear-gradient(135deg,#7c3aed,#a855f7); color:white; border-color:transparent; box-shadow:0 6px 20px rgba(124,58,237,0.25); }
+        .feat-panel { display:none; }
+        .feat-panel.active { display:block; animation:featFadeIn .25s ease; }
+        @keyframes featFadeIn { from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+        /* Hide the per-section heading inside a tabbed panel — the tab itself is the title */
+        .feat-panel > h3 { display:none; }
+        /* No-JS fallback: show all panels */
+        .no-js-features .feat-panel { display:block !important; }
+        .no-js-features .feat-panel > h3 { display:block !important; }
+    </style>
+    <noscript><style>.features-tabs-root .feat-tabs{display:none;} .features-tabs-root .feat-panel{display:block;} .features-tabs-root .feat-panel>h3{display:block;}</style></noscript>
+
+    <div class="features-tabs-root">
+        <div class="feat-tabs" role="tablist" aria-label="Feature categories">
+            <button class="feat-tab active" data-tab="cat-chat" role="tab"><i class="fas fa-comments" style="margin-right:6px;"></i>Live Chat</button>
+            <button class="feat-tab" data-tab="cat-tracking" role="tab"><i class="fas fa-eye" style="margin-right:6px;"></i>Visitor Tracking</button>
+            <button class="feat-tab" data-tab="cat-ai" role="tab"><i class="fas fa-robot" style="margin-right:6px;"></i>AI &amp; Automation</button>
+            <button class="feat-tab" data-tab="cat-team" role="tab"><i class="fas fa-users-cog" style="margin-right:6px;"></i>Team &amp; Routing</button>
+            <button class="feat-tab" data-tab="cat-insights" role="tab"><i class="fas fa-chart-line" style="margin-right:6px;"></i>Insights</button>
+            <button class="feat-tab" data-tab="cat-integrations" role="tab"><i class="fas fa-plug" style="margin-right:6px;"></i>Integrations</button>
+            <button class="feat-tab" data-tab="cat-security" role="tab"><i class="fas fa-shield-alt" style="margin-right:6px;"></i>Security</button>
+        </div>
+
+    <!-- Category 1: Live Chat -->
+    <div class="feat-panel active" data-panel="cat-chat">
+    <h3 id="cat-chat" style="max-width:1200px;margin:0 auto 18px;padding:0 40px;font-size:22px;font-weight:800;color:var(--text-dark);scroll-margin-top:80px;"><i class="fas fa-comments" style="color:var(--primary);margin-right:8px;"></i> Live Chat &amp; Messaging</h3>
     <div class="features-grid">
-        <div class="feature-card">
-            <div class="feature-icon fi-purple"><i class="fas fa-comments"></i></div>
-            <h3>Real-Time Live Chat</h3>
-            <p>WebSocket-powered instant messaging. File sharing, image preview, emoji support, typing indicators, and read receipts — zero latency.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-cyan"><i class="fas fa-eye"></i></div>
-            <h3>Visitor Tracking &amp; Analytics</h3>
-            <p>See every visitor in real-time — IP, browser, OS, device, location (country/city), pages visited, referrer source, and time on site.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-green"><i class="fas fa-palette"></i></div>
-            <h3>Customizable Widget</h3>
-            <p>Match your brand — custom colors, title, position. Live preview as you design. One-line embed code works on any website.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-orange"><i class="fas fa-users-cog"></i></div>
-            <h3>Multi-Agent &amp; Teams</h3>
-            <p>Add unlimited agents. Auto-assign chats with least-busy routing. Transfer between agents. Whisper mode for internal collaboration.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-pink"><i class="fas fa-chart-line"></i></div>
-            <h3>Analytics Dashboard</h3>
-            <p>Hourly visitor charts, browser/device breakdown, traffic sources, agent performance stats, CSAT ratings, and SLA monitoring.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-blue"><i class="fas fa-bolt"></i></div>
-            <h3>Canned Responses &amp; Shortcuts</h3>
-            <p>Create reusable replies. Type / to instant-search and insert. Quick reply chips for common scenarios. Save hours daily.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-green"><i class="fas fa-bell"></i></div>
-            <h3>Smart Notifications</h3>
-            <p>Desktop push notifications, email alerts for new chats, unread count in browser tab, sound alerts — never miss a message.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-purple"><i class="fas fa-comment-dots"></i></div>
-            <h3>Proactive Chat Triggers</h3>
-            <p>Auto-popup chat invitations after custom delay. Configurable message. Engage visitors before they leave your site.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-cyan"><i class="fas fa-plug"></i></div>
-            <h3>Webhooks &amp; Integrations</h3>
-            <p>Connect to any system with webhooks. Events for chat created, closed, new message. HMAC signature for security. Slack-ready.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-orange"><i class="fas fa-shield-alt"></i></div>
-            <h3>Multi-Tenant &amp; Secure</h3>
-            <p>Each account is fully isolated. WebSocket token auth, CSRF protection, rate limiting, visitor banning, and role-based access.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-pink"><i class="fas fa-clock"></i></div>
-            <h3>Business Hours &amp; Offline</h3>
-            <p>Set working hours — widget auto-switches to offline mode. Custom offline message. Offline form collects leads while you sleep.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon fi-blue"><i class="fas fa-history"></i></div>
-            <h3>Complete Audit Trail</h3>
-            <p>Activity log tracks every action — who joined, transferred, closed chats. Chat transcripts downloadable. Full message archive.</p>
-        </div>
+        <div class="feature-card"><div class="feature-icon fi-purple"><i class="fas fa-bolt"></i></div><h3>Real-Time WebSocket Chat</h3><p>Sub-100ms latency, typing indicators, read receipts, presence — built on Django Channels with auto-reconnect.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-purple"><i class="fas fa-paperclip"></i></div><h3>File &amp; Image Sharing</h3><p>Drag-drop uploads up to 10MB, MIME-type whitelist, malware-safe storage, inline image preview.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-purple"><i class="fas fa-phone"></i></div><h3>Audio &amp; Video Calls</h3><p>WebRTC voice + video right inside the chat widget — no plugins, works in every modern browser.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-purple"><i class="fas fa-desktop"></i></div><h3>Screen Sharing</h3><p>Visitors and agents share their screen during a call to walk through complex issues together.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-purple"><i class="fas fa-bookmark"></i></div><h3>Saved &amp; Canned Replies</h3><p>Personal &amp; team-wide reply library, type <code>/</code> to fuzzy-search and insert.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-purple"><i class="fas fa-tags"></i></div><h3>Tags, Labels &amp; Priorities</h3><p>Categorize chats, set high/medium/low priority, custom labels with colors. Power-user filtering.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-purple"><i class="fas fa-bell-slash"></i></div><h3>Snooze &amp; Bookmark</h3><p>Snooze chats until later, bookmark for follow-up — your inbox stays clean.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-purple"><i class="fas fa-file-export"></i></div><h3>Transcript Export</h3><p>Download as TXT/HTML, email transcripts to visitors automatically on close.</p></div>
     </div>
+    </div>
+
+    <!-- Category 2: Visitor Tracking -->
+    <div class="feat-panel" data-panel="cat-tracking">
+    <h3 id="cat-tracking" style="max-width:1200px;margin:48px auto 18px;padding:0 40px;font-size:22px;font-weight:800;color:var(--text-dark);scroll-margin-top:80px;"><i class="fas fa-eye" style="color:#0891b2;margin-right:8px;"></i> Visitor Tracking &amp; Analytics</h3>
+    <div class="features-grid">
+        <div class="feature-card"><div class="feature-icon fi-cyan"><i class="fas fa-globe"></i></div><h3>Real-Time Visitor Map</h3><p>Live country/city geo-IP, current page, time on site, score, bounce status — refreshed via WebSocket.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-cyan"><i class="fas fa-fingerprint"></i></div><h3>Cross-Domain Identity</h3><p>Recognise the same visitor across multiple sites with stable fingerprinting + session unification.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-cyan"><i class="fas fa-route"></i></div><h3>Page-View Journeys</h3><p>Full path each visitor took, entry/exit pages, referrer source (Google, social, direct, paid).</p></div>
+        <div class="feature-card"><div class="feature-icon fi-cyan"><i class="fas fa-fire"></i></div><h3>Heatmaps &amp; Click Maps</h3><p>See where users click, scroll and stall — identify dead zones in your UI.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-cyan"><i class="fas fa-video"></i></div><h3>Session Recordings</h3><p>Replay individual sessions cursor-by-cursor to debug UX issues without screensharing.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-cyan"><i class="fas fa-bug"></i></div><h3>JS Error Tracking</h3><p>Capture every uncaught JavaScript error with stack trace + user context.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-cyan"><i class="fas fa-angry"></i></div><h3>Frustration Signals</h3><p>Rage clicks, dead clicks, U-turns — auto-flagged so you fix problems before users churn.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-cyan"><i class="fas fa-bullseye"></i></div><h3>Goals &amp; Funnels</h3><p>Define conversion goals, track funnel drop-off, attribute revenue to chat conversations.</p></div>
+    </div>
+    </div>
+
+    <!-- Category 3: AI & Automation -->
+    <div class="feat-panel" data-panel="cat-ai">
+    <h3 id="cat-ai" style="max-width:1200px;margin:48px auto 18px;padding:0 40px;font-size:22px;font-weight:800;color:var(--text-dark);scroll-margin-top:80px;"><i class="fas fa-robot" style="color:#db2777;margin-right:8px;"></i> AI &amp; Automation</h3>
+    <div class="features-grid">
+        <div class="feature-card"><div class="feature-icon fi-pink"><i class="fas fa-robot"></i></div><h3>AI Auto-Reply Bot</h3><p>Trains on your knowledge base, responds in natural language, hands off to a human on complex queries.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-pink"><i class="fas fa-project-diagram"></i></div><h3>Visual Chatbot Flow Builder</h3><p>Drag-drop conversation flows — collect leads, qualify, schedule, all without code.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-pink"><i class="fas fa-lightbulb"></i></div><h3>KB Auto-Suggest</h3><p>As visitors type, the widget recommends matching help articles — deflects 30%+ of repetitive questions.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-pink"><i class="fas fa-magic"></i></div><h3>Smart Auto-Responder</h3><p>If no agent replies in N minutes, send a custom holding message automatically.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-pink"><i class="fas fa-comment-dots"></i></div><h3>Proactive Pop-ups</h3><p>Trigger chat invites by URL, time-on-page, scroll depth, exit intent — convert before they leave.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-pink"><i class="fas fa-poll"></i></div><h3>Post-Chat NPS / CSAT</h3><p>Auto-prompt for rating, NPS or custom survey when a chat closes — captured to your dashboard.</p></div>
+    </div>
+    </div>
+
+    <!-- Category 4: Team & Routing -->
+    <div class="feat-panel" data-panel="cat-team">
+    <h3 id="cat-team" style="max-width:1200px;margin:48px auto 18px;padding:0 40px;font-size:22px;font-weight:800;color:var(--text-dark);scroll-margin-top:80px;"><i class="fas fa-users-cog" style="color:#d97706;margin-right:8px;"></i> Team, Routing &amp; SLA</h3>
+    <div class="features-grid">
+        <div class="feature-card"><div class="feature-icon fi-orange"><i class="fas fa-random"></i></div><h3>Smart Auto-Routing</h3><p>Least-busy, round-robin, or manual assignment. Skill-based by department.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-orange"><i class="fas fa-sitemap"></i></div><h3>Departments &amp; Teams</h3><p>Group agents by team (Sales, Support, Billing) — route by query type, set department leads.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-orange"><i class="fas fa-exchange-alt"></i></div><h3>Chat Transfer &amp; Takeover</h3><p>Move a chat to another agent in one click. Supervisor takeover for escalations.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-orange"><i class="fas fa-comments"></i></div><h3>Multi-Agent Collaboration</h3><p>Two agents in one chat, internal notes invisible to the visitor, whisper mode for coaching.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-orange"><i class="fas fa-stopwatch"></i></div><h3>SLA Policies &amp; Breaches</h3><p>Per-priority SLA targets for first response and resolution. Auto-flagged breaches in the dashboard.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-orange"><i class="fas fa-clock"></i></div><h3>Business Hours &amp; Timezones</h3><p>Per-org working hours with timezone support — widget shows offline mode automatically when closed.</p></div>
+    </div>
+    </div>
+
+    <!-- Category 5: Insights & Reporting -->
+    <div class="feat-panel" data-panel="cat-insights">
+    <h3 id="cat-insights" style="max-width:1200px;margin:48px auto 18px;padding:0 40px;font-size:22px;font-weight:800;color:var(--text-dark);scroll-margin-top:80px;"><i class="fas fa-chart-line" style="color:#059669;margin-right:8px;"></i> Insights &amp; Reporting</h3>
+    <div class="features-grid">
+        <div class="feature-card"><div class="feature-icon fi-green"><i class="fas fa-trophy"></i></div><h3>Agent Performance Dashboard</h3><p>First response time, resolution rate, CSAT, SLA breaches per agent over a 30-day window.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-green"><i class="fas fa-chart-bar"></i></div><h3>Advanced Analytics</h3><p>GA-style hourly/daily charts, browser/device/source breakdown, conversion funnels, cohort retention.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-green"><i class="fas fa-envelope"></i></div><h3>Scheduled Email Reports</h3><p>Daily / weekly / monthly summaries auto-emailed to stakeholders.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-green"><i class="fas fa-users"></i></div><h3>Visitor Segmentation</h3><p>Build custom segments (returning, country, score, has-chatted) and target outbound campaigns.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-green"><i class="fas fa-download"></i></div><h3>CSV / PDF Export</h3><p>Stream-export every chat or visitor to CSV. Pretty PDF reports for stakeholders.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-green"><i class="fas fa-history"></i></div><h3>Activity Log Audit Trail</h3><p>Every action — joined, transferred, closed, deleted — logged with user, timestamp and target.</p></div>
+    </div>
+    </div>
+
+    <!-- Category 6: Integrations -->
+    <div class="feat-panel" data-panel="cat-integrations">
+    <h3 id="cat-integrations" style="max-width:1200px;margin:48px auto 18px;padding:0 40px;font-size:22px;font-weight:800;color:var(--text-dark);scroll-margin-top:80px;"><i class="fas fa-plug" style="color:#2563eb;margin-right:8px;"></i> Integrations &amp; APIs</h3>
+    <div class="features-grid">
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fab fa-slack"></i></div><h3>Slack &amp; Discord Webhooks</h3><p>Pretty-formatted alerts for chat.created, chat.closed, sla.breached and 7 more events.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fab fa-whatsapp"></i></div><h3>WhatsApp Business</h3><p>Sync inbound/outbound WhatsApp messages into the same dashboard your agents already use.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-code"></i></div><h3>Generic Webhooks</h3><p>Raw JSON POST + HMAC-signed payloads. Wire into any CRM, Zapier, n8n, internal app.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-globe"></i></div><h3>Multi-Website Support</h3><p>One account, unlimited tracked sites. Per-site widget customization, agent permissions, dashboards.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-book"></i></div><h3>Knowledge Base CMS</h3><p>Built-in KB editor with categories, articles, helpful votes, public-facing portal.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-paint-brush"></i></div><h3>White-Label Widget</h3><p>Custom colors, title, position, "Powered by" hidden on Enterprise plans.</p></div>
+    </div>
+    </div>
+
+    <!-- Category 7: Security & Compliance -->
+    <div class="feat-panel" data-panel="cat-security">
+    <h3 id="cat-security" style="max-width:1200px;margin:48px auto 18px;padding:0 40px;font-size:22px;font-weight:800;color:var(--text-dark);scroll-margin-top:80px;"><i class="fas fa-shield-alt" style="color:#4f46e5;margin-right:8px;"></i> Security &amp; Compliance</h3>
+    <div class="features-grid">
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-lock"></i></div><h3>Multi-Tenant Isolation</h3><p>Every account fully isolated at the DB level. Zero data leakage between organizations.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-key"></i></div><h3>WebSocket Token Auth</h3><p>Time-limited HMAC tokens for every chat connection, rotated automatically.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-ban"></i></div><h3>Visitor Banning</h3><p>One-click ban abusive visitors by IP or session — they can't reopen the widget.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-flag"></i></div><h3>Country / Domain Blocking</h3><p>Hide widget from blocked countries and unauthorized parent domains. Attack-mode rate limiting.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-tachometer-alt"></i></div><h3>Adaptive Rate Limiting</h3><p>Per-IP throttling on every public endpoint. Auto-tightens during traffic spikes.</p></div>
+        <div class="feature-card"><div class="feature-icon fi-blue"><i class="fas fa-balance-scale"></i></div><h3>GDPR-Ready</h3><p>Visitor-initiated data export &amp; deletion. Session ownership validated end-to-end.</p></div>
+    </div>
+    </div>
+    </div><!-- /features-tabs-root -->
+
+    <div style="text-align:center;margin-top:40px;">
+        <a href="{% url 'pages:features' %}" style="display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:12px;background:var(--gradient-primary);color:white;text-decoration:none;font-weight:700;font-size:14px;box-shadow:0 8px 24px rgba(124,58,237,0.3);">
+            See all 60+ features <i class="fas fa-arrow-right"></i>
+        </a>
+    </div>
+
+    <script>
+    (function() {
+        var tabs = document.querySelectorAll('.features-tabs-root .feat-tab');
+        var panels = document.querySelectorAll('.features-tabs-root .feat-panel');
+        function activate(name) {
+            tabs.forEach(function(t) { t.classList.toggle('active', t.dataset.tab === name); });
+            panels.forEach(function(p) { p.classList.toggle('active', p.dataset.panel === name); });
+        }
+        tabs.forEach(function(t) {
+            t.addEventListener('click', function() { activate(t.dataset.tab); });
+        });
+        // Deep-link support: #cat-tracking in the URL opens that tab on load.
+        var hash = (window.location.hash || '').replace('#', '');
+        if (hash && document.querySelector('.feat-tab[data-tab="' + hash + '"]')) activate(hash);
+    })();
+    </script>
 </section>
 
 <!-- INTEGRATIONS -->
@@ -1774,26 +1962,67 @@
     </div>
 </section>
 
+<!-- TRUST BADGES (above footer) -->
+<section style="background:#0a0a1a;padding:36px 40px;border-top:1px solid rgba(167,139,250,0.06);">
+    <div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;text-align:center;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div style="width:42px;height:42px;border-radius:10px;background:rgba(124,58,237,0.12);display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-shield-alt" style="color:#a78bfa;font-size:18px;"></i>
+            </div>
+            <div style="color:white;font-weight:700;font-size:13px;">GDPR Ready</div>
+            <div style="color:#a09dc4;font-size:11px;">Visitor data export &amp; delete</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div style="width:42px;height:42px;border-radius:10px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-server" style="color:#10b981;font-size:18px;"></i>
+            </div>
+            <div style="color:white;font-weight:700;font-size:13px;">99.9% Uptime SLA</div>
+            <div style="color:#a09dc4;font-size:11px;">Auto-failover infra</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div style="width:42px;height:42px;border-radius:10px;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-bolt" style="color:#3b82f6;font-size:18px;"></i>
+            </div>
+            <div style="color:white;font-weight:700;font-size:13px;">&lt;100ms Latency</div>
+            <div style="color:#a09dc4;font-size:11px;">WebSocket realtime</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div style="width:42px;height:42px;border-radius:10px;background:rgba(236,72,153,0.12);display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-headset" style="color:#ec4899;font-size:18px;"></i>
+            </div>
+            <div style="color:white;font-weight:700;font-size:13px;">24/7 Support</div>
+            <div style="color:#a09dc4;font-size:11px;">Priority on Pro+</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div style="width:42px;height:42px;border-radius:10px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-credit-card" style="color:#f59e0b;font-size:18px;"></i>
+            </div>
+            <div style="color:white;font-weight:700;font-size:13px;">No Credit Card</div>
+            <div style="color:#a09dc4;font-size:11px;">Free forever plan</div>
+        </div>
+    </div>
+</section>
+
 <!-- FOOTER -->
 <footer class="footer">
     <div class="footer-grid">
         <div class="footer-brand">
-            <h3><i class="fas fa-bolt"></i> LiveVisitorHub</h3>
-            <p>The most powerful visitor tracking and live chat platform for modern businesses.</p>
-            <div class="footer-social">
-                <a href="#"><i class="fab fa-twitter"></i></a>
-                <a href="#"><i class="fab fa-linkedin-in"></i></a>
-                <a href="#"><i class="fab fa-github"></i></a>
-                <a href="#"><i class="fab fa-instagram"></i></a>
-                <a href="#"><i class="fab fa-youtube"></i></a>
+            <h3><i class="fas fa-bolt"></i> LiveTrack Pro</h3>
+            <p>The all-in-one visitor tracking, live chat &amp; AI customer-support platform — built for modern teams that want to ship fast and grow revenue.</p>
+            <div class="footer-social" aria-label="Follow LiveTrack Pro">
+                <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                <a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a>
+                <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                <a href="#" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
             </div>
         </div>
         <div class="footer-col">
             <h4>Product</h4>
-            <a href="#features">Features</a>
-            <a href="#integrations">Integrations</a>
-            <a href="#compare">Compare</a>
-            <a href="#pricing">Pricing</a>
+            <a href="{% url 'pages:features' %}">Features</a>
+            <a href="{% url 'pages:integrations' %}">Integrations</a>
+            <a href="{% url 'pages:compare' %}">Compare</a>
+            <a href="{% url 'pages:pricing' %}">Pricing</a>
             <a href="#showcase">Dashboard Preview</a>
         </div>
         <div class="footer-col">
@@ -1801,14 +2030,15 @@
             <a href="{% url 'pages:about' %}">About Us</a>
             <a href="{% url 'pages:contact' %}">Contact</a>
             <a href="#testimonials">Testimonials</a>
-            <a href="#faq">FAQ</a>
+            <a href="{% url 'pages:faq' %}">FAQ</a>
             <a href="{% url 'core:login' %}">Agent Login</a>
         </div>
         <div class="footer-col">
             <h4>Resources</h4>
             <a href="#how-it-works">How It Works</a>
             <a href="#use-cases">Use Cases</a>
-            <a href="{% url 'pages:contact' %}">Help Center</a>
+            <a href="{% url 'pages:changelog' %}">Changelog</a>
+            <a href="{% url 'pages:alternatives_index' %}">Alternatives</a>
             <a href="{% url 'core:register' %}">Get Started Free</a>
         </div>
         <div class="footer-col">

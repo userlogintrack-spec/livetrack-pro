@@ -1,0 +1,259 @@
+{% extends 'pages/base_public.html' %}
+{% block title %}FAQ — Common Questions Answered{% endblock %}
+{% block meta_desc %}LiveVisitorHub FAQ — billing, security, installation, AI bot, GDPR, refunds, white-label, and team setup answered in plain English.{% endblock %}
+
+{% block hero %}
+<section class="page-hero">
+    <div class="grid-bg"></div>
+    <div class="breadcrumb"><a href="/">Home</a> <span>/</span> <span>FAQ</span></div>
+    <h1>Got a <span>Question?</span></h1>
+    <p>Common questions about installation, billing, security, AI, and team management — answered in plain English.</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<style>
+    .faq-wrap { max-width: 860px; margin: 0 auto; }
+    .faq-search { position: sticky; top: 80px; z-index: 5; background: var(--bg-body); padding: 12px 0 20px; margin-bottom: 20px; }
+    .faq-search input { width: 100%; padding: 14px 20px 14px 48px; border: 1.5px solid var(--border-light); border-radius: 14px; font-size: 14px; font-family: inherit; outline: none; background: white; transition: border-color .2s; }
+    .faq-search input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(124,58,237,0.08); }
+    .faq-search .icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: var(--text-muted); margin-top: 16px; }
+    .faq-search-wrap { position: relative; }
+
+    .faq-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+    .faq-tab { padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: white; border: 1px solid var(--border-light); cursor: pointer; font-family: inherit; transition: all .2s; }
+    .faq-tab:hover { color: var(--primary); border-color: var(--primary-soft); }
+    .faq-tab.active { background: var(--gradient-primary); color: white; border-color: transparent; box-shadow: 0 4px 12px rgba(124,58,237,0.25); }
+
+    .faq-group { margin-bottom: 32px; }
+    .faq-group h2 { font-size: 17px; font-weight: 700; color: var(--text-dark); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-light); }
+
+    .faq-item { background: white; border: 1px solid var(--border-light); border-radius: 14px; margin-bottom: 10px; transition: border-color .2s, box-shadow .2s; }
+    .faq-item:hover { border-color: var(--primary-soft); }
+    .faq-item summary { padding: 16px 22px; font-size: 14px; font-weight: 600; color: var(--text-dark); list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after { content: '\f078'; font-family: 'Font Awesome 6 Free'; font-weight: 900; color: var(--primary); font-size: 11px; transition: transform .2s; }
+    .faq-item[open] summary::after { transform: rotate(180deg); }
+    .faq-item[open] { box-shadow: 0 6px 24px rgba(124,58,237,0.06); border-color: var(--primary-soft); }
+    .faq-item .body { padding: 0 22px 18px; font-size: 13.5px; color: var(--text-body); line-height: 1.75; }
+    .faq-item .body a { color: var(--primary); text-decoration: none; font-weight: 500; }
+    .faq-item .body a:hover { text-decoration: underline; }
+
+    .no-results { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; display: none; }
+
+    .cta-help { background: white; border: 1px solid var(--border-light); border-radius: 18px; padding: 32px; text-align: center; margin-top: 60px; }
+    .cta-help h3 { font-size: 20px; font-weight: 800; color: var(--text-dark); margin-bottom: 8px; }
+    .cta-help p { font-size: 14px; color: var(--text-muted); margin-bottom: 18px; }
+    .cta-help .btns { display: inline-flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+    @media (max-width: 768px) {
+        .faq-search { top: 60px; }
+        .faq-group h2 { font-size: 15px; }
+        .faq-item summary { padding: 14px 18px; font-size: 13.5px; }
+        .faq-item .body { padding: 0 18px 14px; font-size: 13px; }
+        .cta-help { padding: 24px 20px; }
+    }
+</style>
+
+<div class="faq-wrap">
+
+    <!-- Search -->
+    <div class="faq-search">
+        <div class="faq-search-wrap">
+            <i class="fas fa-search icon"></i>
+            <input type="search" id="faqSearch" placeholder="Search questions — billing, AI, security, install..." aria-label="Search FAQ">
+        </div>
+    </div>
+
+    <!-- Category tabs -->
+    <div class="faq-tabs" id="faqTabs">
+        <button class="faq-tab active" data-cat="all">All</button>
+        <button class="faq-tab" data-cat="general">General</button>
+        <button class="faq-tab" data-cat="install">Install</button>
+        <button class="faq-tab" data-cat="billing">Billing</button>
+        <button class="faq-tab" data-cat="security">Security &amp; Privacy</button>
+        <button class="faq-tab" data-cat="ai">AI Bot</button>
+        <button class="faq-tab" data-cat="team">Teams &amp; Agents</button>
+    </div>
+
+    <div id="faqResults">
+
+        <div class="faq-group" data-cat="general">
+            <h2>General</h2>
+            <details class="faq-item">
+                <summary>Is LiveVisitorHub really free?</summary>
+                <div class="body">Yes — the Free plan is genuinely free forever. No credit card required. It includes the live chat widget, real-time visitor tracking, and basic analytics for up to 100 visitors per month. Upgrade only when you outgrow it.</div>
+            </details>
+            <details class="faq-item">
+                <summary>What makes LiveVisitorHub different from Intercom or Tawk.to?</summary>
+                <div class="body">Three things: (1) Real visitor tracking and session recording are built in — not paid add-ons. (2) The AI bot uses your own Anthropic key, so you pay providers directly with no markup. (3) Pricing is flat and predictable — no per-resolution or per-message fees. See our <a href="{% url 'pages:compare' %}">comparison page</a> for the full breakdown.</div>
+            </details>
+            <details class="faq-item">
+                <summary>How fast can I get set up?</summary>
+                <div class="body">Under 5 minutes. Sign up → copy the embed snippet → paste before <code>&lt;/body&gt;</code> on your site. Visitors start showing up in your dashboard in real time.</div>
+            </details>
+        </div>
+
+        <div class="faq-group" data-cat="install">
+            <h2>Installation</h2>
+            <details class="faq-item">
+                <summary>How do I add the widget to my website?</summary>
+                <div class="body">Copy the embed code from your dashboard (Settings → Widget) and paste it just before the closing <code>&lt;/body&gt;</code> tag. It's one line of JavaScript. Works with WordPress, Shopify, Wix, Webflow, React, Vue, plain HTML — anything.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Does it work on single-page apps (React, Vue, Next.js)?</summary>
+                <div class="body">Yes. The widget script automatically tracks SPA route changes via <code>history.pushState</code> hooks — no manual instrumentation needed. See <a href="{% url 'pages:integrations' %}">Integrations</a> for framework guides.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Can I track multiple websites from one account?</summary>
+                <div class="body">Yes. Each website gets its own tracking key, dashboard view, and stats. Domain-wise filtering is built into the dashboard so multi-domain customers can analyze each site independently.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Can I hide the chat widget but keep tracking?</summary>
+                <div class="body">Yes — in Widget Settings, enable "Hide chat widget (tracking-only mode)". The chat bubble disappears from your site but visitor tracking, page views, and session recordings keep running.</div>
+            </details>
+        </div>
+
+        <div class="faq-group" data-cat="billing">
+            <h2>Billing &amp; Plans</h2>
+            <details class="faq-item">
+                <summary>What's your refund policy?</summary>
+                <div class="body">14-day money-back guarantee on every paid plan. If you're not satisfied within 14 days of billing, email us for a full refund — no questions asked. See the <a href="{% url 'pages:refund' %}">Refund Policy</a> for details.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Can I switch plans later?</summary>
+                <div class="body">Anytime. Upgrades take effect immediately and we prorate the difference. Downgrades take effect at the end of your current billing cycle.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Do you offer annual billing?</summary>
+                <div class="body">Yes. Switch to annual billing on <a href="{% url 'pages:pricing' %}">Pricing</a> and save 20% on Pro and Enterprise — billed once a year.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Are there hidden fees, message overages, or AI surcharges?</summary>
+                <div class="body">No. Flat price, predictable bill. The Enterprise AI bot is bring-your-own-key (Anthropic) — you pay them directly with zero markup from us.</div>
+            </details>
+            <details class="faq-item">
+                <summary>What payment methods do you accept?</summary>
+                <div class="body">All major credit and debit cards. Enterprise customers can request invoice billing or wire transfer — contact <a href="{% url 'pages:contact' %}">sales</a>.</div>
+            </details>
+        </div>
+
+        <div class="faq-group" data-cat="security">
+            <h2>Security &amp; Privacy</h2>
+            <details class="faq-item">
+                <summary>Is my data secure?</summary>
+                <div class="body">Yes. All data is encrypted in transit (TLS 1.3) and at rest. Sensitive fields — 2FA secrets, webhook signing keys, API keys — are individually encrypted with Fernet (AES-128-CBC + HMAC) on top of database-level encryption.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Are you GDPR compliant?</summary>
+                <div class="body">Yes. We give visitors data export and deletion endpoints, ship a configurable cookie banner, and process minimum-required data only. Your visitors' data is never sold or shared with third parties.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Do you support two-factor authentication?</summary>
+                <div class="body">Yes. Time-based OTP (Google Authenticator, Authy, 1Password) plus 8 single-use backup codes per agent. Magic-link passwordless login is also available.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Where is data stored?</summary>
+                <div class="body">Primary infrastructure runs in AWS US-East and EU-West regions. Enterprise customers can request EU-only or single-region pinning.</div>
+            </details>
+            <details class="faq-item">
+                <summary>What's your uptime SLA?</summary>
+                <div class="body">99.9% on Pro and Enterprise. Real-time chat runs on auto-failover infrastructure with Redis-backed channel layers, so a single worker outage doesn't drop messages.</div>
+            </details>
+        </div>
+
+        <div class="faq-group" data-cat="ai">
+            <h2>AI Bot</h2>
+            <details class="faq-item">
+                <summary>How does the AI auto-reply bot work?</summary>
+                <div class="body">When a visitor sends a message, the bot first checks your knowledge base for a keyword match. If nothing fits and you've connected Claude (Anthropic), it sends the visitor's message plus your KB context to Claude and posts the reply. Human handoff happens automatically if confidence is low or the visitor asks for one.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Do I have to pay per AI message?</summary>
+                <div class="body">No markup from us. The AI bot uses your own Anthropic API key — you pay Anthropic directly for tokens. We charge a flat Enterprise plan price, no per-resolution fees.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Which Claude model is used?</summary>
+                <div class="body">Default is <code>claude-haiku-4-5</code> — fast and cheap, great for support replies. You can switch to Sonnet or Opus per organization in AI Bot Settings.</div>
+            </details>
+            <details class="faq-item">
+                <summary>What if Claude is down or my API key is invalid?</summary>
+                <div class="body">The bot falls back to keyword-matched knowledge base entries. If nothing matches there either, the chat is routed to a human agent automatically. No silent failures.</div>
+            </details>
+        </div>
+
+        <div class="faq-group" data-cat="team">
+            <h2>Teams &amp; Agents</h2>
+            <details class="faq-item">
+                <summary>How many agents can use the platform?</summary>
+                <div class="body">Free: 1 agent. Pro: 5 agents. Enterprise: unlimited. All plans support multiple simultaneous chats per agent — there's no per-chat throttle.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Can I customize the chat widget colors and branding?</summary>
+                <div class="body">Yes. Widget color, position, welcome message, business hours, and custom logo are configurable from the dashboard. Pro removes the "Powered by" badge. Enterprise gets full white-label.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Do you offer customer support?</summary>
+                <div class="body">Yes — email support on Free, priority email + live chat on Pro, dedicated account manager with 24/7 phone support on Enterprise. We dogfood our own product, so chat us anytime at <a href="{% url 'pages:contact' %}">Contact</a>.</div>
+            </details>
+            <details class="faq-item">
+                <summary>Can I assign chats to specific departments?</summary>
+                <div class="body">Yes. Create departments (Sales, Support, Billing) and route chats automatically by keyword, page URL, or visitor segment. Departmental SLAs and surveys are configurable per department.</div>
+            </details>
+        </div>
+
+    </div>
+
+    <div class="no-results" id="noResults">
+        <i class="fas fa-search" style="font-size: 32px; color: var(--text-muted); margin-bottom: 12px;"></i>
+        <div>No questions matched. Try a different keyword or <a href="{% url 'pages:contact' %}" style="color: var(--primary);">ask us directly</a>.</div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-help">
+        <h3>Still have questions?</h3>
+        <p>Our team replies to support emails in under 4 business hours.</p>
+        <div class="btns">
+            <a href="{% url 'pages:contact' %}" class="btn btn-primary"><i class="fas fa-envelope"></i> Contact Support</a>
+            <a href="{% url 'pages:pricing' %}" class="btn btn-ghost">View Pricing</a>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Category filter
+    const tabs = document.querySelectorAll('.faq-tab');
+    const groups = document.querySelectorAll('.faq-group');
+    const searchInput = document.getElementById('faqSearch');
+    const noResults = document.getElementById('noResults');
+
+    function applyFilters() {
+        const activeCat = document.querySelector('.faq-tab.active').dataset.cat;
+        const q = searchInput.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        groups.forEach(group => {
+            const catMatch = (activeCat === 'all' || group.dataset.cat === activeCat);
+            let groupHasVisible = false;
+            group.querySelectorAll('.faq-item').forEach(item => {
+                const text = item.innerText.toLowerCase();
+                const matchesSearch = !q || text.includes(q);
+                const show = catMatch && matchesSearch;
+                item.style.display = show ? '' : 'none';
+                if (show) { groupHasVisible = true; visibleCount++; }
+            });
+            group.style.display = (catMatch && groupHasVisible) ? '' : 'none';
+        });
+
+        noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+
+    tabs.forEach(t => t.addEventListener('click', () => {
+        tabs.forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        applyFilters();
+    }));
+    searchInput.addEventListener('input', applyFilters);
+</script>
+{% endblock %}

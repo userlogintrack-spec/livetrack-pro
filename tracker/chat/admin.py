@@ -1,5 +1,32 @@
 from django.contrib import admin
-from .models import ChatRoom, Message, AgentProfile, OfflineMessage, CannedResponse, VisitorNote
+from .models import (
+    ChatRoom, Message, AgentProfile, OfflineMessage, CannedResponse, VisitorNote,
+    ChangelogEntry, WebhookDelivery, MagicLinkToken,
+)
+
+
+@admin.register(ChangelogEntry)
+class ChangelogEntryAdmin(admin.ModelAdmin):
+    list_display = ['published_at', 'category', 'version', 'title', 'is_published']
+    list_filter = ['category', 'is_published', 'published_at']
+    search_fields = ['title', 'body', 'version']
+    fields = ['title', 'category', 'version', 'body', 'is_published', 'published_at']
+
+
+@admin.register(WebhookDelivery)
+class WebhookDeliveryAdmin(admin.ModelAdmin):
+    list_display = ['created_at', 'event', 'webhook', 'status', 'response_status', 'attempt_count']
+    list_filter = ['status', 'event', 'created_at']
+    readonly_fields = ['webhook', 'event', 'payload', 'response_status', 'response_body',
+                       'attempt_count', 'next_retry_at', 'status', 'last_error',
+                       'created_at', 'completed_at']
+    search_fields = ['event', 'webhook__url']
+
+
+@admin.register(MagicLinkToken)
+class MagicLinkTokenAdmin(admin.ModelAdmin):
+    list_display = ['user', 'created_at', 'expires_at', 'consumed_at', 'requested_ip']
+    readonly_fields = ['user', 'token', 'expires_at', 'consumed_at', 'requested_ip', 'created_at']
 
 
 @admin.register(ChatRoom)
@@ -17,8 +44,12 @@ class MessageAdmin(admin.ModelAdmin):
 
 @admin.register(AgentProfile)
 class AgentProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'is_available', 'max_chats', 'total_chats_handled']
-    list_filter = ['is_available']
+    list_display = ['user', 'is_available', 'max_chats', 'total_chats_handled', 'totp_enabled']
+    list_filter = ['is_available', 'totp_enabled']
+    # Never expose the encrypted TOTP secret or hashed backup codes through
+    # the admin — even readonly, surfacing them invites accidental copy-paste
+    # leaks. `totp_enabled` is the only 2FA-state knob admins need.
+    exclude = ['totp_secret', 'backup_codes']
 
 
 @admin.register(OfflineMessage)

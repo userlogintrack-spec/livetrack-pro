@@ -5,12 +5,35 @@ from django.db.models import Count, Q
 from tracker.chat.models import ChatRoom
 
 
-def close_stale_chats(inactive_minutes=30):
-    """Auto-close waiting/active chats that have been inactive for too long.
-    Also sends WebSocket notification to visitors in those chats."""
-    cutoff = timezone.now() - timedelta(minutes=inactive_minutes)
-    stale_rooms = list(ChatRoom.objects.filter(status__in=['waiting', 'active'], updated_at__lt=cutoff).values_list('room_id', flat=True))
-    count = ChatRoom.objects.filter(room_id__in=stale_rooms).update(status='closed', closed_at=timezone.now())
+def close_stale_chats(waiting_inactive_minutes=120, active_inactive_minutes=720, inactive_minutes=None):
+    """Auto-close stale chats.
+
+    Two separate thresholds because the failure modes are different:
+      - Waiting chats (no agent yet): close after 2h. The visitor likely
+        bounced; keeping these around clutters the Waiting queue.
+      - Active chats (agent assigned): close after 12h. Many support chats
+        have slow back-and-forth (visitor steps away, agent waits for info).
+        The earlier 30-min global threshold was nuking real conversations.
+
+    Also sends a WebSocket notification to visitors in those rooms so the
+    widget can update their UI instead of silently going dark.
+
+    `inactive_minutes` is the legacy single-knob signature. When passed it
+    applies to both buckets so old callers keep working.
+    """
+    if inactive_minutes is not None:
+        waiting_inactive_minutes = inactive_minutes
+        active_inactive_minutes = inactive_minutes
+    now = timezone.now()
+    waiting_cutoff = now - timedelta(minutes=waiting_inactive_minutes)
+    active_cutoff = now - timedelta(minutes=active_inactive_minutes)
+    stale_rooms = list(
+        ChatRoom.objects.filter(
+            Q(status='waiting', updated_at__lt=waiting_cutoff) |
+            Q(status='active', updated_at__lt=active_cutoff)
+        ).values_list('room_id', flat=True)
+    )
+    count = ChatRoom.objects.filter(room_id__in=stale_rooms).update(status='closed', closed_at=now)
 
     # Notify visitors via WebSocket that chat was auto-closed
     if stale_rooms:

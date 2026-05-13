@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Agent Performance{% endblock %}
+{% block nav_stats %}active{% endblock %}
+{% block page_title %}Agent Performance — {{ period_label }}{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'dashboard:agent_stats' %}" class="btn btn-sm btn-secondary">
+    <i class="fas fa-chart-bar"></i> Basic Stats
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="overflow:auto;">
+    <table class="data-table" style="width:100%; border-collapse:collapse;">
+        <thead>
+            <tr style="background:#f5f3ff; text-align:left;">
+                <th style="padding:12px;">Agent</th>
+                <th style="padding:12px; text-align:center;">Status</th>
+                <th style="padding:12px; text-align:right;">Chats (30d)</th>
+                <th style="padding:12px; text-align:right;">Resolved</th>
+                <th style="padding:12px; text-align:right;">Resolution %</th>
+                <th style="padding:12px; text-align:right;">Avg First Response</th>
+                <th style="padding:12px; text-align:right;">Avg Duration</th>
+                <th style="padding:12px; text-align:right;">CSAT</th>
+                <th style="padding:12px; text-align:right;">SLA Breaches</th>
+                <th style="padding:12px; text-align:right;">Active Now</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr style="border-bottom:1px solid #eee;">
+                <td style="padding:12px; font-weight:600;">
+                    {{ r.agent.get_full_name|default:r.agent.username }}
+                    <div style="font-size:11px; color:#888;">{{ r.agent.email }}</div>
+                </td>
+                <td style="padding:12px; text-align:center;">
+                    {% if r.is_online %}
+                    <span style="display:inline-block; padding:2px 10px; border-radius:12px; background:#dcfce7; color:#15803d; font-size:11px; font-weight:600;">● Online</span>
+                    {% else %}
+                    <span style="display:inline-block; padding:2px 10px; border-radius:12px; background:#f3f4f6; color:#6b7280; font-size:11px;">Offline</span>
+                    {% endif %}
+                </td>
+                <td style="padding:12px; text-align:right;">{{ r.total_chats_30d|intcomma }}</td>
+                <td style="padding:12px; text-align:right;">{{ r.closed_30d|intcomma }}</td>
+                <td style="padding:12px; text-align:right;">
+                    <span style="font-weight:600; color:{% if r.resolution_rate >= 80 %}#15803d{% elif r.resolution_rate >= 50 %}#ca8a04{% else %}#dc2626{% endif %};">
+                        {{ r.resolution_rate }}%
+                    </span>
+                </td>
+                <td style="padding:12px; text-align:right;">
+                    {% if r.avg_first_response_seconds %}
+                        {% if r.avg_first_response_seconds < 60 %}
+                            {{ r.avg_first_response_seconds|floatformat:0 }}s
+                        {% else %}
+                            {% widthratio r.avg_first_response_seconds 60 1 %}m
+                        {% endif %}
+                    {% else %}
+                        <span style="color:#bbb;">—</span>
+                    {% endif %}
+                </td>
+                <td style="padding:12px; text-align:right;">
+                    {% if r.avg_duration_seconds %}
+                        {% widthratio r.avg_duration_seconds 60 1 %}m
+                    {% else %}
+                        <span style="color:#bbb;">—</span>
+                    {% endif %}
+                </td>
+                <td style="padding:12px; text-align:right;">
+                    {% if r.avg_rating %}
+                        <span style="font-weight:600;">★ {{ r.avg_rating|floatformat:2 }}</span>
+                    {% else %}
+                        <span style="color:#bbb;">—</span>
+                    {% endif %}
+                </td>
+                <td style="padding:12px; text-align:right;">
+                    {% if r.sla_breach_count %}
+                        <span style="color:#dc2626; font-weight:600;">{{ r.sla_breach_count }}</span>
+                    {% else %}
+                        <span style="color:#15803d;">0</span>
+                    {% endif %}
+                </td>
+                <td style="padding:12px; text-align:right;">{{ r.active_chats }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="10" style="padding:32px; text-align:center; color:#888;">
+                    No agents in this organization yet.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top:16px; padding:12px; background:#fef3c7; border-radius:8px; font-size:13px; color:#78350f;">
+    <strong>What you're looking at:</strong> Performance over the last 30 days.
+    First-response time = seconds between chat creation and the agent's first reply.
+    Resolution % = closed chats ÷ total assigned. SLA breaches counted from the SLA policy logs.
+</div>
+{% endblock %}

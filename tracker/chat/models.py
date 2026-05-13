@@ -34,6 +34,11 @@ class ChatRoom(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     closed_at = models.DateTimeField(null=True, blank=True)
+    # AI auto-summary populated on close — short paragraph + topic tags so agents
+    # can scan a chat list without opening every transcript.
+    summary = models.TextField(blank=True, default='')
+    summary_topics = models.CharField(max_length=200, blank=True, default='', help_text='Comma-separated topics extracted by the summary model.')
+    summary_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-updated_at']
@@ -135,6 +140,13 @@ class AgentProfile(models.Model):
     is_available = models.BooleanField(default=True)
     max_chats = models.PositiveIntegerField(default=5)
     total_chats_handled = models.PositiveIntegerField(default=0)
+    # 2FA. The raw column holds Fernet-encrypted ciphertext; access via
+    # `totp_secret_plain` so call sites never touch the wire format.
+    # Backup codes are stored as PBKDF2 hashes — they're one-time, so we never
+    # need to read them back, only verify with constant-time compare.
+    totp_secret = models.TextField(blank=True, default='')
+    totp_enabled = models.BooleanField(default=False)
+    backup_codes = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Agent: {self.user.get_full_name() or self.user.username}"
@@ -142,6 +154,16 @@ class AgentProfile(models.Model):
     @property
     def active_chats_count(self):
         return self.user.chat_rooms.filter(status='active').count()
+
+    @property
+    def totp_secret_plain(self) -> str:
+        from tracker.core.crypto import decrypt_str
+        return decrypt_str(self.totp_secret)
+
+    @totp_secret_plain.setter
+    def totp_secret_plain(self, value: str):
+        from tracker.core.crypto import encrypt_str
+        self.totp_secret = encrypt_str(value or '')
 
 
 class AgentWebsiteAccess(models.Model):
@@ -221,20 +243,43 @@ class Webhook(models.Model):
     """Webhook endpoints for chat events."""
     EVENT_CHOICES = [
         ('chat.created', 'Chat Created'),
+        ('chat.assigned', 'Chat Assigned'),
+        ('chat.transferred', 'Chat Transferred'),
         ('chat.closed', 'Chat Closed'),
+        ('chat.rated', 'Chat Rated'),
         ('message.new', 'New Message'),
         ('visitor.new', 'New Visitor'),
         ('agent.joined', 'Agent Joined'),
+        ('offline.message', 'Offline Message Received'),
+        ('sla.breached', 'SLA Breached'),
+    ]
+    PROVIDER_CHOICES = [
+        ('generic', 'Generic JSON (raw POST)'),
+        ('slack', 'Slack Incoming Webhook'),
+        ('discord', 'Discord Webhook'),
     ]
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='webhooks')
     url = models.URLField(max_length=500)
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='generic')
     events = models.CharField(max_length=500, default='chat.created,chat.closed')
     is_active = models.BooleanField(default=True)
-    secret = models.CharField(max_length=64, blank=True, default='')
+    # Encrypted at rest — read via `secret_plain`. Widened from 64 to TextField
+    # because Fernet ciphertext for a 64-char secret is ~140 chars.
+    secret = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"Webhook {self.url[:50]} for {self.organization.name}"
+
+    @property
+    def secret_plain(self) -> str:
+        from tracker.core.crypto import decrypt_str
+        return decrypt_str(self.secret)
+
+    @secret_plain.setter
+    def secret_plain(self, value: str):
+        from tracker.core.crypto import encrypt_str
+        self.secret = encrypt_str(value or '')
 
 
 class ActivityLog(models.Model):
@@ -462,6 +507,10 @@ class SurveyAnswer(models.Model):
 # ──────────────────────────────────────────────────────────
 class AIBotConfig(models.Model):
     """AI auto-reply bot configuration per organization."""
+    PROVIDER_CHOICES = [
+        ('keyword', 'Keyword / KB matching only (no LLM cost)'),
+        ('anthropic', 'Anthropic Claude (recommended)'),
+    ]
     organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='ai_bot_config')
     is_enabled = models.BooleanField(default=False)
     bot_name = models.CharField(max_length=100, default='AI Assistant')
@@ -470,6 +519,16 @@ class AIBotConfig(models.Model):
     handoff_keywords = models.TextField(default='agent,human,person,help,speak,talk', help_text='Comma-separated keywords that trigger agent handoff')
     max_auto_replies = models.PositiveIntegerField(default=5, help_text='Max AI replies before auto-handoff to agent')
     response_delay_seconds = models.PositiveIntegerField(default=2, help_text='Delay before AI responds (natural feel)')
+    # LLM provider config — when provider='anthropic' and api_key is set, the
+    # bot uses Claude with the org's KB as context. Otherwise falls back to
+    # the original keyword-overlap matcher (free, no external dependency).
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='keyword')
+    # Encrypted at rest — read via `api_key_plain`. Widened to TextField because
+    # Fernet ciphertext for a 200-char key is ~340 chars.
+    api_key = models.TextField(blank=True, default='', help_text='Anthropic API key — stored per-org so each customer pays for their own usage.')
+    model_name = models.CharField(max_length=100, default='claude-haiku-4-5-20251001', help_text='Claude model to use. Haiku 4.5 is fast and cheap.')
+    system_prompt = models.TextField(blank=True, default='', help_text='Optional extra instructions appended to the system prompt.')
+    auto_summarize = models.BooleanField(default=False, help_text='When chat closes, generate a 2-line AI summary visible in the dashboard.')
     created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
@@ -478,6 +537,16 @@ class AIBotConfig(models.Model):
     @property
     def handoff_keywords_list(self):
         return [k.strip().lower() for k in self.handoff_keywords.split(',') if k.strip()]
+
+    @property
+    def api_key_plain(self) -> str:
+        from tracker.core.crypto import decrypt_str
+        return decrypt_str(self.api_key)
+
+    @api_key_plain.setter
+    def api_key_plain(self, value: str):
+        from tracker.core.crypto import encrypt_str
+        self.api_key = encrypt_str(value or '')
 
 
 class AIBotKnowledge(models.Model):
@@ -587,13 +656,38 @@ class WhatsAppConfig(models.Model):
     organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='whatsapp_config')
     is_enabled = models.BooleanField(default=False)
     phone_number_id = models.CharField(max_length=100, blank=True, default='')
+    # access_token + webhook_secret are write-only secrets — encrypted at rest.
+    # verify_token stays plaintext because Meta echoes it back to us in the
+    # webhook handshake; we have to look up configs by it, so it can't be a
+    # one-way hash. It's a low-sensitivity shared-secret (verifies the webhook
+    # came from Meta), not a credential.
     access_token = models.TextField(blank=True, default='')
     verify_token = models.CharField(max_length=100, blank=True, default='')
-    webhook_secret = models.CharField(max_length=100, blank=True, default='')
+    webhook_secret = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"WhatsApp config for {self.organization.name}"
+
+    @property
+    def access_token_plain(self) -> str:
+        from tracker.core.crypto import decrypt_str
+        return decrypt_str(self.access_token)
+
+    @access_token_plain.setter
+    def access_token_plain(self, value: str):
+        from tracker.core.crypto import encrypt_str
+        self.access_token = encrypt_str(value or '')
+
+    @property
+    def webhook_secret_plain(self) -> str:
+        from tracker.core.crypto import decrypt_str
+        return decrypt_str(self.webhook_secret)
+
+    @webhook_secret_plain.setter
+    def webhook_secret_plain(self, value: str):
+        from tracker.core.crypto import encrypt_str
+        self.webhook_secret = encrypt_str(value or '')
 
 
 class WhatsAppMessage(models.Model):
@@ -681,3 +775,84 @@ class VisitorSegment(models.Model):
     @property
     def visitor_count(self):
         return self.get_visitors().count()
+
+
+# ──────────────────────────────────────────────────────────
+# Reliability: webhook delivery log + retry
+# ──────────────────────────────────────────────────────────
+class WebhookDelivery(models.Model):
+    """One row per outbound webhook attempt — used for retry and observability."""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('success', 'Success'),
+        ('failed', 'Failed (giving up after retries)'),
+    ]
+    webhook = models.ForeignKey(Webhook, on_delete=models.CASCADE, related_name='deliveries')
+    event = models.CharField(max_length=50)
+    payload = models.JSONField(default=dict)
+    response_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    response_body = models.TextField(blank=True, default='')
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    next_retry_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    last_error = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(default=timezone.now)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'next_retry_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.event} → {self.webhook.url[:40]} ({self.status})'
+
+
+# ──────────────────────────────────────────────────────────
+# Auth: passwordless magic-link login tokens
+# ──────────────────────────────────────────────────────────
+class MagicLinkToken(models.Model):
+    """Single-use passwordless login tokens emailed to the user."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='magic_links')
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    requested_ip = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    @property
+    def is_valid(self):
+        return self.consumed_at is None and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f'magic-link for {self.user.username}'
+
+
+# ──────────────────────────────────────────────────────────
+# Marketing: changelog entries (rendered on /changelog/ page)
+# ──────────────────────────────────────────────────────────
+class ChangelogEntry(models.Model):
+    CATEGORY_CHOICES = [
+        ('new', 'New Feature'),
+        ('improved', 'Improved'),
+        ('fixed', 'Bug Fix'),
+        ('security', 'Security'),
+    ]
+    version = models.CharField(max_length=30, blank=True, default='', help_text='Optional semver tag.')
+    title = models.CharField(max_length=200)
+    body = models.TextField(help_text='Markdown-ish; rendered as plain HTML in the template.')
+    category = models.CharField(max_length=10, choices=CATEGORY_CHOICES, default='new')
+    is_published = models.BooleanField(default=True)
+    published_at = models.DateField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-published_at', '-created_at']
+        verbose_name_plural = 'Changelog Entries'
+
+    def __str__(self):
+        return f'{self.published_at} — {self.title}'

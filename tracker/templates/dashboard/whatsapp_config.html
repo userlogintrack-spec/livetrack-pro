@@ -24,7 +24,7 @@
                 <label><input type="checkbox" id="waEnabled" {% if config.is_enabled %}checked{% endif %}> Enable WhatsApp Integration</label>
             </div>
             <div class="form-group"><label>Phone Number ID</label><input type="text" id="waPhoneId" class="form-control" value="{{ config.phone_number_id }}" placeholder="From Meta Business Suite"></div>
-            <div class="form-group"><label>Access Token</label><input type="password" id="waToken" class="form-control" value="{{ config.access_token }}" placeholder="WhatsApp API access token"></div>
+            <div class="form-group"><label>Access Token</label><input type="password" id="waToken" class="form-control" value="" placeholder="{% if config.access_token %}Saved — leave blank to keep current{% else %}WhatsApp API access token{% endif %}"></div>
             <div class="form-group"><label>Verify Token</label><input type="text" id="waVerify" class="form-control" value="{{ config.verify_token }}" placeholder="Custom verify token for webhook">
                 <small style="color:var(--text-muted);">Use this token when setting up the webhook in Meta Business Suite</small>
             </div>

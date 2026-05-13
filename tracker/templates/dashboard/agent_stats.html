@@ -7,6 +7,7 @@
 
 {% block top_actions %}
 <div style="display: flex; gap: 8px;">
+    <a href="{% url 'dashboard:agent_performance' %}" class="btn btn-sm btn-primary"><i class="fas fa-trophy"></i> Performance Report (Pro)</a>
     <a href="{% url 'dashboard:export_chats' %}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> Export Chats CSV</a>
     <a href="{% url 'dashboard:export_visitors' %}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i> Export Visitors CSV</a>
 </div>

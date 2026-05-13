@@ -12,6 +12,8 @@
     <link rel="icon" type="image/svg+xml" href="/static/images/icon-192.svg">
     <link rel="shortcut icon" href="/static/images/icon-192.svg">
     <link rel="apple-touch-icon" href="/static/images/icon-192.svg">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#7c3aed">
     <title>{% block title %}LiveVisitorHub{% endblock %} | LiveVisitorHub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -929,6 +931,107 @@
         navigator.serviceWorker.register('/static/sw.js', {scope: '/'}).catch(function() {});
     }
     </script>
+
+    <!-- ─── Keyboard shortcuts overlay (press ?) ─── -->
+    <div id="ltKeyboardOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,10,42,0.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px;">
+        <div style="background:white;border-radius:18px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #f3f4f6;">
+                <div style="font-size:16px;font-weight:700;color:#1e1b4b;"><i class="fas fa-keyboard" style="margin-right:8px;color:#7c3aed;"></i> Keyboard shortcuts</div>
+                <button onclick="document.getElementById('ltKeyboardOverlay').style.display='none'" style="background:transparent;border:none;font-size:20px;color:#9ca3af;cursor:pointer;">×</button>
+            </div>
+            <div style="padding:18px 22px;display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;font-size:13px;color:#4b5563;">
+                <div style="display:flex;justify-content:space-between;"><span>Open shortcuts</span><kbd style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:6px;">?</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>Go to Chats</span><kbd style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:6px;">g c</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>Go to Visitors</span><kbd style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:6px;">g v</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>Go to Dashboard</span><kbd style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:6px;">g d</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>Go to Analytics</span><kbd style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:6px;">g a</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>Go to Settings</span><kbd style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:6px;">g s</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>Search</span><kbd style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:6px;">/</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>Close modal</span><kbd style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:6px;">Esc</kbd></div>
+            </div>
+            <div style="padding:12px 22px;background:#fafafa;font-size:11px;color:#6b7280;text-align:center;">Press <kbd style="font-family:monospace;background:white;padding:1px 6px;border-radius:4px;border:1px solid #e5e7eb;">?</kbd> any time to reopen this panel</div>
+        </div>
+    </div>
+
+    <!-- ─── In-app upgrade modal (triggered by 402 plan-gate responses) ─── -->
+    <div id="ltUpgradeModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,10,42,0.65);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px;">
+        <div style="background:white;border-radius:18px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
+            <div style="padding:24px 26px 12px;text-align:center;">
+                <div style="width:60px;height:60px;border-radius:14px;background:linear-gradient(135deg,#7c3aed,#a855f7);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;box-shadow:0 8px 24px rgba(124,58,237,0.3);">
+                    <i class="fas fa-rocket" style="color:white;font-size:24px;"></i>
+                </div>
+                <div style="font-size:20px;font-weight:800;color:#1e1b4b;margin-bottom:8px;" id="ltUpgradeTitle">Upgrade to unlock</div>
+                <div style="font-size:14px;color:#6b7280;margin-bottom:18px;" id="ltUpgradeDesc">This feature is part of a paid plan.</div>
+            </div>
+            <div style="padding:0 26px 24px;display:flex;gap:10px;">
+                <button onclick="document.getElementById('ltUpgradeModal').style.display='none'" style="flex:1;padding:11px;border:1px solid #e5e7eb;background:white;color:#6b7280;border-radius:10px;font-weight:600;cursor:pointer;">Maybe later</button>
+                <a href="/dashboard/billing/" style="flex:1;padding:11px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;text-decoration:none;border-radius:10px;font-weight:700;text-align:center;">See plans →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ───── Keyboard shortcuts ─────
+    (function() {
+        var lastKey = '';
+        var lastKeyAt = 0;
+        function isTyping(el) {
+            if (!el) return false;
+            var t = el.tagName;
+            return t === 'INPUT' || t === 'TEXTAREA' || el.isContentEditable;
+        }
+        document.addEventListener('keydown', function(e) {
+            if (isTyping(document.activeElement)) return;
+            if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+                e.preventDefault();
+                document.getElementById('ltKeyboardOverlay').style.display = 'flex';
+                return;
+            }
+            if (e.key === 'Escape') {
+                var ov = document.getElementById('ltKeyboardOverlay');
+                var um = document.getElementById('ltUpgradeModal');
+                if (ov && ov.style.display !== 'none') ov.style.display = 'none';
+                if (um && um.style.display !== 'none') um.style.display = 'none';
+            }
+            if (e.key === '/') {
+                var s = document.querySelector('input[type=search],input[name=q],input[placeholder*=earch]');
+                if (s) { e.preventDefault(); s.focus(); }
+                return;
+            }
+            // Two-key sequences: g <letter>
+            var now = Date.now();
+            if (lastKey === 'g' && (now - lastKeyAt) < 800) {
+                var routes = {c:'/dashboard/chats/', v:'/dashboard/visitors/', d:'/dashboard/', a:'/dashboard/analytics/', s:'/dashboard/settings/website/'};
+                if (routes[e.key]) { window.location.href = routes[e.key]; lastKey = ''; return; }
+            }
+            lastKey = e.key; lastKeyAt = now;
+        });
+    })();
+
+    // ───── Upgrade modal: intercept 402 fetch responses ─────
+    (function() {
+        if (!window.fetch || window._ltUpgradeWrapped) return;
+        window._ltUpgradeWrapped = true;
+        var origFetch = window.fetch.bind(window);
+        window.fetch = function(input, init) {
+            return origFetch(input, init).then(function(resp) {
+                if (resp.status === 402) {
+                    resp.clone().json().then(function(d) {
+                        if (d && d.code === 'PLAN_UPGRADE_REQUIRED') {
+                            var t = document.getElementById('ltUpgradeTitle');
+                            var dsc = document.getElementById('ltUpgradeDesc');
+                            if (t) t.textContent = 'Upgrade to ' + (d.required_plan || 'Pro');
+                            if (dsc) dsc.textContent = d.error || 'This feature requires a paid plan.';
+                            document.getElementById('ltUpgradeModal').style.display = 'flex';
+                        }
+                    }).catch(function(){});
+                }
+                return resp;
+            });
+        };
+    })();
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -194,14 +194,70 @@
     <div class="messages hidden" id="messages"></div>
 
     <!-- Pre-chat form -->
-    <div class="prechat" id="prechat">
+    <div class="prechat{% if is_offline %} hidden{% endif %}" id="prechat">
+        {% if org.prechat_enabled and org.prechat_intro %}
+        <p>{{ org.prechat_intro }}</p>
+        {% else %}
         <p>{{ org.welcome_message|default:"Please fill in this form. We will get back to you as soon as possible." }}</p>
-        <input type="text" id="nameInput" placeholder="Your name *" required>
-        <input type="email" id="emailInput" placeholder="Email (optional)">
+        {% endif %}
+        {% if not org.prechat_enabled or org.prechat_require_name %}
+        <input type="text" id="nameInput" placeholder="Your name{% if not org.prechat_enabled or org.prechat_require_name %} *{% endif %}"{% if not org.prechat_enabled or org.prechat_require_name %} required{% endif %}>
+        {% endif %}
+        {% if not org.prechat_enabled or org.prechat_require_email %}
+        <input type="email" id="emailInput" placeholder="Email{% if org.prechat_enabled and org.prechat_require_email %} *{% else %} (optional){% endif %}"{% if org.prechat_enabled and org.prechat_require_email %} required{% endif %}>
+        {% endif %}
         <input type="text" id="hpInput" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;padding:0;border:0;" aria-hidden="true">
-        <input type="tel" id="phoneInput" placeholder="Phone number (optional)">
-        <textarea id="subjectInput" placeholder="How can we help you?"></textarea>
+        {% if not org.prechat_enabled or org.prechat_require_phone %}
+        <input type="tel" id="phoneInput" placeholder="Phone number{% if org.prechat_enabled and org.prechat_require_phone %} *{% else %} (optional){% endif %}"{% if org.prechat_enabled and org.prechat_require_phone %} required{% endif %}>
+        {% endif %}
+        {% if not org.prechat_enabled or org.prechat_require_subject %}
+        <textarea id="subjectInput" placeholder="How can we help you?{% if org.prechat_enabled and org.prechat_require_subject %} *{% endif %}"{% if org.prechat_enabled and org.prechat_require_subject %} required{% endif %}></textarea>
+        {% endif %}
         <button class="start-btn" onclick="startChat()"><i class="fas fa-paper-plane" style="margin-right:8px;"></i> Start Chat</button>
+    </div>
+
+    {% if is_offline %}
+    <!-- Offline panel (business hours closed) — leaves a message instead of starting a chat -->
+    <div class="prechat" id="offlinePanel" style="background:#fafafa;">
+        <div style="text-align:center;padding:8px 0 4px;">
+            <div style="width:48px;height:48px;border-radius:50%;background:rgba(124,58,237,0.1);display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                <i class="fas fa-moon" style="font-size:20px;color:var(--wc);"></i>
+            </div>
+            <div style="font-size:15px;font-weight:700;color:#1f2937;margin-bottom:6px;">We're offline right now</div>
+        </div>
+        <p style="text-align:center;">{{ org.offline_message|default:"Leave us a message and we'll get back to you as soon as we're back." }}</p>
+        <input type="text" id="offlineName" placeholder="Your name *" required>
+        <input type="email" id="offlineEmail" placeholder="Your email *" required>
+        <textarea id="offlineMsg" placeholder="What's on your mind?" required></textarea>
+        <button class="start-btn" onclick="sendOfflineMessage()"><i class="fas fa-paper-plane" style="margin-right:8px;"></i> Send Message</button>
+        <p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:4px;">
+            We typically reply within {{ org.business_hours_start|time:"g:i a" }}–{{ org.business_hours_end|time:"g:i a" }} ({{ org.business_hours_timezone }}).
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Post-chat survey modal -->
+    <div id="surveyModal" class="hidden" style="position:absolute;inset:0;z-index:30;background:rgba(15,10,42,0.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:18px;">
+        <div style="background:white;border-radius:16px;max-width:340px;width:100%;max-height:90%;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="padding:18px 20px;border-bottom:1px solid #f3f4f6;">
+                <div style="font-size:15px;font-weight:700;color:#1f2937;" id="surveyTitle">Quick feedback</div>
+                <div style="font-size:12px;color:#6b7280;margin-top:2px;" id="surveyDesc"></div>
+            </div>
+            <div id="surveyQuestions" style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;"></div>
+            <div style="padding:0 20px 18px;display:flex;gap:8px;">
+                <button onclick="closeSurvey(false)" style="flex:0 0 auto;padding:11px 16px;border:1px solid #e5e7eb;background:white;color:#6b7280;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">Skip</button>
+                <button onclick="submitSurvey()" style="flex:1;padding:11px;background:var(--wc);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KB auto-suggest panel — shown above the input when typing -->
+    <div id="kbSuggestPanel" class="hidden" style="position:absolute;left:10px;right:10px;bottom:78px;background:white;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,0.12);max-height:240px;overflow-y:auto;z-index:15;">
+        <div style="padding:10px 14px;border-bottom:1px solid #f3f4f6;font-size:11px;font-weight:700;color:var(--wc);text-transform:uppercase;letter-spacing:0.5px;display:flex;justify-content:space-between;align-items:center;">
+            <span><i class="fas fa-lightbulb" style="margin-right:6px;"></i> Suggested answers</span>
+            <button onclick="document.getElementById('kbSuggestPanel').classList.add('hidden')" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:12px;">×</button>
+        </div>
+        <div id="kbSuggestList"></div>
     </div>
 
     <!-- Typing indicator -->
@@ -378,7 +434,11 @@ function insertEmoji(e) { document.getElementById('msgInput').value += e; docume
 
 function post(path, data) {
     data = data || {}; data.key = KEY; data.session_key = SESSION; data.parent_domain = PARENT_DOMAIN; data.fingerprint = FINGERPRINT;
-    return fetch(BASE + path, {method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(data)})
+    // Cross-origin (iframe lives on customer domain). Auth is via `key` +
+    // `session_key` in the body; we cannot use cookies because the server
+    // replies with `Access-Control-Allow-Origin: *` and browsers refuse
+    // wildcard + credentials together.
+    return fetch(BASE + path, {method:'POST',headers:{'Content-Type':'application/json'},credentials:'omit',body:JSON.stringify(data)})
         .then(parseApiResponse)
         .then(function(j){
             // Persist any session_key the server sends back so we stay the same visitor
@@ -471,6 +531,10 @@ function connectWs() {
         if (d.type === 'chat_closed') {
             handleChatClosed('Agent ended the chat.');
         }
+        if (d.type === 'survey_prompt' && d.survey_id) {
+            // Agent closed the chat — show the post-chat survey if one is configured.
+            showSurvey(d.survey_id);
+        }
     };
     socket.onclose = function() {
         if (wsClosedByUser || !roomId) return;
@@ -511,12 +575,19 @@ window.addEventListener('online', function() {
 });
 
 function startChat() {
-    var name = document.getElementById('nameInput').value.trim();
-    if (!name) { document.getElementById('nameInput').style.borderColor='#ef4444'; return; }
+    // Pre-chat inputs are conditionally rendered based on org.prechat_* flags,
+    // so each must be null-checked before reading. Name still required when
+    // present; if the org disabled the name field entirely we fall back to
+    // 'Visitor' so chat can still start.
+    var nameEl = document.getElementById('nameInput');
+    var name = nameEl ? nameEl.value.trim() : 'Visitor';
+    if (nameEl && !name) { nameEl.style.borderColor = '#ef4444'; return; }
     visitorName = name;
     try { localStorage.setItem(NAME_STORAGE, name); } catch(_){}
-    var email = document.getElementById('emailInput').value.trim();
-    var subject = document.getElementById('subjectInput').value.trim();
+    var emailEl = document.getElementById('emailInput');
+    var subjectEl = document.getElementById('subjectInput');
+    var email = emailEl ? emailEl.value.trim() : '';
+    var subject = subjectEl ? subjectEl.value.trim() : '';
     var website = '';
     try {
         var hp = document.getElementById('hpInput');
@@ -566,7 +637,8 @@ function uploadFile(input) {
     fd.append('session_key', SESSION);   // for cross-origin where the cookie may be blocked
     fd.append('key', KEY);
     var url = BASE + '/api/chat/upload/' + encodeURIComponent(roomId) + '/?sk=' + encodeURIComponent(SESSION);
-    fetch(url, {method:'POST', body:fd, credentials:'include'})
+    // Cross-origin: omit cookies. session_key is in form data + URL.
+    fetch(url, {method:'POST', body:fd, credentials:'omit'})
     .then(parseApiResponse)
     .then(function(data) {
         if (data.file_url) {
@@ -659,8 +731,180 @@ var lastRoomId = null;
 // Pre-fill saved name in prechat form
 try {
     var _savedName = localStorage.getItem(NAME_STORAGE) || '';
-    if (_savedName) document.getElementById('nameInput').value = _savedName;
+    var _nameInput = document.getElementById('nameInput');
+    if (_savedName && _nameInput) _nameInput.value = _savedName;
 } catch(_){}
+
+// ═══════ POST-CHAT SURVEY ═══════
+// Initial payload is server-rendered into widget_embed_page context so we
+// don't need an extra round-trip when the WebSocket survey_prompt fires.
+var SURVEY_PRESET = {{ post_chat_survey|default:"null"|safe }};
+var pendingSurveyAnswers = {};
+function showSurvey(surveyId) {
+    var modal = document.getElementById('surveyModal');
+    if (!modal) return;
+    function render(s) {
+        document.getElementById('surveyTitle').textContent = s.title || 'Quick feedback';
+        document.getElementById('surveyDesc').textContent = s.description || '';
+        var container = document.getElementById('surveyQuestions');
+        container.innerHTML = '';
+        pendingSurveyAnswers = {};
+        (s.questions || []).forEach(function(q) {
+            var wrap = document.createElement('div');
+            var label = document.createElement('label');
+            label.style.cssText = 'display:block;font-size:13px;font-weight:600;color:#1f2937;margin-bottom:6px;';
+            label.textContent = q.text + (q.required ? ' *' : '');
+            wrap.appendChild(label);
+            if (q.type === 'rating') {
+                var stars = document.createElement('div');
+                stars.style.cssText = 'display:flex;gap:6px;';
+                for (var i = 1; i <= 10; i++) {
+                    (function(score) {
+                        var b = document.createElement('button');
+                        b.type = 'button';
+                        b.textContent = score;
+                        b.style.cssText = 'flex:1;min-width:0;padding:8px 0;border:1.5px solid #e5e7eb;background:white;color:#6b7280;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;';
+                        b.onclick = function() {
+                            pendingSurveyAnswers[q.id] = {rating: score};
+                            stars.querySelectorAll('button').forEach(function(x){ x.style.background='white'; x.style.color='#6b7280'; x.style.borderColor='#e5e7eb'; });
+                            b.style.background = 'var(--wc)'; b.style.color = 'white'; b.style.borderColor = 'var(--wc)';
+                        };
+                        stars.appendChild(b);
+                    })(i);
+                }
+                wrap.appendChild(stars);
+            } else if (q.type === 'yesno') {
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:8px;';
+                ['Yes', 'No'].forEach(function(opt) {
+                    var b = document.createElement('button');
+                    b.type = 'button'; b.textContent = opt;
+                    b.style.cssText = 'flex:1;padding:9px;border:1.5px solid #e5e7eb;background:white;color:#1f2937;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;';
+                    b.onclick = function() {
+                        pendingSurveyAnswers[q.id] = {text: opt};
+                        row.querySelectorAll('button').forEach(function(x){ x.style.background='white'; x.style.color='#1f2937'; x.style.borderColor='#e5e7eb'; });
+                        b.style.background = 'var(--wc)'; b.style.color = 'white'; b.style.borderColor = 'var(--wc)';
+                    };
+                    row.appendChild(b);
+                });
+                wrap.appendChild(row);
+            } else if (q.type === 'choice' && q.choices && q.choices.length) {
+                var sel = document.createElement('select');
+                sel.style.cssText = 'width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:13px;background:white;';
+                sel.innerHTML = '<option value="">Choose…</option>' + q.choices.map(function(c){ return '<option>'+c+'</option>'; }).join('');
+                sel.onchange = function() { pendingSurveyAnswers[q.id] = {text: sel.value}; };
+                wrap.appendChild(sel);
+            } else {
+                var ta = document.createElement('textarea');
+                ta.placeholder = 'Type your answer…';
+                ta.style.cssText = 'width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;resize:none;min-height:60px;';
+                ta.oninput = function() { pendingSurveyAnswers[q.id] = {text: ta.value}; };
+                wrap.appendChild(ta);
+            }
+            container.appendChild(wrap);
+        });
+        window._activeSurveyId = s.id;
+        modal.classList.remove('hidden');
+    }
+    if (SURVEY_PRESET && SURVEY_PRESET.id === surveyId) {
+        render(SURVEY_PRESET);
+        return;
+    }
+    fetch(BASE + '/dashboard/api/widget/survey/' + surveyId + '/', {credentials: 'omit'})
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(s) { if (s && !s.error) render(s); })
+        .catch(function(){});
+}
+function closeSurvey(submitted) {
+    document.getElementById('surveyModal').classList.add('hidden');
+    if (submitted) showToast('Thanks for your feedback!', 'success');
+}
+function submitSurvey() {
+    var sid = window._activeSurveyId;
+    if (!sid) { closeSurvey(false); return; }
+    var rid = roomId || lastRoomId;
+    var rating = null;
+    var answers = [];
+    Object.keys(pendingSurveyAnswers).forEach(function(qid) {
+        var a = pendingSurveyAnswers[qid];
+        if (a.rating != null && rating == null) rating = a.rating;
+        answers.push({question_id: parseInt(qid, 10), text: a.text || '', rating: a.rating});
+    });
+    fetch(BASE + '/api/survey/' + sid + '/submit/', {
+        method: 'POST', credentials: 'omit',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({room_id: rid, score: rating, answers: answers, session_key: SESSION}),
+    }).then(function(){ closeSurvey(true); }).catch(function(){ closeSurvey(false); });
+}
+
+// ═══════ OFFLINE MESSAGE ═══════
+function sendOfflineMessage() {
+    var name = (document.getElementById('offlineName') || {}).value || '';
+    var email = (document.getElementById('offlineEmail') || {}).value || '';
+    var msg = (document.getElementById('offlineMsg') || {}).value || '';
+    if (!name.trim() || !email.trim() || !msg.trim()) {
+        showToast('Please fill in all fields', 'warning'); return;
+    }
+    fetch(BASE + '/api/chat/offline-message/', {
+        method: 'POST', credentials: 'omit',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, email: email, message: msg, key: KEY, session_key: SESSION}),
+    }).then(function(r){ return r.json(); })
+      .then(function(d) {
+          if (d && d.error) { showToast(d.error, 'error'); return; }
+          var panel = document.getElementById('offlinePanel');
+          if (panel) panel.innerHTML = '<div style="text-align:center;padding:40px 20px;"><i class="fas fa-check-circle" style="font-size:36px;color:#10b981;margin-bottom:10px;"></i><div style="font-size:15px;font-weight:700;color:#1f2937;margin-bottom:6px;">Message received</div><div style="font-size:12px;color:#6b7280;">We\'ll get back to you at ' + email + '.</div></div>';
+      })
+      .catch(function(){ showToast('Could not send. Please try again.', 'error'); });
+}
+
+// ═══════ KB AUTO-SUGGEST ═══════
+var KB_TRACKING_KEY = '{{ tracking_key|default:"" }}';
+var _kbDebounce = null;
+function fetchKbSuggest(query) {
+    if (!KB_TRACKING_KEY || !query || query.length < 4) {
+        document.getElementById('kbSuggestPanel').classList.add('hidden');
+        return;
+    }
+    fetch(BASE + '/dashboard/api/kb-suggest/', {
+        method: 'POST', credentials: 'omit',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query: query, tracking_key: KB_TRACKING_KEY}),
+    }).then(function(r){ return r.ok ? r.json() : {results: []}; })
+      .then(function(d) {
+          var panel = document.getElementById('kbSuggestPanel');
+          var list = document.getElementById('kbSuggestList');
+          if (!d.results || !d.results.length) { panel.classList.add('hidden'); return; }
+          list.innerHTML = d.results.map(function(a) {
+              var snippet = (a.snippet || '').replace(/[<>&]/g, function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c]; });
+              return '<div style="padding:11px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;" onclick="document.getElementById(\'kbSuggestPanel\').classList.add(\'hidden\')">' +
+                     '<div style="font-size:12px;font-weight:700;color:#1f2937;margin-bottom:2px;">' + a.title + '</div>' +
+                     '<div style="font-size:11px;color:#6b7280;line-height:1.4;">' + snippet + '…</div>' +
+                     '</div>';
+          }).join('');
+          panel.classList.remove('hidden');
+      }).catch(function(){});
+}
+(function attachKbListener() {
+    var input = document.getElementById('msgInput');
+    if (!input) return;
+    input.addEventListener('input', function() {
+        if (_kbDebounce) clearTimeout(_kbDebounce);
+        var q = input.value;
+        _kbDebounce = setTimeout(function(){ fetchKbSuggest(q); }, 350);
+    });
+    input.addEventListener('blur', function() {
+        // Hide on blur after a short delay so click-to-select still works.
+        setTimeout(function(){ document.getElementById('kbSuggestPanel').classList.add('hidden'); }, 150);
+    });
+})();
+
+// Patch close handler to also show survey if SURVEY_PRESET is configured.
+var _origHandleChatClosed = handleChatClosed;
+handleChatClosed = function(msg) {
+    _origHandleChatClosed(msg);
+    if (SURVEY_PRESET && SURVEY_PRESET.id) showSurvey(SURVEY_PRESET.id);
+};
 
 // Auto-restore chat on load — keep user inside the same room until they end it
 post('/api/widget/start-chat/', {name:'',email:'',subject:'',restore_only:true})
