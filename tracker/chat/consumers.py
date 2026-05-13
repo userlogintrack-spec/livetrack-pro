@@ -141,12 +141,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # WebRTC signaling for calls, screen share, cobrowse
         elif message_type in ('screen_share_request', 'screen_share_offer', 'screen_share_answer', 'ice_candidate', 'screen_share_stop', 'cobrowse_update', 'call_request', 'call_offer', 'call_answer', 'call_end', 'call_reject', 'call_toggle_video', 'call_toggle_audio'):
+            # Include sender's channel so peers can filter self-echo. Without this
+            # tag, an `endCall()` that ships call_end loops back to its sender, who
+            # re-runs the local end-handler, which sends call_end again — the
+            # infinite "Call ended" system-message spam users were seeing.
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'webrtc_signal',
                     'message_type': message_type,
                     'sender_type': 'agent' if self.is_agent else 'visitor',
+                    'sender_channel': self.channel_name,
                     'data': data.get('data', {}),
                 }
             )
@@ -200,6 +205,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
 
     async def webrtc_signal(self, event):
+        # Skip echoing back to the originator — otherwise call_end / call_reject
+        # / ice_candidate signals loop into the sender's own handlers.
+        if event.get('sender_channel') == self.channel_name:
+            return
         await self.send(text_data=json.dumps({
             'type': event['message_type'],
             'sender_type': event['sender_type'],

@@ -3846,51 +3846,63 @@
         }
     }
 
-    function rejectCall() {
-        document.getElementById('incomingCallBanner').style.display = 'none';
-        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
-        chatSocket.send(JSON.stringify({ type: 'call_reject', data: {} }));
-        appendMessage('Call rejected', 'system', 'System', new Date().toISOString(), 'text');
-    }
-
-    function handleCallReject() {
-        endCall();
-        appendMessage('Call was rejected', 'system', 'System', new Date().toISOString(), 'text');
-    }
-
-    function endCall() {
+    var _callTornDown = false;
+    function _silentTeardown() {
         document.getElementById('callOverlay').style.display = 'none';
         document.getElementById('incomingCallBanner').style.display = 'none';
         document.getElementById('videoContainer').style.display = 'none';
         document.getElementById('screenContainer').style.display = 'none';
         if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
-
         if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
         if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
         if (callPC) { callPC.close(); callPC = null; }
-
         callActive = false;
         isAudioMuted = false;
         isVideoOff = false;
         if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
-        callSeconds = 0;
+    }
 
+    function rejectCall() {
+        if (_callTornDown) return;
+        _callTornDown = true;
+        document.getElementById('incomingCallBanner').style.display = 'none';
+        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
+        chatSocket.send(JSON.stringify({ type: 'call_reject', data: {} }));
+        appendMessage('Call rejected', 'system', 'System', new Date().toISOString(), 'text');
+        setTimeout(function(){ _callTornDown = false; }, 1500);
+    }
+
+    function handleCallReject() {
+        // Remote rejected — DO NOT send another `call_end` back, otherwise the
+        // peer re-enters its own end-handler and loops "Call ended" messages.
+        if (_callTornDown) return;
+        _callTornDown = true;
+        _silentTeardown();
+        appendMessage('Call was rejected', 'system', 'System', new Date().toISOString(), 'text');
+        setTimeout(function(){ _callTornDown = false; }, 1500);
+    }
+
+    function endCall() {
+        // Local agent ended the call. Tear down + notify peer once.
+        if (_callTornDown) return;
+        _callTornDown = true;
+        var secs = callSeconds;
+        _silentTeardown();
+        callSeconds = 0;
         if (chatSocket && chatSocket.readyState === 1) {
             chatSocket.send(JSON.stringify({ type: 'call_end', data: {} }));
         }
-        appendMessage('Call ended (' + formatCallTime(callSeconds) + ')', 'system', 'System', new Date().toISOString(), 'text');
+        appendMessage('Call ended (' + formatCallTime(secs) + ')', 'system', 'System', new Date().toISOString(), 'text');
+        setTimeout(function(){ _callTornDown = false; }, 1500);
     }
 
     function handleCallEnd() {
-        document.getElementById('callOverlay').style.display = 'none';
-        document.getElementById('incomingCallBanner').style.display = 'none';
-        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
-        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-        if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
-        if (callPC) { callPC.close(); callPC = null; }
-        callActive = false;
-        if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
+        // Remote ended — DO NOT send `call_end` back.
+        if (_callTornDown) return;
+        _callTornDown = true;
+        _silentTeardown();
         appendMessage('Call ended', 'system', 'System', new Date().toISOString(), 'text');
+        setTimeout(function(){ _callTornDown = false; }, 1500);
     }
 
     function toggleCallAudio() {
