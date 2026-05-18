@@ -74,6 +74,9 @@ urlpatterns = [
     # API
     path('api/stats/', views.api_stats, name='api_stats'),
     path('api/live-visitors/', views.live_visitors_api, name='live_visitors_api'),
+    path('api/ai/snippet/<str:room_id>/', views.ai_snippet_view, name='ai_snippet'),
+    path('api/ai/translate/', views.ai_translate_view, name='ai_translate'),
+    path('widget-funnel/', views.widget_funnel_dashboard, name='widget_funnel'),
 
     # Feature 7: Departments
     path('departments/', views.departments_view, name='departments'),

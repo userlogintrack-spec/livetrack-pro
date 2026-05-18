@@ -283,7 +283,7 @@
             <button class="tool-btn" onclick="endChat()" title="End Chat" style="color:#ef4444;font-size:13px;"><i class="fas fa-phone-slash"></i></button>
         </div>
         <div class="input-row">
-            <input type="text" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()">
+            <input type="text" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()" oninput="_fnlTypedOnce()">
             <button class="send-btn" onclick="sendMsg()"><i class="fas fa-paper-plane"></i></button>
         </div>
         <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this)" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip">
@@ -622,12 +622,32 @@ function startChat() {
     });
 }
 
+// Funnel: typed → sent. Server dedupes per (session, event, hour).
+function _fnl(event) {
+    try {
+        fetch(BASE + '/api/widget/funnel/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'omit',
+            body: JSON.stringify({event: event, key: KEY, session_key: SESSION, parent_domain: PARENT_DOMAIN}),
+            keepalive: true,
+        }).catch(function(){});
+    } catch(e) {}
+}
+var _fnlTyped = false;
+function _fnlTypedOnce() {
+    if (_fnlTyped) return;
+    _fnlTyped = true;
+    _fnl('typed');
+}
+
 function sendMsg() {
     if (!socket || socket.readyState !== 1) return;
     var input = document.getElementById('msgInput');
     var text = input.value.trim();
     if (!text) return;
     socket.send(JSON.stringify({type:'chat_message',message:text,sender_type:'visitor',sender_name:visitorName,msg_type:'text'}));
+    _fnl('sent');
     addMsg(text, 'visitor', new Date().toISOString());
     input.value = '';
     input.focus();

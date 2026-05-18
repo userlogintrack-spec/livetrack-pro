@@ -1248,13 +1248,35 @@ def widget_script(request):
   document.body.appendChild(btn);
   document.body.appendChild(frame);
 
+  // ===== Funnel events =====
+  // Track where visitors drop off: bubble seen → opened → typed → sent.
+  // Server dedupes per (session, event, hour) so reload spam doesn't skew.
+  function _fnl(event) {
+    try {
+      fetch(BASE + "/api/widget/funnel/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        credentials: "omit",
+        body: JSON.stringify({
+          event: event,
+          key: WIDGET_KEY,
+          session_key: getSessionKey(),
+          parent_domain: location.hostname || ""
+        }),
+        keepalive: true
+      }).catch(function(){});
+    } catch(e) {}
+  }
+  // bubble_seen fires once per visit (after the button is actually in the DOM).
+  _idle(function(){ _fnl("bubble_seen"); });
+
   function setOpen(open) {
     isOpen = open;
     frame.style.display = open ? "block" : "none";
     btn.innerHTML = open ? ICON_CLOSE : ICON_CHAT;
     btn.setAttribute("aria-label", open ? "Close chat" : "Open chat");
     btn.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) btn.style.animation = "";
+    if (open) { btn.style.animation = ""; _fnl("panel_opened"); }
   }
   function closePanel() { setOpen(false); }
 

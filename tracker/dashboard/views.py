@@ -5117,3 +5117,180 @@ def visitors_bulk_action(request):
     qs = Visitor.objects.filter(organization=org, id__in=id_list)
     affected = qs.update(is_banned=(action == 'ban'))
     return JsonResponse({'ok': True, 'action': action, 'affected': affected})
+
+
+# ═══════════════════════════════════════════════════════════
+# AI Snippet completion (slash-command drafted replies)
+# ═══════════════════════════════════════════════════════════
+
+@login_required
+def ai_snippet_view(request, room_id):
+    """POST /dashboard/api/ai/snippet/<room_id>/ {"command": "refund"}
+    Returns a drafted reply based on the chat context + visitor + KB. Agent
+    pastes/edits before sending — this is suggestion, never auto-send."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
+
+    from tracker.core.throttle import check as throttle_check
+    state = throttle_check(request, action='ai_snippet', limit=30, window=60,
+                            key=f'user:{request.user.id}')
+    if state.blocked:
+        return JsonResponse({'error': 'Slow down — too many suggestions'}, status=429)
+
+    data = _parse_json_body(request) or {}
+    command = (data.get('command') or '').strip()
+    if not command:
+        return JsonResponse({'error': 'command required'}, status=400)
+
+    config = AIBotConfig.objects.filter(organization=org).first()
+    if not config or not config.api_key:
+        return JsonResponse({
+            'error': 'AI not configured for this organization. Set up an API key in AI Bot settings.',
+            'code': 'AI_NOT_CONFIGURED',
+        }, status=400)
+
+    # Build transcript tail for grounding.
+    msgs = (Message.objects
+            .filter(room=room)
+            .exclude(sender_type='system')
+            .order_by('-timestamp')[:8])
+    transcript = [
+        {'role': 'visitor' if m.sender_type == 'visitor' else 'agent', 'content': m.content}
+        for m in reversed(list(msgs))
+    ]
+
+    from tracker.chat.ai import suggest_snippet
+    out = suggest_snippet(
+        config, room, command, transcript,
+        visitor_name=room.visitor_name or '',
+    )
+    if not out:
+        return JsonResponse({'error': 'AI did not return a suggestion'}, status=502)
+    return JsonResponse({'ok': True, 'text': out, 'command': command})
+
+
+# ═══════════════════════════════════════════════════════════
+# Per-message translation (on-demand)
+# ═══════════════════════════════════════════════════════════
+
+@login_required
+def ai_translate_view(request):
+    """POST /dashboard/api/ai/translate/ {"text": "...", "target": "en"}
+    Returns the translated text. Used by the per-message Translate button."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    data = _parse_json_body(request) or {}
+    text = (data.get('text') or '').strip()
+    target = (data.get('target') or 'en').strip()
+    source = (data.get('source') or '').strip()
+    if not text:
+        return JsonResponse({'error': 'text required'}, status=400)
+    if len(text) > 4000:
+        return JsonResponse({'error': 'text too long (4000 char max)'}, status=400)
+
+    from tracker.core.throttle import check as throttle_check
+    state = throttle_check(request, action='ai_translate', limit=60, window=60,
+                            key=f'user:{request.user.id}')
+    if state.blocked:
+        return JsonResponse({'error': 'Slow down — too many translate calls'}, status=429)
+
+    config = AIBotConfig.objects.filter(organization=org).first()
+    if not config or not config.api_key:
+        return JsonResponse({
+            'error': 'AI not configured. Set up Gemini / Claude key in AI Bot settings.',
+            'code': 'AI_NOT_CONFIGURED',
+        }, status=400)
+
+    from tracker.chat.ai import translate_text
+    translated = translate_text(config, text, target_language=target, source_language=source)
+    if not translated:
+        return JsonResponse({'error': 'Translation failed'}, status=502)
+    return JsonResponse({'ok': True, 'translated': translated, 'target': target})
+
+
+# ═══════════════════════════════════════════════════════════
+# Widget funnel — bubble seen → opened → typed → sent
+# ═══════════════════════════════════════════════════════════
+
+@csrf_exempt
+def widget_funnel_event(request):
+    """POST /api/widget/funnel/ {"event": "bubble_seen|panel_opened|typed|sent",
+    "key": "<tracking_key>", "session_key": "..."}.
+
+    No auth — fired from the widget on any customer site. Idempotent per
+    (session_key, event) so reloading a page doesn't double-count, and
+    per-IP rate limited to stop abuse.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    from tracker.core.views import _parse_json_body as _parse, _get_website_from_request
+    data = _parse(request) or {}
+    event = (data.get('event') or '').strip()
+    if event not in ('bubble_seen', 'panel_opened', 'typed', 'sent'):
+        return JsonResponse({'error': 'invalid event'}, status=400)
+    session_key = (data.get('session_key') or '').strip()
+    if not session_key:
+        return JsonResponse({'error': 'session_key required'}, status=400)
+
+    org, website = _get_website_from_request(request)
+    if not org:
+        return JsonResponse({'error': 'org not found'}, status=404)
+
+    # Idempotency: at most one row per (session, event, hour). Avoids one
+    # visitor refreshing 50× from flooding the funnel.
+    from tracker.core import process_throttle
+    dedup_key = f'funnel:{event}:{session_key}'
+    if not process_throttle.should_run(dedup_key, 3600):
+        return JsonResponse({'ok': True, 'deduped': True})
+
+    from tracker.chat.models import WidgetFunnelEvent
+    WidgetFunnelEvent.objects.create(
+        organization=org,
+        website=website,
+        event=event,
+        session_key=session_key,
+    )
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def widget_funnel_dashboard(request):
+    """Dashboard view that shows the funnel for the last 7 / 30 days."""
+    org = get_user_org(request.user)
+    from tracker.chat.models import WidgetFunnelEvent
+    from django.db.models import Count
+    days = int(request.GET.get('days', 7) or 7)
+    days = min(max(days, 1), 90)
+    since = timezone.now() - timedelta(days=days)
+    rows = (WidgetFunnelEvent.objects
+            .filter(organization=org, created_at__gte=since)
+            .values('event')
+            .annotate(c=Count('session_key', distinct=True)))
+    counts = {r['event']: r['c'] for r in rows}
+    steps = [
+        ('bubble_seen', 'Bubble seen'),
+        ('panel_opened', 'Panel opened'),
+        ('typed', 'Typed something'),
+        ('sent', 'Message sent'),
+    ]
+    funnel = []
+    prev = counts.get('bubble_seen', 0) or 0
+    for key, label in steps:
+        n = counts.get(key, 0)
+        pct_of_top = (n / prev * 100) if (prev and key != 'bubble_seen') else 100.0
+        # actual prev is the immediately previous step, not bubble_seen
+        funnel.append({'key': key, 'label': label, 'count': n})
+    # Compute step-to-step drop-off
+    for i, item in enumerate(funnel):
+        prev_count = funnel[i - 1]['count'] if i > 0 else (item['count'] or 1)
+        item['pct_of_top'] = round((item['count'] / funnel[0]['count'] * 100) if funnel[0]['count'] else 0, 1)
+        item['pct_of_prev'] = round((item['count'] / prev_count * 100) if prev_count else 0, 1)
+        item['dropped'] = max(0, prev_count - item['count']) if i > 0 else 0
+    return render(request, 'dashboard/widget_funnel.html', {
+        'funnel': funnel,
+        'days': days,
+        'org': org,
+    })

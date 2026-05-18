@@ -2013,12 +2013,15 @@
                     </div>
                 </div>
                 <input type="text" class="chat-input-field" id="chatInput"
-                       placeholder="Type your message... (/ for canned responses)"
+                       placeholder="Type your message... (/refund, /shipping, /thanks — AI drafts a reply)"
                        autocomplete="off"
                        onkeydown="handleKeyDown(event)"
                        oninput="handleInputChange(this)">
-                <button class="send-btn" onclick="sendMessage()" title="Send now (Enter)">
+                <button class="send-btn" onclick="sendMessage()" title="Send now (Enter) — slash commands become AI suggestions">
                     <i class="fas fa-paper-plane"></i>
+                </button>
+                <button onclick="triggerAiSuggest()" style="width:36px;height:46px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);border:0;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;box-shadow:0 4px 12px rgba(124,58,237,.25);" title="AI suggest reply">
+                    <i class="fas fa-wand-magic-sparkles"></i>
                 </button>
                 <button onclick="scheduleMessage()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Schedule message">
                     <i class="fas fa-clock"></i>
@@ -2798,10 +2801,59 @@
         scrollToBottom();
     }
 
+    // ───── AI Snippet Completion ─────
+    // When the agent types `/<keyword>` and hits Enter, instead of sending
+    // it raw we ask the LLM to draft a full personalised reply and load it
+    // back into the input box for review/edit.
+    var _aiBusy = false;
+    function triggerAiSuggest(rawCommand) {
+        if (_aiBusy) return;
+        const input = document.getElementById('chatInput');
+        const cmd = (rawCommand || input.value || '').trim().replace(/^\//, '');
+        if (!cmd) {
+            input.placeholder = "Type /refund (or any keyword) and click the wand";
+            return;
+        }
+        _aiBusy = true;
+        const originalPlaceholder = input.placeholder;
+        input.value = '';
+        input.placeholder = '✨ Drafting your reply…';
+        fetch('/dashboard/api/ai/snippet/' + encodeURIComponent(roomId) + '/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: cmd }),
+        })
+        .then(r => r.json().then(d => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+            input.placeholder = originalPlaceholder;
+            if (ok && d.text) {
+                input.value = d.text;
+                input.focus();
+                // Move caret to end so agent can keep typing.
+                input.setSelectionRange(input.value.length, input.value.length);
+            } else {
+                const msg = (d && d.error) || 'AI did not respond. Send manually.';
+                input.placeholder = msg;
+                setTimeout(() => { input.placeholder = originalPlaceholder; }, 4000);
+            }
+        })
+        .catch(() => {
+            input.placeholder = 'AI request failed. Try again.';
+            setTimeout(() => { input.placeholder = originalPlaceholder; }, 4000);
+        })
+        .finally(() => { _aiBusy = false; });
+    }
+
     function sendMessage() {
         const input = document.getElementById('chatInput');
         const message = input.value.trim();
         if (!message) return;
+
+        // Slash-command shortcut → AI suggestion instead of sending the raw "/refund".
+        if (inputMode !== 'whisper' && /^\/[a-z][a-z0-9_-]{1,40}$/i.test(message)) {
+            triggerAiSuggest(message);
+            return;
+        }
 
         if (inputMode === 'whisper') {
             // Send as internal note (whisper)

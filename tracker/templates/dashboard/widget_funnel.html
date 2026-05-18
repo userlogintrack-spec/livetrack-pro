@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Widget Funnel — LiveVisitorHub{% endblock %}
+
+{% block content %}
+<style>
+    .fnl-wrap { max-width: 920px; margin: 0 auto; padding: 24px; }
+    .fnl-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .fnl-head h1 { font-size: 22px; font-weight: 800; color: var(--text-primary, #1f2937); margin: 0; letter-spacing: -0.4px; }
+    .fnl-head .lede { font-size: 13px; color: var(--text-muted, #6b7280); margin-top: 4px; }
+
+    .day-tabs { display: inline-flex; background: white; border: 1px solid var(--border, #e5e7eb); border-radius: 999px; padding: 3px; gap: 2px; }
+    .day-tabs a { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--text-muted, #6b7280); text-decoration: none; transition: all .15s; }
+    .day-tabs a.active { background: var(--primary, #7c3aed); color: white; box-shadow: 0 2px 8px rgba(124,58,237,0.25); }
+
+    .fnl-card { background: white; border: 1px solid var(--border, #e5e7eb); border-radius: 16px; padding: 28px; box-shadow: 0 4px 18px rgba(0,0,0,0.04); }
+
+    .step { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid #f3f4f6; }
+    .step:last-child { border-bottom: 0; }
+    .step .meta { display: flex; align-items: center; gap: 12px; }
+    .step .meta .num { width: 30px; height: 30px; border-radius: 50%; background: var(--primary, #7c3aed); color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step .meta .label { font-size: 14px; font-weight: 600; color: var(--text-primary, #1f2937); }
+    .step .count { font-size: 22px; font-weight: 800; color: var(--text-primary, #1f2937); min-width: 80px; text-align: right; letter-spacing: -0.4px; }
+    .step .pct { font-size: 12px; color: var(--text-muted, #6b7280); min-width: 110px; text-align: right; }
+    .step .pct .big { color: var(--text-primary, #1f2937); font-weight: 600; }
+
+    .bar-track { grid-column: 1 / -1; height: 8px; background: #f1f0ff; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary, #7c3aed), var(--primary-light, #a78bfa)); border-radius: 999px; transition: width .4s; }
+
+    .drop-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: rgba(239,68,68,0.08); color: #b91c1c; }
+    .drop-pill i { font-size: 9px; }
+    .drop-pill.ok { background: rgba(16,185,129,0.08); color: #047857; }
+
+    .insight { margin-top: 22px; padding: 16px 20px; border-radius: 12px; background: linear-gradient(135deg, rgba(124,58,237,0.06), rgba(167,139,250,0.04)); border: 1px solid rgba(124,58,237,0.12); display: flex; gap: 12px; align-items: flex-start; }
+    .insight i { color: var(--primary, #7c3aed); font-size: 16px; margin-top: 2px; }
+    .insight .text { font-size: 13px; color: var(--text-primary, #1f2937); line-height: 1.6; }
+    .insight .text strong { color: var(--primary-dark, #5b21b6); }
+
+    .empty { text-align: center; padding: 60px 24px; color: var(--text-muted, #6b7280); }
+    .empty i { font-size: 38px; color: var(--primary-soft, #c4b5fd); margin-bottom: 12px; }
+
+    @media (max-width: 700px) {
+        .step { grid-template-columns: 1fr; }
+        .step .count, .step .pct { text-align: left; }
+    }
+</style>
+
+<div class="fnl-wrap">
+
+    <div class="fnl-head">
+        <div>
+            <h1><i class="fas fa-filter" style="color: var(--primary, #7c3aed); margin-right: 6px;"></i> Widget Conversion Funnel</h1>
+            <div class="lede">Where visitors drop off between seeing the bubble and actually chatting. Each row counts unique sessions.</div>
+        </div>
+        <div class="day-tabs">
+            <a href="?days=7"  class="{% if days == 7 %}active{% endif %}">7 days</a>
+            <a href="?days=30" class="{% if days == 30 %}active{% endif %}">30 days</a>
+            <a href="?days=90" class="{% if days == 90 %}active{% endif %}">90 days</a>
+        </div>
+    </div>
+
+    <div class="fnl-card">
+        {% if funnel.0.count == 0 %}
+            <div class="empty">
+                <i class="fas fa-funnel-dollar" style="font-size: 38px; color: var(--primary-soft, #c4b5fd); margin-bottom: 12px;"></i>
+                <div style="font-size: 15px; font-weight: 600; color: var(--text-primary, #1f2937);">No funnel data yet</div>
+                <div style="font-size: 13px; margin-top: 6px;">Events will populate as visitors load the widget on your sites.</div>
+            </div>
+        {% else %}
+            {% for step in funnel %}
+            <div class="step">
+                <div class="meta">
+                    <div class="num">{{ forloop.counter }}</div>
+                    <div class="label">{{ step.label }}</div>
+                </div>
+                <div class="count">{{ step.count }}</div>
+                <div class="pct">
+                    {% if forloop.first %}
+                        <span class="big">100%</span> of top
+                    {% else %}
+                        <span class="big">{{ step.pct_of_prev }}%</span> from previous
+                        {% if step.dropped %}
+                            <br><span class="drop-pill {% if step.pct_of_prev >= 50 %}ok{% endif %}"><i class="fas fa-arrow-down"></i> {{ step.dropped }} dropped</span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width: {{ step.pct_of_top }}%;"></div>
+                </div>
+            </div>
+            {% endfor %}
+
+            {# Inline guidance — point at the biggest leak. #}
+            {% with first=funnel.0 last=funnel|last %}
+            {% if first.count and last.count %}
+                {% widthratio last.count first.count 100 as overall_pct %}
+                <div class="insight">
+                    <i class="fas fa-lightbulb"></i>
+                    <div class="text">
+                        Of <strong>{{ first.count }}</strong> visitors who saw the bubble, <strong>{{ last.count }}</strong> sent a message — that's <strong>{{ overall_pct }}%</strong> end-to-end.
+                        Industry typical: 3–6%. The biggest drop above is where to focus next.
+                    </div>
+                </div>
+            {% endif %}
+            {% endwith %}
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
