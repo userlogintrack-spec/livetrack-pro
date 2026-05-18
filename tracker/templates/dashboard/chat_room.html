@@ -2012,13 +2012,20 @@
                         {% endfor %}
                     </div>
                 </div>
+                <div id="quickReplyChips" style="display:none;width:100%;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
                 <input type="text" class="chat-input-field" id="chatInput"
-                       placeholder="Type your message... (/ for canned responses)"
+                       placeholder="Type your message... (/refund, /shipping, /thanks — AI drafts a reply)"
                        autocomplete="off"
                        onkeydown="handleKeyDown(event)"
                        oninput="handleInputChange(this)">
-                <button class="send-btn" onclick="sendMessage()" title="Send now (Enter)">
+                <button class="send-btn" onclick="sendMessage()" title="Send now (Enter) — slash commands become AI suggestions">
                     <i class="fas fa-paper-plane"></i>
+                </button>
+                <button onclick="triggerAiSuggest()" style="width:36px;height:46px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);border:0;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;box-shadow:0 4px 12px rgba(124,58,237,.25);" title="AI suggest reply">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                </button>
+                <button id="micBtn" onmousedown="startMic(event)" onmouseup="stopMic(event)" onmouseleave="stopMic(event)" ontouchstart="startMic(event)" ontouchend="stopMic(event)" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Hold to talk — Gemini transcribes">
+                    <i class="fas fa-microphone"></i>
                 </button>
                 <button onclick="scheduleMessage()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Schedule message">
                     <i class="fas fa-clock"></i>
@@ -2627,6 +2634,8 @@
                 if (data.sender_type !== 'agent' || data.sender_name !== agentName) {
                     appendMessage(data.message, data.sender_type, data.sender_name, data.timestamp, data.msg_type, data.file_url, data.file_name);
                     if (soundEnabled && data.sender_type === 'visitor') playSound();
+                    // AI Quick-Reply chips (3 options) — fires when visitor speaks.
+                    if (data.sender_type === 'visitor') { refreshQuickReplies(); }
                     // AI Smart Reply + Sentiment
                     if (data.sender_type === 'visitor') {
                         generateSmartReplies(data.message);
@@ -2798,10 +2807,147 @@
         scrollToBottom();
     }
 
+    // ───── AI Quick-Reply Hints ─────
+    // While the visitor is typing, pre-compute 3 short reply options the
+    // agent can click-to-send. Refreshed when a new visitor message arrives.
+    var _qrCooldown = 0;
+    function refreshQuickReplies() {
+        if (Date.now() < _qrCooldown) return;
+        _qrCooldown = Date.now() + 4000; // 4s throttle so we don't burn API on every keystroke
+        fetch('/dashboard/api/ai/quick-replies/' + encodeURIComponent(roomId) + '/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        }).then(r => r.ok ? r.json() : null).then(d => {
+            var wrap = document.getElementById('quickReplyChips');
+            if (!wrap) return;
+            wrap.innerHTML = '';
+            if (!d || !d.options || !d.options.length) { wrap.style.display = 'none'; return; }
+            d.options.forEach(function(opt) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = opt;
+                b.style.cssText = 'padding:6px 12px;border-radius:999px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.18);color:#5b21b6;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;font-family:inherit;';
+                b.onmouseover = function() { b.style.background = 'rgba(124,58,237,0.16)'; };
+                b.onmouseleave = function() { b.style.background = 'rgba(124,58,237,0.08)'; };
+                b.onclick = function() {
+                    document.getElementById('chatInput').value = opt;
+                    sendMessage();
+                    wrap.style.display = 'none';
+                };
+                wrap.appendChild(b);
+            });
+            wrap.style.display = 'flex';
+        }).catch(function(){});
+    }
+
+    // ───── Voice-to-text (push to talk) ─────
+    var _mediaRec = null, _audioChunks = [];
+    function startMic(ev) {
+        if (ev) { ev.preventDefault(); }
+        if (_mediaRec) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Microphone not supported in this browser'); return;
+        }
+        var btn = document.getElementById('micBtn');
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+            _audioChunks = [];
+            try { _mediaRec = new MediaRecorder(stream, { mimeType: 'audio/webm' }); }
+            catch(e) { _mediaRec = new MediaRecorder(stream); }
+            _mediaRec.ondataavailable = function(e) { if (e.data.size > 0) _audioChunks.push(e.data); };
+            _mediaRec.onstop = function() {
+                stream.getTracks().forEach(function(t){ t.stop(); });
+                if (!_audioChunks.length) { _mediaRec = null; return; }
+                var blob = new Blob(_audioChunks, { type: _mediaRec.mimeType || 'audio/webm' });
+                _mediaRec = null;
+                _transcribeAndFill(blob);
+            };
+            _mediaRec.start();
+            btn.style.background = '#ef4444'; btn.style.color = '#fff';
+        }).catch(function(){
+            alert('Microphone permission denied');
+        });
+    }
+    function stopMic(ev) {
+        if (ev) { ev.preventDefault(); }
+        if (!_mediaRec) return;
+        try { _mediaRec.stop(); } catch(e) {}
+        var btn = document.getElementById('micBtn');
+        if (btn) { btn.style.background = ''; btn.style.color = ''; }
+    }
+    function _transcribeAndFill(blob) {
+        var input = document.getElementById('chatInput');
+        var oldPlaceholder = input.placeholder;
+        input.placeholder = '🎤 Transcribing…';
+        var fd = new FormData();
+        fd.append('audio', blob, 'voice.webm');
+        fetch('/dashboard/api/voice/transcribe/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+            body: fd,
+        }).then(r => r.ok ? r.json() : null).then(d => {
+            input.placeholder = oldPlaceholder;
+            if (d && d.text) {
+                input.value = (input.value ? input.value + ' ' : '') + d.text;
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+        }).catch(function() { input.placeholder = oldPlaceholder; });
+    }
+
+    // ───── AI Snippet Completion ─────
+    // When the agent types `/<keyword>` and hits Enter, instead of sending
+    // it raw we ask the LLM to draft a full personalised reply and load it
+    // back into the input box for review/edit.
+    var _aiBusy = false;
+    function triggerAiSuggest(rawCommand) {
+        if (_aiBusy) return;
+        const input = document.getElementById('chatInput');
+        const cmd = (rawCommand || input.value || '').trim().replace(/^\//, '');
+        if (!cmd) {
+            input.placeholder = "Type /refund (or any keyword) and click the wand";
+            return;
+        }
+        _aiBusy = true;
+        const originalPlaceholder = input.placeholder;
+        input.value = '';
+        input.placeholder = '✨ Drafting your reply…';
+        fetch('/dashboard/api/ai/snippet/' + encodeURIComponent(roomId) + '/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: cmd }),
+        })
+        .then(r => r.json().then(d => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+            input.placeholder = originalPlaceholder;
+            if (ok && d.text) {
+                input.value = d.text;
+                input.focus();
+                // Move caret to end so agent can keep typing.
+                input.setSelectionRange(input.value.length, input.value.length);
+            } else {
+                const msg = (d && d.error) || 'AI did not respond. Send manually.';
+                input.placeholder = msg;
+                setTimeout(() => { input.placeholder = originalPlaceholder; }, 4000);
+            }
+        })
+        .catch(() => {
+            input.placeholder = 'AI request failed. Try again.';
+            setTimeout(() => { input.placeholder = originalPlaceholder; }, 4000);
+        })
+        .finally(() => { _aiBusy = false; });
+    }
+
     function sendMessage() {
         const input = document.getElementById('chatInput');
         const message = input.value.trim();
         if (!message) return;
+
+        // Slash-command shortcut → AI suggestion instead of sending the raw "/refund".
+        if (inputMode !== 'whisper' && /^\/[a-z][a-z0-9_-]{1,40}$/i.test(message)) {
+            triggerAiSuggest(message);
+            return;
+        }
 
         if (inputMode === 'whisper') {
             // Send as internal note (whisper)
@@ -3846,51 +3992,63 @@
         }
     }
 
-    function rejectCall() {
-        document.getElementById('incomingCallBanner').style.display = 'none';
-        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
-        chatSocket.send(JSON.stringify({ type: 'call_reject', data: {} }));
-        appendMessage('Call rejected', 'system', 'System', new Date().toISOString(), 'text');
-    }
-
-    function handleCallReject() {
-        endCall();
-        appendMessage('Call was rejected', 'system', 'System', new Date().toISOString(), 'text');
-    }
-
-    function endCall() {
+    var _callTornDown = false;
+    function _silentTeardown() {
         document.getElementById('callOverlay').style.display = 'none';
         document.getElementById('incomingCallBanner').style.display = 'none';
         document.getElementById('videoContainer').style.display = 'none';
         document.getElementById('screenContainer').style.display = 'none';
         if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
-
         if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
         if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
         if (callPC) { callPC.close(); callPC = null; }
-
         callActive = false;
         isAudioMuted = false;
         isVideoOff = false;
         if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
-        callSeconds = 0;
+    }
 
+    function rejectCall() {
+        if (_callTornDown) return;
+        _callTornDown = true;
+        document.getElementById('incomingCallBanner').style.display = 'none';
+        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
+        chatSocket.send(JSON.stringify({ type: 'call_reject', data: {} }));
+        appendMessage('Call rejected', 'system', 'System', new Date().toISOString(), 'text');
+        setTimeout(function(){ _callTornDown = false; }, 1500);
+    }
+
+    function handleCallReject() {
+        // Remote rejected — DO NOT send another `call_end` back, otherwise the
+        // peer re-enters its own end-handler and loops "Call ended" messages.
+        if (_callTornDown) return;
+        _callTornDown = true;
+        _silentTeardown();
+        appendMessage('Call was rejected', 'system', 'System', new Date().toISOString(), 'text');
+        setTimeout(function(){ _callTornDown = false; }, 1500);
+    }
+
+    function endCall() {
+        // Local agent ended the call. Tear down + notify peer once.
+        if (_callTornDown) return;
+        _callTornDown = true;
+        var secs = callSeconds;
+        _silentTeardown();
+        callSeconds = 0;
         if (chatSocket && chatSocket.readyState === 1) {
             chatSocket.send(JSON.stringify({ type: 'call_end', data: {} }));
         }
-        appendMessage('Call ended (' + formatCallTime(callSeconds) + ')', 'system', 'System', new Date().toISOString(), 'text');
+        appendMessage('Call ended (' + formatCallTime(secs) + ')', 'system', 'System', new Date().toISOString(), 'text');
+        setTimeout(function(){ _callTornDown = false; }, 1500);
     }
 
     function handleCallEnd() {
-        document.getElementById('callOverlay').style.display = 'none';
-        document.getElementById('incomingCallBanner').style.display = 'none';
-        if (window._ringAudio) { window._ringAudio.pause(); window._ringAudio = null; }
-        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-        if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
-        if (callPC) { callPC.close(); callPC = null; }
-        callActive = false;
-        if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
+        // Remote ended — DO NOT send `call_end` back.
+        if (_callTornDown) return;
+        _callTornDown = true;
+        _silentTeardown();
         appendMessage('Call ended', 'system', 'System', new Date().toISOString(), 'text');
+        setTimeout(function(){ _callTornDown = false; }, 1500);
     }
 
     function toggleCallAudio() {

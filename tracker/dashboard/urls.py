@@ -74,6 +74,14 @@ urlpatterns = [
     # API
     path('api/stats/', views.api_stats, name='api_stats'),
     path('api/live-visitors/', views.live_visitors_api, name='live_visitors_api'),
+    path('api/ai/snippet/<str:room_id>/', views.ai_snippet_view, name='ai_snippet'),
+    path('api/ai/translate/', views.ai_translate_view, name='ai_translate'),
+    path('api/ai/quick-replies/<str:room_id>/', views.ai_quick_replies, name='ai_quick_replies'),
+    path('api/agent/dnd/', views.toggle_agent_dnd, name='toggle_dnd'),
+    path('api/voice/transcribe/', views.voice_transcribe, name='voice_transcribe'),
+    path('chats/<str:room_id>/reopen-link/', views.chat_send_reopen_link, name='chat_send_reopen_link'),
+    path('widget-funnel/', views.widget_funnel_dashboard, name='widget_funnel'),
+    path('chats/<str:room_id>/notes-broadcast/', views.notes_broadcast, name='notes_broadcast'),
 
     # Feature 7: Departments
     path('departments/', views.departments_view, name='departments'),

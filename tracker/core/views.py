@@ -878,10 +878,12 @@ def widget_track_pageview(request):
         is_exit=True,
     )
 
-    # Real-time broadcast to dashboard (throttled)
-    cache_key = f'ws_broadcast_{visitor.id}'
-    if visitor.organization_id and not cache.get(cache_key):
-        cache.set(cache_key, True, 2)
+    # Real-time broadcast to dashboard (throttled). Per-worker throttle is
+    # fine here — at most N broadcasts/2s instead of 1, which the dashboard
+    # ignores via its own animation debounce. Was burning ~1 Redis op per
+    # pageview before.
+    from tracker.core import process_throttle
+    if visitor.organization_id and process_throttle.should_run(f'ws_broadcast:{visitor.id}', 2):
         try:
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
@@ -1220,7 +1222,7 @@ def widget_script(request):
   if ("__CHAT_HIDDEN__" === "true") { return; }
 
   var style = document.createElement("style");
-  style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:24px;z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:transform .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-btn:focus-visible{outline:3px solid rgba(59,130,246,.5);outline-offset:2px}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(600px,calc(100vh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;}@media(max-width:480px){.ltw-btn{width:48px;height:48px;font-size:18px;bottom:16px}.ltw-frame{bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 88px);border-radius:16px}}@keyframes ltw-pulse{0%,100%{transform:scale(1);box-shadow:0 8px 24px rgba(0,0,0,.2)}50%{transform:scale(1.12);box-shadow:0 12px 36px rgba(0,0,0,.35)}}@media(prefers-reduced-motion:reduce){.ltw-btn,.ltw-btn:hover{transition:none;transform:none}.ltw-btn[style*=\"animation\"]{animation:none!important}}";
+  style.textContent = ".ltw-btn{position:fixed;__POS_CSS__;bottom:max(24px,env(safe-area-inset-bottom,0));z-index:999999;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:22px;background:"+WC+";box-shadow:0 8px 24px rgba(0,0,0,.2);transition:transform .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center;}.ltw-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.3)}.ltw-btn:focus-visible{outline:3px solid rgba(59,130,246,.5);outline-offset:2px}.ltw-frame{position:fixed;__PANEL_POS_CSS__;bottom:94px;z-index:999999;width:min(400px,calc(100vw - 24px));height:min(640px,calc(100dvh - 120px));border:none;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);display:none;background:white;overflow:hidden;animation:ltw-pop .25s ease-out;}@keyframes ltw-pop{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}@media(max-width:560px){.ltw-btn{width:54px;height:54px;font-size:20px;bottom:max(16px,env(safe-area-inset-bottom,0));}.ltw-frame{left:0!important;right:0!important;bottom:0!important;top:auto;width:100%;height:100dvh;max-height:100dvh;border-radius:18px 18px 0 0;animation:ltw-sheet .28s cubic-bezier(.2,.9,.3,1.2);}}@keyframes ltw-sheet{from{transform:translateY(100%)}to{transform:none}}@media(max-width:380px){.ltw-btn{width:48px;height:48px;font-size:18px}}@keyframes ltw-pulse{0%,100%{transform:scale(1);box-shadow:0 8px 24px rgba(0,0,0,.2)}50%{transform:scale(1.12);box-shadow:0 12px 36px rgba(0,0,0,.35)}}@media(prefers-reduced-motion:reduce){.ltw-btn,.ltw-btn:hover,.ltw-frame{transition:none;transform:none;animation:none}.ltw-btn[style*=\"animation\"]{animation:none!important}}";
   document.head.appendChild(style);
 
   var ICON_CHAT = '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
@@ -1246,13 +1248,35 @@ def widget_script(request):
   document.body.appendChild(btn);
   document.body.appendChild(frame);
 
+  // ===== Funnel events =====
+  // Track where visitors drop off: bubble seen → opened → typed → sent.
+  // Server dedupes per (session, event, hour) so reload spam doesn't skew.
+  function _fnl(event) {
+    try {
+      fetch(BASE + "/api/widget/funnel/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        credentials: "omit",
+        body: JSON.stringify({
+          event: event,
+          key: WIDGET_KEY,
+          session_key: getSessionKey(),
+          parent_domain: location.hostname || ""
+        }),
+        keepalive: true
+      }).catch(function(){});
+    } catch(e) {}
+  }
+  // bubble_seen fires once per visit (after the button is actually in the DOM).
+  _idle(function(){ _fnl("bubble_seen"); });
+
   function setOpen(open) {
     isOpen = open;
     frame.style.display = open ? "block" : "none";
     btn.innerHTML = open ? ICON_CLOSE : ICON_CHAT;
     btn.setAttribute("aria-label", open ? "Close chat" : "Open chat");
     btn.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) btn.style.animation = "";
+    if (open) { btn.style.animation = ""; _fnl("panel_opened"); }
   }
   function closePanel() { setOpen(false); }
 
@@ -1787,6 +1811,133 @@ def chat_file_upload(request, room_id):
         'sender_type': actor['sender_type'],
         'sender_name': actor['sender_name'],
         'timestamp': msg.timestamp.isoformat(),
+    })
+
+
+def chat_reopen_consume(request, token):
+    """Public landing page for /chat/reopen/<token>/. Validates the token,
+    reactivates the chat, and bounces the visitor back to the customer
+    site with sk + room hints so the widget restores conversation state."""
+    import hmac as _hmac
+    from tracker.chat.models import ChatReopenToken
+    if not token or len(token) > 80:
+        return render(request, 'core/magic_link_invalid.html', status=400)
+    tok = ChatReopenToken.objects.filter(token=token).select_related('room', 'room__visitor', 'room__organization').first()
+    if not tok or not _hmac.compare_digest(tok.token, token) or not tok.is_valid:
+        return render(request, 'core/magic_link_invalid.html', status=400)
+    room = tok.room
+    visitor = room.visitor
+    if not visitor or not room.organization:
+        return render(request, 'core/magic_link_invalid.html', status=400)
+    tok.consumed_at = timezone.now()
+    tok.save(update_fields=['consumed_at'])
+
+    # Reactivate the chat for a fresh round of conversation. Unassign agent
+    # so it lands back in the waiting queue (least_busy reassign rules apply).
+    if room.status == 'closed':
+        room.status = 'waiting'
+        room.closed_at = None
+        room.agent = None
+        room.save(update_fields=['status', 'closed_at', 'agent', 'updated_at'])
+
+    # Determine the landing URL — primary website domain if available, else
+    # show a friendly intermediate page with the embed link.
+    target = ''
+    website = room.organization.websites.filter(approval_status='approved').first()
+    if website and website.domain:
+        proto = 'https' if not settings.DEBUG else 'http'
+        target = f'{proto}://{website.domain}/?_ltw_resume=1&sk={visitor.session_key}&room={room.room_id}'
+
+    if target:
+        from django.shortcuts import redirect as _redirect
+        return _redirect(target)
+
+    html = f"""<!DOCTYPE html><html><head><title>Chat resumed</title>
+    <style>body{{font-family:Inter,Arial,sans-serif;max-width:480px;margin:80px auto;padding:24px;text-align:center;color:#1f2937;}}</style></head>
+    <body>
+      <h2>Chat reopened ✅</h2>
+      <p>Your previous conversation with {room.organization.name} is ready to continue.</p>
+      <p>Open the chat widget on the original site to pick up where you left off.</p>
+    </body></html>"""
+    return HttpResponse(html)
+
+
+@csrf_exempt
+def widget_queue_position(request, room_id):
+    """Public endpoint — visitor's widget polls this when their chat is in
+    'waiting' status. Returns {position, ahead, eta_seconds, status}.
+
+    Cheap to compute (one COUNT) and process-throttled so a chatty widget
+    doesn't burn Redis on every poll.
+    """
+    from tracker.chat.models import ChatRoom
+    from tracker.core import process_throttle
+
+    room = ChatRoom.objects.filter(room_id=room_id).only(
+        'id', 'organization_id', 'status', 'created_at', 'visitor_id'
+    ).first()
+    if not room:
+        return JsonResponse({'error': 'not_found'}, status=404)
+
+    # Visitor auth: session_key check so a random URL guess can't probe.
+    sk = (request.GET.get('sk') or '').strip()[:64]
+    if room.visitor_id:
+        from tracker.visitors.models import Visitor
+        v = Visitor.objects.filter(id=room.visitor_id).only('session_key').first()
+        if sk and v and sk != v.session_key:
+            return JsonResponse({'error': 'forbidden'}, status=403)
+
+    if room.status != 'waiting':
+        # Caller can stop polling.
+        return JsonResponse({'status': room.status, 'position': 0, 'ahead': 0, 'eta_seconds': 0})
+
+    # Position = number of older waiting chats in the same org (and same
+    # website, if assigned) + 1.
+    qs = ChatRoom.objects.filter(
+        organization_id=room.organization_id,
+        status='waiting',
+        created_at__lt=room.created_at,
+    )
+    ahead = qs.count()
+    position = ahead + 1
+
+    # ETA: rough — recent avg first-response time across the last 20 closed
+    # chats in this org. Cached per-org for 30s to keep this cheap.
+    cache_key = f'q_eta:{room.organization_id}'
+    eta_seconds = None
+    if process_throttle.should_run(f'q_eta_refresh:{room.organization_id}', 30):
+        from django.db.models import Min
+        from tracker.chat.models import Message
+        # Avg seconds between room.created_at and first agent reply.
+        last_resolved = list(ChatRoom.objects.filter(
+            organization_id=room.organization_id,
+            status__in=('active', 'closed'),
+            agent__isnull=False,
+        ).order_by('-created_at')[:20].values_list('id', flat=True))
+        first_agent = (
+            Message.objects.filter(room_id__in=last_resolved, sender_type='agent')
+            .values('room_id')
+            .annotate(first_at=Min('timestamp'))
+        )
+        # Compute avg in Python — small sample, no Postgres extract needed.
+        room_created = dict(ChatRoom.objects.filter(id__in=list(last_resolved)).values_list('id', 'created_at'))
+        deltas = []
+        for row in first_agent:
+            ca = room_created.get(row['room_id'])
+            if ca and row['first_at']:
+                deltas.append((row['first_at'] - ca).total_seconds())
+        if deltas:
+            avg = int(sum(deltas) / len(deltas))
+            eta_seconds = max(15, avg) * position
+            cache.set(cache_key, eta_seconds, 60)
+    if eta_seconds is None:
+        eta_seconds = cache.get(cache_key) or (60 * position)  # fallback: 1 min per slot
+
+    return JsonResponse({
+        'status': 'waiting',
+        'position': position,
+        'ahead': ahead,
+        'eta_seconds': eta_seconds,
     })
 
 

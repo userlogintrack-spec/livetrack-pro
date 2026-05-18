@@ -282,11 +282,10 @@ class VisitorTrackingMiddleware:
         # Check goal completions
         self._check_goals(visitor, full_url, default_org)
 
-        # WebSocket broadcast (throttled - skip if same page within 2 sec)
-        cache_key = f'ws_broadcast_{visitor.id}'
-        from django.core.cache import cache
-        if visitor.organization_id and not cache.get(cache_key):
-            cache.set(cache_key, True, 2)  # Throttle: 1 broadcast per 2 seconds per visitor
+        # WebSocket broadcast (throttled — skip if same page within 2s). In-
+        # process gate; multi-worker dup is harmless (dashboard debounces).
+        from tracker.core import process_throttle
+        if visitor.organization_id and process_throttle.should_run(f'ws_broadcast:{visitor.id}', 2):
             try:
                 from asgiref.sync import async_to_sync
                 from channels.layers import get_channel_layer

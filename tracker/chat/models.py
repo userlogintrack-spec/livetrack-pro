@@ -138,6 +138,11 @@ class AgentProfile(models.Model):
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='agent')
     avatar_color = models.CharField(max_length=7, default='#6366f1')
     is_available = models.BooleanField(default=True)
+    # "Do Not Disturb": stronger than is_available=False. DND agents are
+    # skipped by auto-assign AND existing chats they're on get a system
+    # message flagging their unavailability so collaborators can pick up.
+    do_not_disturb = models.BooleanField(default=False)
+    dnd_message = models.CharField(max_length=200, blank=True, default='', help_text='Optional auto-reply shown to new visitors while in DND.')
     max_chats = models.PositiveIntegerField(default=5)
     total_chats_handled = models.PositiveIntegerField(default=0)
     # 2FA. The raw column holds Fernet-encrypted ciphertext; access via
@@ -509,7 +514,8 @@ class AIBotConfig(models.Model):
     """AI auto-reply bot configuration per organization."""
     PROVIDER_CHOICES = [
         ('keyword', 'Keyword / KB matching only (no LLM cost)'),
-        ('anthropic', 'Anthropic Claude (recommended)'),
+        ('anthropic', 'Anthropic Claude'),
+        ('gemini', 'Google Gemini (recommended — cheapest)'),
     ]
     organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='ai_bot_config')
     is_enabled = models.BooleanField(default=False)
@@ -525,8 +531,8 @@ class AIBotConfig(models.Model):
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='keyword')
     # Encrypted at rest — read via `api_key_plain`. Widened to TextField because
     # Fernet ciphertext for a 200-char key is ~340 chars.
-    api_key = models.TextField(blank=True, default='', help_text='Anthropic API key — stored per-org so each customer pays for their own usage.')
-    model_name = models.CharField(max_length=100, default='claude-haiku-4-5-20251001', help_text='Claude model to use. Haiku 4.5 is fast and cheap.')
+    api_key = models.TextField(blank=True, default='', help_text='Provider API key (Anthropic or Google AI Studio). Stored per-org so each customer pays for their own usage.')
+    model_name = models.CharField(max_length=100, default='gemini-2.0-flash', help_text='Model name. Gemini: gemini-2.0-flash (cheap+fast), gemini-2.0-pro. Claude: claude-haiku-4-5-20251001.')
     system_prompt = models.TextField(blank=True, default='', help_text='Optional extra instructions appended to the system prompt.')
     auto_summarize = models.BooleanField(default=False, help_text='When chat closes, generate a 2-line AI summary visible in the dashboard.')
     created_at = models.DateTimeField(default=timezone.now)
@@ -830,6 +836,58 @@ class MagicLinkToken(models.Model):
 
     def __str__(self):
         return f'magic-link for {self.user.username}'
+
+
+# ──────────────────────────────────────────────────────────
+# Chat reopen tokens — agent sends visitor an email link that resumes
+# the same conversation days later. Tokens are single-use, short-lived
+# (default 7d), tied to a specific ChatRoom + visitor session.
+# ──────────────────────────────────────────────────────────
+class ChatReopenToken(models.Model):
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='reopen_tokens')
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reopen_tokens_sent')
+    sent_to_email = models.EmailField(blank=True, default='')
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    @property
+    def is_valid(self):
+        return self.consumed_at is None and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f'reopen for {self.room.room_id} ({"used" if self.consumed_at else "live"})'
+
+
+# ──────────────────────────────────────────────────────────
+# Widget Funnel — bubble seen → opened → typed → sent
+# Tells the team where they lose visitors *before* the chat starts.
+# ──────────────────────────────────────────────────────────
+class WidgetFunnelEvent(models.Model):
+    EVENT_CHOICES = [
+        ('bubble_seen', 'Bubble seen'),
+        ('panel_opened', 'Panel opened'),
+        ('typed', 'Typed first keystroke'),
+        ('sent', 'Message sent'),
+    ]
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='funnel_events')
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='funnel_events')
+    event = models.CharField(max_length=20, choices=EVENT_CHOICES, db_index=True)
+    session_key = models.CharField(max_length=64, db_index=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['organization', 'event', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.event} ({self.session_key[:8]})'
 
 
 # ──────────────────────────────────────────────────────────

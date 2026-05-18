@@ -141,12 +141,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # WebRTC signaling for calls, screen share, cobrowse
         elif message_type in ('screen_share_request', 'screen_share_offer', 'screen_share_answer', 'ice_candidate', 'screen_share_stop', 'cobrowse_update', 'call_request', 'call_offer', 'call_answer', 'call_end', 'call_reject', 'call_toggle_video', 'call_toggle_audio'):
+            # Include sender's channel so peers can filter self-echo. Without this
+            # tag, an `endCall()` that ships call_end loops back to its sender, who
+            # re-runs the local end-handler, which sends call_end again — the
+            # infinite "Call ended" system-message spam users were seeing.
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'webrtc_signal',
                     'message_type': message_type,
                     'sender_type': 'agent' if self.is_agent else 'visitor',
+                    'sender_channel': self.channel_name,
                     'data': data.get('data', {}),
                 }
             )
@@ -200,6 +205,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
 
     async def webrtc_signal(self, event):
+        # Skip echoing back to the originator — otherwise call_end / call_reject
+        # / ice_candidate signals loop into the sender's own handlers.
+        if event.get('sender_channel') == self.channel_name:
+            return
         await self.send(text_data=json.dumps({
             'type': event['message_type'],
             'sender_type': event['sender_type'],
@@ -210,6 +219,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'chat_closed',
             'message': event['message'],
+        }))
+
+    async def notes_typing(self, event):
+        """Co-edit notes: broadcast collaborator's draft to everyone in the
+        room. Visitors never receive this — gated on `is_agent`."""
+        if not getattr(self, 'is_agent', False):
+            return
+        await self.send(text_data=json.dumps({
+            'type': 'notes_typing',
+            'agent_name': event.get('agent_name', ''),
+            'agent_id': event.get('agent_id'),
+            'text': event.get('text', ''),
+            'timestamp': event.get('timestamp', ''),
         }))
 
     async def chat_transferred(self, event):
@@ -546,14 +568,16 @@ class DashboardConsumer(AsyncWebsocketConsumer):
     def _run_sla_check(self):
         if not self.org_id:
             return
-        from django.core.cache import cache
         from tracker.chat.utils import check_sla_breaches
+        from tracker.core import process_throttle
 
-        cache_key = f'sla_ws_{self.org_id}'
-        if cache.get(cache_key):
+        # In-process gate. WS pings fire this often — every dashboard tab,
+        # every heartbeat. Using a Redis-backed cache to dedupe burned ~1
+        # op per heartbeat. Per-worker firing is fine because
+        # `check_sla_breaches` is idempotent (skips chats already notified).
+        if not process_throttle.should_run(f'sla_ws:{self.org_id}', 30):
             return
         check_sla_breaches(
             sla_minutes=int(getattr(settings, 'CHAT_SLA_MINUTES', 5)),
             org_id=self.org_id,
         )
-        cache.set(cache_key, True, 30)

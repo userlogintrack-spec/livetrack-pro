@@ -10,7 +10,7 @@
     <style>
         :root { --wc: {{ org.widget_color|default:"#7c3aed" }}; }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Inter',-apple-system,sans-serif; background:#f8f9ff; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+        body { font-family:'Inter',-apple-system,sans-serif; background:#f8f9ff; height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding-bottom:env(safe-area-inset-bottom,0); }
 
         /* Header */
         .header {
@@ -29,6 +29,10 @@
         .header-actions { display:flex; gap:5px; position:relative; z-index:1; }
         .header-btn { background:rgba(255,255,255,0.12); border:none; color:rgba(255,255,255,0.9); border-radius:10px; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; transition:all .2s; backdrop-filter:blur(4px); }
         .header-btn:hover { background:rgba(255,255,255,0.25); transform:scale(1.05); }
+        /* "End chat" icon — same shape as siblings but tinted to read as a
+           destructive action (no agent confusion with the close button). */
+        .header-btn-end { background:rgba(239,68,68,0.22); color:#fff; }
+        .header-btn-end:hover { background:rgba(239,68,68,0.55); }
 
         /* Messages */
         .messages { flex:1; overflow-y:auto; padding:16px; background:linear-gradient(180deg,#f8f9ff,#fff); display:flex; flex-direction:column; gap:10px; }
@@ -171,6 +175,7 @@
             </div>
         </div>
         <div class="header-actions">
+            <button class="header-btn header-btn-end" onclick="endChatFromMenu()" title="End chat" aria-label="End chat" id="ltwEndChatBtn" style="display:none;"><i class="fas fa-sign-out-alt"></i></button>
             <button class="header-btn" onclick="toggleMenu(event)" title="Menu"><i class="fas fa-ellipsis-v"></i></button>
             <button class="header-btn" onclick="closeWidget()" title="Close"><i class="fas fa-times"></i></button>
         </div>
@@ -264,6 +269,12 @@
     <div class="typing" id="typing"><span style="display:inline-flex;gap:3px;margin-right:6px;"><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s infinite;"></span><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s .2s infinite;"></span><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s .4s infinite;"></span></span> Agent is typing...</div>
     <style>@keyframes typingB{0%,100%{opacity:.3}50%{opacity:1}}</style>
 
+    <!-- Queue position banner (shown while status='waiting') -->
+    <div id="queueBanner" style="display:none;padding:10px 14px;background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(167,139,250,0.04));border-bottom:1px solid rgba(124,58,237,0.15);font-size:12px;color:#5b21b6;text-align:center;">
+        <i class="fas fa-hourglass-half" style="margin-right:4px;"></i>
+        <span id="queueText">Connecting…</span>
+    </div>
+
     <!-- Chat input -->
     <div class="chat-input hidden" id="chatInput">
         <div class="toolbar">
@@ -278,7 +289,7 @@
             <button class="tool-btn" onclick="endChat()" title="End Chat" style="color:#ef4444;font-size:13px;"><i class="fas fa-phone-slash"></i></button>
         </div>
         <div class="input-row">
-            <input type="text" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()">
+            <input type="text" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()" oninput="_fnlTypedOnce()">
             <button class="send-btn" onclick="sendMsg()"><i class="fas fa-paper-plane"></i></button>
         </div>
         <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this)" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip">
@@ -602,6 +613,7 @@ function startChat() {
         document.getElementById('prechat').classList.add('hidden');
         document.getElementById('messages').classList.remove('hidden');
         document.getElementById('chatInput').classList.remove('hidden');
+        startQueuePolling();
         if (data.messages) {
             data.messages.forEach(function(m) {
                 var cls = m.sender_type === 'visitor' ? 'visitor' : m.sender_type === 'system' ? 'system' : 'agent';
@@ -617,15 +629,76 @@ function startChat() {
     });
 }
 
+// Funnel: typed → sent. Server dedupes per (session, event, hour).
+function _fnl(event) {
+    try {
+        fetch(BASE + '/api/widget/funnel/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'omit',
+            body: JSON.stringify({event: event, key: KEY, session_key: SESSION, parent_domain: PARENT_DOMAIN}),
+            keepalive: true,
+        }).catch(function(){});
+    } catch(e) {}
+}
+var _fnlTyped = false;
+function _fnlTypedOnce() {
+    if (_fnlTyped) return;
+    _fnlTyped = true;
+    _fnl('typed');
+}
+
 function sendMsg() {
     if (!socket || socket.readyState !== 1) return;
     var input = document.getElementById('msgInput');
     var text = input.value.trim();
     if (!text) return;
     socket.send(JSON.stringify({type:'chat_message',message:text,sender_type:'visitor',sender_name:visitorName,msg_type:'text'}));
+    _fnl('sent');
     addMsg(text, 'visitor', new Date().toISOString());
     input.value = '';
     input.focus();
+}
+
+// ───── Queue position polling ─────
+// Show "You're #2 in queue · ~3 min" while no agent has joined. Polls every
+// 8s; stops as soon as status transitions away from 'waiting'.
+var _qPollTimer = null;
+function startQueuePolling() {
+    if (_qPollTimer) return;
+    var banner = document.getElementById('queueBanner');
+    var textEl = document.getElementById('queueText');
+    function poll() {
+        if (!roomId) { stopQueuePolling(); return; }
+        fetch(BASE + '/api/widget/queue/' + encodeURIComponent(roomId) + '/?sk=' + encodeURIComponent(SESSION), {credentials: 'omit'})
+            .then(function(r){ return r.ok ? r.json() : null; })
+            .then(function(d) {
+                if (!d) return;
+                if (d.status !== 'waiting') {
+                    if (banner) banner.style.display = 'none';
+                    stopQueuePolling();
+                    return;
+                }
+                if (banner) banner.style.display = 'block';
+                if (textEl) {
+                    var minutes = Math.max(1, Math.round((d.eta_seconds || 60) / 60));
+                    var pos = d.position || 1;
+                    if (pos === 1) {
+                        textEl.textContent = 'You\'re next · about ' + minutes + ' min wait';
+                    } else {
+                        textEl.textContent = 'You\'re #' + pos + ' in line · about ' + minutes + ' min wait';
+                    }
+                }
+            })
+            .catch(function(){});
+    }
+    poll();
+    _qPollTimer = setInterval(poll, 8000);
+}
+function stopQueuePolling() {
+    if (_qPollTimer) { clearInterval(_qPollTimer); _qPollTimer = null; }
+    var banner = document.getElementById('queueBanner');
+    if (banner) banner.style.display = 'none';
 }
 
 function uploadFile(input) {
@@ -689,6 +762,19 @@ function newChat() {
     } catch(_){}
 }
 
+function _refreshEndChatBtn() {
+    // Header "End chat" icon only makes sense when there's a live chat. Hide
+    // it during prechat / after the chat has been ended so visitors don't
+    // click a destructive-styled button with nothing to end.
+    var hasActive = !!(roomId && socket && socket.readyState === 1);
+    var hdrBtn = document.getElementById('ltwEndChatBtn');
+    if (hdrBtn) hdrBtn.style.display = hasActive ? '' : 'none';
+}
+// Cheap polling — covers state changes (ws reconnect, ws close, room
+// assigned via different code paths) without wiring every assignment site.
+setInterval(_refreshEndChatBtn, 600);
+_refreshEndChatBtn();
+
 function toggleMenu(ev) {
     if (ev) { ev.stopPropagation(); ev.preventDefault(); }
     var m = document.getElementById('ltwMenu');
@@ -699,6 +785,7 @@ function toggleMenu(ev) {
     var dlBtn  = document.getElementById('menuDownload');
     if (endBtn) endBtn.classList.toggle('ltw-hide', !hasActive);
     if (dlBtn)  dlBtn.classList.toggle('ltw-hide', !hasAnyRoom);
+    _refreshEndChatBtn();
     m.classList.toggle('show');
 }
 document.addEventListener('click', function(e) {
@@ -1102,7 +1189,14 @@ function showCallUI(type) {
     document.getElementById('callIcon').className = type==='video' ? 'fas fa-video' : 'fas fa-phone';
 }
 
-function endCallVisitor() {
+var _callEnded = false;
+function endCallVisitor(notifyRemote, label) {
+    // Idempotency guard — without this, a remote `call_end` re-enters this
+    // function via the WS handler, which then sends another `call_end` back
+    // and triggers a loop of "Call ended" system messages on the peer.
+    if (_callEnded) return;
+    _callEnded = true;
+    if (notifyRemote === undefined) notifyRemote = true;
     document.getElementById('callOverlay').style.display='none';
     document.getElementById('videoBox').style.display='none';
     document.getElementById('screenBox').style.display='none';
@@ -1112,8 +1206,10 @@ function endCallVisitor() {
     if(callPC){callPC.close(); callPC=null;}
     if(callTimer){clearInterval(callTimer); callTimer=null;} callSecs=0;
     isMuted=false; isCamOff=false;
-    if(socket && socket.readyState===1) socket.send(JSON.stringify({type:'call_end',data:{}}));
-    addMsg('Call ended','system',new Date().toISOString());
+    if(notifyRemote && socket && socket.readyState===1) socket.send(JSON.stringify({type:'call_end',data:{}}));
+    addMsg(label || 'Call ended','system',new Date().toISOString());
+    // Allow a fresh call after this one is fully torn down.
+    setTimeout(function(){ _callEnded = false; }, 1500);
 }
 
 function toggleMute() {
@@ -1180,8 +1276,9 @@ function patchCallHandler() {
         try { d = JSON.parse(e.data); } catch(_) { return; }
         if(d.type==='call_offer' && d.sender_type!=='visitor') { handleIncomingCall(d.data||d); return; }
         if(d.type==='call_answer' && callPC) { callPC.setRemoteDescription(new RTCSessionDescription((d.data||d).sdp)); startCallTimer(); document.getElementById('callTitle').textContent='Connected'; return; }
-        if(d.type==='call_end') { endCallVisitor(); return; }
-        if(d.type==='call_reject') { endCallVisitor(); addMsg('Call rejected','system',new Date().toISOString()); return; }
+        // Remote-triggered: don't bounce a `call_end` back to the peer.
+        if(d.type==='call_end') { endCallVisitor(false); return; }
+        if(d.type==='call_reject') { endCallVisitor(false, 'Call rejected'); return; }
         if(d.type==='ice_candidate' && d.data) {
             var ctx = d.data.context;
             // Explicit context wins
