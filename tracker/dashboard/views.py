@@ -803,6 +803,7 @@ def visitor_detail(request, visitor_id):
     notes = visitor.agent_notes.order_by('-created_at')
     events_count = visitor.events.count()
     recordings = visitor.recordings.order_by('-created_at')[:20]
+    timeline = _build_visitor_timeline(visitor)
     # Format visit duration
     dur = visitor.session_duration or 0
     if dur >= 3600:
@@ -820,7 +821,112 @@ def visitor_detail(request, visitor_id):
         'events_count': events_count,
         'recordings': recordings,
         'visit_duration': visit_duration,
+        'timeline': timeline,
     })
+
+
+def _build_visitor_timeline(visitor, limit_per_kind=80):
+    """Merge every visitor-event source into one chronological feed.
+
+    Each item is a dict with: ts (datetime), kind, title, detail, icon, color.
+    Keeps query cost bounded by capping each source at `limit_per_kind`.
+    Sorted newest first; template renders the first ~120 entries.
+    """
+    items = []
+
+    # Page views
+    for pv in visitor.page_views.order_by('-timestamp')[:limit_per_kind]:
+        title = pv.page_title or pv.url[:60]
+        items.append({
+            'ts': pv.timestamp, 'kind': 'pageview',
+            'title': title, 'detail': pv.url,
+            'icon': 'fa-link', 'color': '#3b82f6',
+            'is_entry': pv.is_entry, 'is_exit': pv.is_exit,
+        })
+
+    # Chats
+    for cr in visitor.chat_rooms.order_by('-created_at')[:limit_per_kind].select_related('agent'):
+        agent_label = cr.agent.get_full_name() if cr.agent else (cr.agent.username if cr.agent else 'Unassigned')
+        items.append({
+            'ts': cr.created_at, 'kind': 'chat_started',
+            'title': f'Chat started — {cr.subject or "No subject"}',
+            'detail': f'Agent: {agent_label} · Status: {cr.get_status_display()}',
+            'icon': 'fa-comments', 'color': '#7c3aed',
+            'room_id': cr.room_id,
+        })
+        if cr.closed_at:
+            extra = []
+            if cr.rating:
+                extra.append(f'⭐ {cr.rating}/5')
+            if cr.duration_display:
+                extra.append(cr.duration_display)
+            items.append({
+                'ts': cr.closed_at, 'kind': 'chat_closed',
+                'title': 'Chat closed',
+                'detail': ' · '.join(extra) or f'Agent: {agent_label}',
+                'icon': 'fa-check-circle', 'color': '#10b981',
+                'room_id': cr.room_id,
+            })
+
+    # Agent notes
+    for n in visitor.agent_notes.order_by('-created_at')[:limit_per_kind].select_related('agent'):
+        items.append({
+            'ts': n.created_at, 'kind': 'note',
+            'title': f'Note by {n.agent.get_full_name() or n.agent.username}',
+            'detail': (n.content or '')[:200],
+            'icon': 'fa-sticky-note', 'color': '#f59e0b',
+        })
+
+    # Survey responses
+    try:
+        for resp in visitor.survey_responses.order_by('-created_at')[:limit_per_kind].select_related('survey'):
+            items.append({
+                'ts': resp.created_at, 'kind': 'survey',
+                'title': f'Submitted survey: {resp.survey.title}',
+                'detail': f'Score: {resp.score}' if resp.score is not None else '',
+                'icon': 'fa-clipboard-check', 'color': '#06b6d4',
+            })
+    except Exception:
+        pass
+
+    # Recordings
+    try:
+        for rec in visitor.recordings.order_by('-created_at')[:limit_per_kind]:
+            items.append({
+                'ts': rec.created_at, 'kind': 'recording',
+                'title': 'Session recording captured',
+                'detail': f'{getattr(rec, "duration_seconds", 0)}s' if hasattr(rec, 'duration_seconds') else '',
+                'icon': 'fa-video', 'color': '#ec4899',
+            })
+    except Exception:
+        pass
+
+    # Ban / unban (one terminal event if currently banned)
+    if visitor.is_banned:
+        items.append({
+            'ts': visitor.updated_at if hasattr(visitor, 'updated_at') and visitor.updated_at else visitor.last_seen,
+            'kind': 'banned',
+            'title': 'Visitor banned',
+            'detail': 'Cannot start new chats',
+            'icon': 'fa-ban', 'color': '#ef4444',
+        })
+
+    # First-ever visit anchor
+    if visitor.first_visit:
+        utm_bits = []
+        if visitor.referrer_source:
+            utm_bits.append(f'via {visitor.referrer_source}')
+        if getattr(visitor, 'utm_campaign', ''):
+            utm_bits.append(f'utm: {visitor.utm_campaign}')
+        items.append({
+            'ts': visitor.first_visit, 'kind': 'first_visit',
+            'title': 'First visit',
+            'detail': ' · '.join(utm_bits) or 'Direct traffic',
+            'icon': 'fa-flag-checkered', 'color': '#0ea5e9',
+        })
+
+    items.sort(key=lambda x: x['ts'], reverse=True)
+    return items[:120]
 
 
 @login_required
@@ -1856,6 +1962,227 @@ def toggle_agent_availability(request, agent_id):
     profile.is_available = not profile.is_available
     profile.save(update_fields=['is_available'])
     return JsonResponse({'status': 'ok', 'is_available': profile.is_available})
+
+
+@login_required
+def ai_quick_replies(request, room_id):
+    """Mid-typing predictions: while a visitor is typing, return 3 short
+    reply options the agent can click-to-send. Lighter than `ai_snippet`
+    (one-liners, no slash command needed)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
+
+    from tracker.core.throttle import check as throttle_check
+    state = throttle_check(request, action='ai_quick_reply', limit=40, window=60,
+                            key=f'user:{request.user.id}')
+    if state.blocked:
+        return JsonResponse({'error': 'Slow down'}, status=429)
+
+    config = AIBotConfig.objects.filter(organization=org).first()
+    if not config or not config.api_key:
+        return JsonResponse({'options': []})
+
+    # Use last 6 messages for context — quick replies care about the freshest
+    # context, not the full history.
+    msgs = (Message.objects.filter(room=room).exclude(sender_type='system')
+            .order_by('-timestamp')[:6])
+    convo = []
+    for m in reversed(list(msgs)):
+        who = 'Visitor' if m.sender_type == 'visitor' else 'Agent'
+        convo.append(f'{who}: {m.content[:200]}')
+
+    from tracker.chat.ai import _call_llm
+    system = (
+        "Suggest THREE very short (max 8 words each) reply options for a "
+        "support agent. They should be distinct in tone/intent: e.g., "
+        "one acknowledging, one asking a clarifying question, one proposing "
+        "an action. Return ONLY a JSON array of 3 strings, no preamble."
+    )
+    user = "Conversation so far:\n" + ('\n'.join(convo) if convo else '(empty)') + "\n\nThree quick-reply options:"
+    out = _call_llm(config, system=system, messages=[{'role': 'user', 'content': user}], max_tokens=120)
+    if not out:
+        return JsonResponse({'options': []})
+    import json as _json, re as _re
+    cleaned = _re.sub(r'^```(?:json)?|```$', '', out, flags=_re.MULTILINE).strip()
+    try:
+        parsed = _json.loads(cleaned)
+        if isinstance(parsed, list):
+            options = [str(x)[:120] for x in parsed[:3]]
+            return JsonResponse({'options': options})
+    except Exception:
+        pass
+    # Fallback: split lines.
+    lines = [l.strip(' -•"\'') for l in out.split('\n') if l.strip()][:3]
+    return JsonResponse({'options': lines})
+
+
+@login_required
+def voice_transcribe(request):
+    """Accept an audio blob from the agent's push-to-talk mic, ship it to
+    Gemini multimodal for transcription, return the text.
+
+    Body: multipart/form-data with `audio` file. Anthropic doesn't have a
+    public audio-in endpoint yet, so we route through Gemini regardless of
+    the org's configured provider — but we still require an API key on
+    AIBotConfig so it's an opt-in feature.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    config = AIBotConfig.objects.filter(organization=org).first()
+    if not config or not config.api_key:
+        return JsonResponse({'error': 'AI not configured'}, status=400)
+    api_key = config.api_key_plain
+    if not api_key:
+        return JsonResponse({'error': 'AI key empty'}, status=400)
+
+    from tracker.core.throttle import check as throttle_check
+    state = throttle_check(request, action='voice_transcribe', limit=30, window=60,
+                            key=f'user:{request.user.id}')
+    if state.blocked:
+        return JsonResponse({'error': 'Slow down'}, status=429)
+
+    audio = request.FILES.get('audio')
+    if not audio:
+        return JsonResponse({'error': 'audio file missing'}, status=400)
+    raw = audio.read()
+    if len(raw) > 8 * 1024 * 1024:
+        return JsonResponse({'error': 'audio too large (8MB max)'}, status=413)
+    mime = audio.content_type or 'audio/webm'
+
+    # Gemini accepts inline base64 audio in the `parts` array.
+    import base64, json as _json, urllib.request, urllib.error
+    payload = {
+        'contents': [{
+            'role': 'user',
+            'parts': [
+                {'text': 'Transcribe this audio exactly. Return ONLY the transcript text, no preamble.'},
+                {'inlineData': {'mimeType': mime, 'data': base64.b64encode(raw).decode('ascii')}},
+            ],
+        }],
+        'generationConfig': {'maxOutputTokens': 800, 'temperature': 0.1},
+    }
+    model = 'gemini-2.0-flash'
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}'
+    req = urllib.request.Request(url, data=_json.dumps(payload).encode('utf-8'),
+                                  headers={'Content-Type': 'application/json'}, method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = _json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        logger.warning('gemini transcribe HTTP %s', e.code)
+        return JsonResponse({'error': f'transcribe failed ({e.code})'}, status=502)
+    except Exception:
+        logger.warning('gemini transcribe failed', exc_info=True)
+        return JsonResponse({'error': 'transcribe failed'}, status=502)
+    try:
+        text = ''.join(p.get('text', '') for p in data['candidates'][0]['content']['parts']).strip()
+    except Exception:
+        text = ''
+    if not text:
+        return JsonResponse({'error': 'empty transcript'}, status=502)
+    return JsonResponse({'ok': True, 'text': text})
+
+
+@login_required
+def notes_broadcast(request, room_id):
+    """Multi-agent collaboration on internal notes — agent A's keystrokes
+    appear in agent B's note panel in real-time. Backed by the same
+    Channels group as the chat itself."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
+    data = _parse_json_body(request) or {}
+    text = (data.get('text') or '')[:5000]
+    agent_name = request.user.get_full_name() or request.user.username
+
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'chat_{room.room_id}',
+        {
+            'type': 'notes_typing',
+            'agent_name': agent_name,
+            'agent_id': request.user.id,
+            'text': text,
+            'timestamp': timezone.now().isoformat(),
+        }
+    )
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def chat_send_reopen_link(request, room_id):
+    """Agent → visitor: email a one-time link to resume this chat later.
+    POST body: {"email": "...", "days": 7 (optional)}."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
+    data = _parse_json_body(request) or {}
+    email = (data.get('email') or room.visitor_email or '').strip()
+    if not email:
+        return JsonResponse({'error': 'email required (no visitor email on file)'}, status=400)
+    try:
+        days = int(data.get('days', 7) or 7)
+    except (ValueError, TypeError):
+        days = 7
+    days = max(1, min(days, 30))
+
+    from tracker.chat.models import ChatReopenToken
+    import secrets as py_secrets
+    token = py_secrets.token_urlsafe(32)
+    tok = ChatReopenToken.objects.create(
+        room=room, token=token, created_by=request.user,
+        sent_to_email=email,
+        expires_at=timezone.now() + timedelta(days=days),
+    )
+    link = request.build_absolute_uri(f'/chat/reopen/{token}/')
+    try:
+        from django.core.mail import send_mail
+        send_mail(
+            subject=f'Continue your chat with {org.name}',
+            message=(
+                f"Hi {room.visitor_name or 'there'},\n\n"
+                f"Tap the link below to pick up where we left off — your "
+                f"agent will be reassigned and the full transcript stays "
+                f"intact:\n\n{link}\n\n"
+                f"The link expires in {days} day{'s' if days != 1 else ''}."
+            ),
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+            recipient_list=[email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.warning('reopen-link email failed', exc_info=True)
+    _log_activity(org, request.user, 'chat.reopen_sent',
+                  f'Sent reopen link for chat #{room_id} to {email}',
+                  target_type='chat', target_id=room_id)
+    return JsonResponse({'ok': True, 'expires_at': tok.expires_at.isoformat()})
+
+
+@login_required
+def toggle_agent_dnd(request):
+    """Toggle DND for the *current* user. DND is stronger than 'unavailable':
+    auto-assign skips entirely and (optionally) shows a custom away message."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    profile = getattr(request.user, 'agent_profile', None)
+    if not profile:
+        return JsonResponse({'error': 'No agent profile'}, status=400)
+    data = _parse_json_body(request) or {}
+    profile.do_not_disturb = bool(data.get('enabled', not profile.do_not_disturb))
+    msg = (data.get('message') or '').strip()
+    if msg:
+        profile.dnd_message = msg[:200]
+    profile.save(update_fields=['do_not_disturb', 'dnd_message'])
+    return JsonResponse({
+        'status': 'ok',
+        'do_not_disturb': profile.do_not_disturb,
+        'dnd_message': profile.dnd_message,
+    })
 
 
 @login_required

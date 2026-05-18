@@ -2012,6 +2012,7 @@
                         {% endfor %}
                     </div>
                 </div>
+                <div id="quickReplyChips" style="display:none;width:100%;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
                 <input type="text" class="chat-input-field" id="chatInput"
                        placeholder="Type your message... (/refund, /shipping, /thanks — AI drafts a reply)"
                        autocomplete="off"
@@ -2022,6 +2023,9 @@
                 </button>
                 <button onclick="triggerAiSuggest()" style="width:36px;height:46px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);border:0;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;box-shadow:0 4px 12px rgba(124,58,237,.25);" title="AI suggest reply">
                     <i class="fas fa-wand-magic-sparkles"></i>
+                </button>
+                <button id="micBtn" onmousedown="startMic(event)" onmouseup="stopMic(event)" onmouseleave="stopMic(event)" ontouchstart="startMic(event)" ontouchend="stopMic(event)" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Hold to talk — Gemini transcribes">
+                    <i class="fas fa-microphone"></i>
                 </button>
                 <button onclick="scheduleMessage()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Schedule message">
                     <i class="fas fa-clock"></i>
@@ -2630,6 +2634,8 @@
                 if (data.sender_type !== 'agent' || data.sender_name !== agentName) {
                     appendMessage(data.message, data.sender_type, data.sender_name, data.timestamp, data.msg_type, data.file_url, data.file_name);
                     if (soundEnabled && data.sender_type === 'visitor') playSound();
+                    // AI Quick-Reply chips (3 options) — fires when visitor speaks.
+                    if (data.sender_type === 'visitor') { refreshQuickReplies(); }
                     // AI Smart Reply + Sentiment
                     if (data.sender_type === 'visitor') {
                         generateSmartReplies(data.message);
@@ -2799,6 +2805,94 @@
         div.innerHTML = `<div class="msg-sender"><i class="fas fa-user-secret" style="margin-right:4px;"></i>${escapeHtml(agentName)} · Whisper</div><div class="bubble">${escapeHtml(text)}</div><div class="msg-time">${time}</div>`;
         container.appendChild(div);
         scrollToBottom();
+    }
+
+    // ───── AI Quick-Reply Hints ─────
+    // While the visitor is typing, pre-compute 3 short reply options the
+    // agent can click-to-send. Refreshed when a new visitor message arrives.
+    var _qrCooldown = 0;
+    function refreshQuickReplies() {
+        if (Date.now() < _qrCooldown) return;
+        _qrCooldown = Date.now() + 4000; // 4s throttle so we don't burn API on every keystroke
+        fetch('/dashboard/api/ai/quick-replies/' + encodeURIComponent(roomId) + '/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        }).then(r => r.ok ? r.json() : null).then(d => {
+            var wrap = document.getElementById('quickReplyChips');
+            if (!wrap) return;
+            wrap.innerHTML = '';
+            if (!d || !d.options || !d.options.length) { wrap.style.display = 'none'; return; }
+            d.options.forEach(function(opt) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = opt;
+                b.style.cssText = 'padding:6px 12px;border-radius:999px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.18);color:#5b21b6;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;font-family:inherit;';
+                b.onmouseover = function() { b.style.background = 'rgba(124,58,237,0.16)'; };
+                b.onmouseleave = function() { b.style.background = 'rgba(124,58,237,0.08)'; };
+                b.onclick = function() {
+                    document.getElementById('chatInput').value = opt;
+                    sendMessage();
+                    wrap.style.display = 'none';
+                };
+                wrap.appendChild(b);
+            });
+            wrap.style.display = 'flex';
+        }).catch(function(){});
+    }
+
+    // ───── Voice-to-text (push to talk) ─────
+    var _mediaRec = null, _audioChunks = [];
+    function startMic(ev) {
+        if (ev) { ev.preventDefault(); }
+        if (_mediaRec) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Microphone not supported in this browser'); return;
+        }
+        var btn = document.getElementById('micBtn');
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+            _audioChunks = [];
+            try { _mediaRec = new MediaRecorder(stream, { mimeType: 'audio/webm' }); }
+            catch(e) { _mediaRec = new MediaRecorder(stream); }
+            _mediaRec.ondataavailable = function(e) { if (e.data.size > 0) _audioChunks.push(e.data); };
+            _mediaRec.onstop = function() {
+                stream.getTracks().forEach(function(t){ t.stop(); });
+                if (!_audioChunks.length) { _mediaRec = null; return; }
+                var blob = new Blob(_audioChunks, { type: _mediaRec.mimeType || 'audio/webm' });
+                _mediaRec = null;
+                _transcribeAndFill(blob);
+            };
+            _mediaRec.start();
+            btn.style.background = '#ef4444'; btn.style.color = '#fff';
+        }).catch(function(){
+            alert('Microphone permission denied');
+        });
+    }
+    function stopMic(ev) {
+        if (ev) { ev.preventDefault(); }
+        if (!_mediaRec) return;
+        try { _mediaRec.stop(); } catch(e) {}
+        var btn = document.getElementById('micBtn');
+        if (btn) { btn.style.background = ''; btn.style.color = ''; }
+    }
+    function _transcribeAndFill(blob) {
+        var input = document.getElementById('chatInput');
+        var oldPlaceholder = input.placeholder;
+        input.placeholder = '🎤 Transcribing…';
+        var fd = new FormData();
+        fd.append('audio', blob, 'voice.webm');
+        fetch('/dashboard/api/voice/transcribe/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+            body: fd,
+        }).then(r => r.ok ? r.json() : null).then(d => {
+            input.placeholder = oldPlaceholder;
+            if (d && d.text) {
+                input.value = (input.value ? input.value + ' ' : '') + d.text;
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+        }).catch(function() { input.placeholder = oldPlaceholder; });
     }
 
     // ───── AI Snippet Completion ─────

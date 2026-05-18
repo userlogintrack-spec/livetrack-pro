@@ -74,6 +74,7 @@ def auto_assign_agent(room):
             is_active=True,
             agent_profile__isnull=False,
             agent_profile__is_available=True,
+            agent_profile__do_not_disturb=False,
             agent_profile__organization=org,
         )
         .annotate(active_count=Count('chat_rooms', filter=Q(chat_rooms__status='active')))

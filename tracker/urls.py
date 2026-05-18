@@ -7,6 +7,7 @@ from django.conf.urls.static import static
 from django.views.decorators.cache import never_cache, cache_page
 from django.utils import timezone
 from tracker.dashboard import views as dashboard_views
+from tracker.core.views import chat_reopen_consume
 
 
 @never_cache
@@ -151,6 +152,7 @@ def sitemap_xml(request):
 urlpatterns = [
     path('healthz/', healthz, name='healthz'),
     path('healthz/full/', healthz_full, name='healthz_full'),
+    path('chat/reopen/<str:token>/', chat_reopen_consume, name='chat_reopen'),
     path('robots.txt', robots_txt, name='robots_txt'),
     path('sitemap.xml', sitemap_xml, name='sitemap_xml'),
     path('manifest.json', manifest_json, name='manifest_json'),

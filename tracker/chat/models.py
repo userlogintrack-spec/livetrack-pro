@@ -138,6 +138,11 @@ class AgentProfile(models.Model):
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='agent')
     avatar_color = models.CharField(max_length=7, default='#6366f1')
     is_available = models.BooleanField(default=True)
+    # "Do Not Disturb": stronger than is_available=False. DND agents are
+    # skipped by auto-assign AND existing chats they're on get a system
+    # message flagging their unavailability so collaborators can pick up.
+    do_not_disturb = models.BooleanField(default=False)
+    dnd_message = models.CharField(max_length=200, blank=True, default='', help_text='Optional auto-reply shown to new visitors while in DND.')
     max_chats = models.PositiveIntegerField(default=5)
     total_chats_handled = models.PositiveIntegerField(default=0)
     # 2FA. The raw column holds Fernet-encrypted ciphertext; access via
@@ -831,6 +836,31 @@ class MagicLinkToken(models.Model):
 
     def __str__(self):
         return f'magic-link for {self.user.username}'
+
+
+# ──────────────────────────────────────────────────────────
+# Chat reopen tokens — agent sends visitor an email link that resumes
+# the same conversation days later. Tokens are single-use, short-lived
+# (default 7d), tied to a specific ChatRoom + visitor session.
+# ──────────────────────────────────────────────────────────
+class ChatReopenToken(models.Model):
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='reopen_tokens')
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reopen_tokens_sent')
+    sent_to_email = models.EmailField(blank=True, default='')
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    @property
+    def is_valid(self):
+        return self.consumed_at is None and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f'reopen for {self.room.room_id} ({"used" if self.consumed_at else "live"})'
 
 
 # ──────────────────────────────────────────────────────────

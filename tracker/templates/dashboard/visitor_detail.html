@@ -268,6 +268,52 @@
     </div>
 </div>
 
+<!-- Unified Timeline — every event for this visitor in one feed -->
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-header">
+        <h3><i class="fas fa-stream" style="color:var(--primary);"></i> Timeline</h3>
+        <span style="font-size:12px;color:var(--text-muted);">{{ timeline|length }} events · newest first</span>
+    </div>
+    <div class="card-body" style="padding:0;max-height:480px;overflow-y:auto;">
+        {% if timeline %}
+        <div style="padding:6px 0;">
+            {% for it in timeline %}
+            <div style="display:flex;gap:12px;padding:10px 18px;border-bottom:1px solid var(--border);position:relative;">
+                <div style="flex-shrink:0;width:34px;height:34px;border-radius:50%;background:{{ it.color }}1a;color:{{ it.color }};display:flex;align-items:center;justify-content:center;font-size:13px;">
+                    <i class="fas {{ it.icon }}"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.4;">
+                        {% if it.kind == 'pageview' %}
+                            <a href="{{ it.detail }}" target="_blank" rel="noopener" style="color:var(--text-primary);text-decoration:none;">{{ it.title }}</a>
+                            {% if it.is_entry %}<span style="font-size:9px;background:rgba(16,185,129,0.12);color:#059669;padding:1px 6px;border-radius:6px;margin-left:4px;font-weight:600;">ENTRY</span>{% endif %}
+                            {% if it.is_exit %}<span style="font-size:9px;background:rgba(239,68,68,0.12);color:#dc2626;padding:1px 6px;border-radius:6px;margin-left:4px;font-weight:600;">EXIT</span>{% endif %}
+                        {% elif it.kind == 'chat_started' or it.kind == 'chat_closed' %}
+                            {% if it.room_id %}<a href="{% url 'dashboard:chat_room' it.room_id %}" style="color:var(--text-primary);text-decoration:none;">{{ it.title }}</a>{% else %}{{ it.title }}{% endif %}
+                        {% else %}
+                            {{ it.title }}
+                        {% endif %}
+                    </div>
+                    {% if it.detail and it.kind != 'pageview' %}
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ it.detail }}</div>
+                    {% endif %}
+                </div>
+                <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;align-self:center;text-align:right;">
+                    <div>{{ it.ts|timesince }} ago</div>
+                    <div style="opacity:.7;margin-top:2px;">{{ it.ts|date:"M j, H:i" }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;">
+            <i class="fas fa-stream" style="font-size:28px;opacity:.3;display:block;margin-bottom:8px;"></i>
+            No activity recorded yet.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Page View History (Real-time) -->
 <div class="card">
     <div class="card-header">

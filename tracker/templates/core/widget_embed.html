@@ -10,7 +10,7 @@
     <style>
         :root { --wc: {{ org.widget_color|default:"#7c3aed" }}; }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Inter',-apple-system,sans-serif; background:#f8f9ff; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+        body { font-family:'Inter',-apple-system,sans-serif; background:#f8f9ff; height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding-bottom:env(safe-area-inset-bottom,0); }
 
         /* Header */
         .header {
@@ -268,6 +268,12 @@
     <!-- Typing indicator -->
     <div class="typing" id="typing"><span style="display:inline-flex;gap:3px;margin-right:6px;"><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s infinite;"></span><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s .2s infinite;"></span><span style="width:5px;height:5px;border-radius:50%;background:#7c3aed;animation:typingB 1.4s .4s infinite;"></span></span> Agent is typing...</div>
     <style>@keyframes typingB{0%,100%{opacity:.3}50%{opacity:1}}</style>
+
+    <!-- Queue position banner (shown while status='waiting') -->
+    <div id="queueBanner" style="display:none;padding:10px 14px;background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(167,139,250,0.04));border-bottom:1px solid rgba(124,58,237,0.15);font-size:12px;color:#5b21b6;text-align:center;">
+        <i class="fas fa-hourglass-half" style="margin-right:4px;"></i>
+        <span id="queueText">Connecting…</span>
+    </div>
 
     <!-- Chat input -->
     <div class="chat-input hidden" id="chatInput">
@@ -607,6 +613,7 @@ function startChat() {
         document.getElementById('prechat').classList.add('hidden');
         document.getElementById('messages').classList.remove('hidden');
         document.getElementById('chatInput').classList.remove('hidden');
+        startQueuePolling();
         if (data.messages) {
             data.messages.forEach(function(m) {
                 var cls = m.sender_type === 'visitor' ? 'visitor' : m.sender_type === 'system' ? 'system' : 'agent';
@@ -651,6 +658,47 @@ function sendMsg() {
     addMsg(text, 'visitor', new Date().toISOString());
     input.value = '';
     input.focus();
+}
+
+// ───── Queue position polling ─────
+// Show "You're #2 in queue · ~3 min" while no agent has joined. Polls every
+// 8s; stops as soon as status transitions away from 'waiting'.
+var _qPollTimer = null;
+function startQueuePolling() {
+    if (_qPollTimer) return;
+    var banner = document.getElementById('queueBanner');
+    var textEl = document.getElementById('queueText');
+    function poll() {
+        if (!roomId) { stopQueuePolling(); return; }
+        fetch(BASE + '/api/widget/queue/' + encodeURIComponent(roomId) + '/?sk=' + encodeURIComponent(SESSION), {credentials: 'omit'})
+            .then(function(r){ return r.ok ? r.json() : null; })
+            .then(function(d) {
+                if (!d) return;
+                if (d.status !== 'waiting') {
+                    if (banner) banner.style.display = 'none';
+                    stopQueuePolling();
+                    return;
+                }
+                if (banner) banner.style.display = 'block';
+                if (textEl) {
+                    var minutes = Math.max(1, Math.round((d.eta_seconds || 60) / 60));
+                    var pos = d.position || 1;
+                    if (pos === 1) {
+                        textEl.textContent = 'You\'re next · about ' + minutes + ' min wait';
+                    } else {
+                        textEl.textContent = 'You\'re #' + pos + ' in line · about ' + minutes + ' min wait';
+                    }
+                }
+            })
+            .catch(function(){});
+    }
+    poll();
+    _qPollTimer = setInterval(poll, 8000);
+}
+function stopQueuePolling() {
+    if (_qPollTimer) { clearInterval(_qPollTimer); _qPollTimer = null; }
+    var banner = document.getElementById('queueBanner');
+    if (banner) banner.style.display = 'none';
 }
 
 function uploadFile(input) {

@@ -221,6 +221,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message': event['message'],
         }))
 
+    async def notes_typing(self, event):
+        """Co-edit notes: broadcast collaborator's draft to everyone in the
+        room. Visitors never receive this — gated on `is_agent`."""
+        if not getattr(self, 'is_agent', False):
+            return
+        await self.send(text_data=json.dumps({
+            'type': 'notes_typing',
+            'agent_name': event.get('agent_name', ''),
+            'agent_id': event.get('agent_id'),
+            'text': event.get('text', ''),
+            'timestamp': event.get('timestamp', ''),
+        }))
+
     async def chat_transferred(self, event):
         await self.send(text_data=json.dumps({
             'type': 'chat_transferred',
