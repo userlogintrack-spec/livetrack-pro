@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Visitor Map — LiveVisitorHub{% endblock %}
+
+{% block content %}
+{{ by_country|json_script:"vmData" }}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+
+<style>
+    .vm-wrap { max-width: 1280px; margin: 0 auto; padding: 24px; }
+    .vm-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
+    .vm-head h1 { font-size: 22px; font-weight: 800; color: var(--text-primary); margin: 0; }
+    .vm-head .lede { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .vm-online { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); }
+    .vm-online .dot { width: 10px; height: 10px; background: #10b981; border-radius: 50%; box-shadow: 0 0 0 4px rgba(16,185,129,0.2); animation: vm-pulse 2s infinite; }
+    @keyframes vm-pulse { 0%,100%{ box-shadow:0 0 0 4px rgba(16,185,129,0.2);} 50%{ box-shadow:0 0 0 7px rgba(16,185,129,0.4);} }
+    .vm-online .num { font-size: 22px; font-weight: 800; color: var(--text-primary); margin-right: 4px; }
+
+    .vm-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+    @media (max-width: 900px) { .vm-grid { grid-template-columns: 1fr; } #vmMap { height: 360px; } }
+
+    #vmMap { height: 540px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+
+    .vm-side { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 18px; max-height: 540px; overflow-y: auto; }
+    .vm-side h3 { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; }
+    .vm-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+    .vm-row:last-child { border-bottom: 0; }
+    .vm-row .country { font-weight: 600; color: var(--text-primary); }
+    .vm-row .count { font-weight: 700; color: var(--primary, #7c3aed); font-variant-numeric: tabular-nums; }
+    .empty { text-align: center; padding: 36px 16px; color: var(--text-muted); font-size: 13px; }
+</style>
+
+<div class="vm-wrap">
+    <div class="vm-head">
+        <div>
+            <h1><i class="fas fa-globe" style="color: var(--primary, #7c3aed);"></i> Live Visitor Map</h1>
+            <div class="lede">Where your visitors are right now — updated every 30 seconds. Free, no API key.</div>
+        </div>
+        <div class="vm-online">
+            <span class="dot"></span>
+            <span><span class="num">{{ total_online }}</span> online now</span>
+        </div>
+    </div>
+
+    <div class="vm-grid">
+        <div id="vmMap"></div>
+        <div class="vm-side">
+            <h3>Top countries online</h3>
+            {% if by_country %}
+                {% for row in by_country %}
+                <div class="vm-row">
+                    <span class="country">{{ row.country }}</span>
+                    <span class="count">{{ row.c }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty">No visitors online in the last 30 minutes.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+// Tiny country → centroid lookup (covers the top ~80 countries that
+// account for >99% of internet traffic). Falling back to 0,0 for
+// anything we don't recognise is fine — it just clusters off the map.
+var COUNTRY_LATLON = {
+    'India':[20.59,78.96],'United States':[37.09,-95.71],'United Kingdom':[55.37,-3.43],'Canada':[56.13,-106.34],
+    'Australia':[-25.27,133.77],'Germany':[51.16,10.45],'France':[46.6,1.88],'Brazil':[-14.23,-51.92],
+    'Japan':[36.20,138.25],'China':[35.86,104.19],'Russia':[61.52,105.31],'Mexico':[23.63,-102.55],
+    'Italy':[41.87,12.56],'Spain':[40.46,-3.74],'Netherlands':[52.13,5.29],'Sweden':[60.12,18.64],
+    'Norway':[60.47,8.46],'Finland':[61.92,25.74],'Denmark':[56.26,9.50],'Switzerland':[46.81,8.22],
+    'Belgium':[50.50,4.46],'Poland':[51.91,19.14],'Austria':[47.51,14.55],'Ireland':[53.41,-8.24],
+    'Portugal':[39.39,-8.22],'Greece':[39.07,21.82],'Turkey':[38.96,35.24],'Israel':[31.05,34.85],
+    'United Arab Emirates':[23.42,53.85],'Saudi Arabia':[23.89,45.08],'Egypt':[26.82,30.80],'South Africa':[-30.56,22.94],
+    'Nigeria':[9.08,8.68],'Kenya':[-0.02,37.91],'Argentina':[-38.42,-63.62],'Chile':[-35.68,-71.54],
+    'Colombia':[4.57,-74.30],'Peru':[-9.19,-75.02],'Singapore':[1.35,103.82],'Hong Kong':[22.32,114.17],
+    'Taiwan':[23.70,120.96],'South Korea':[35.91,127.77],'Thailand':[15.87,100.99],'Vietnam':[14.06,108.28],
+    'Indonesia':[-0.79,113.92],'Malaysia':[4.21,101.98],'Philippines':[12.88,121.77],'Pakistan':[30.38,69.35],
+    'Bangladesh':[23.68,90.36],'Sri Lanka':[7.87,80.77],'Nepal':[28.39,84.12],'New Zealand':[-40.90,174.89],
+    'Czech Republic':[49.82,15.47],'Hungary':[47.16,19.50],'Romania':[45.94,24.97],'Ukraine':[48.38,31.17],
+};
+
+var map = L.map('vmMap', {worldCopyJump: true}).setView([20, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 12,
+}).addTo(map);
+
+var data = JSON.parse(document.getElementById('vmData').textContent || '[]');
+data.forEach(function(row) {
+    var pos = COUNTRY_LATLON[row.country];
+    if (!pos) return;
+    var radius = Math.min(40, 6 + row.c * 2);
+    L.circleMarker(pos, {
+        radius: radius,
+        color: '#7c3aed', weight: 2, fillColor: '#a855f7', fillOpacity: 0.4
+    }).addTo(map).bindTooltip(row.country + ': ' + row.c + ' online', {direction: 'top'});
+});
+
+// Auto-refresh every 30s (just reload the page so server re-renders).
+setTimeout(function(){ location.reload(); }, 30000);
+</script>
+{% endblock %}

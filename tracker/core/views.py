@@ -982,6 +982,69 @@ def widget_script(request):
   var WC = "__WIDGET_COLOR__";
   var isOpen = false;
 
+  // ===== Public SDK surface =====
+  // Customer apps call `window.LiveTrack.identify({...})` once their user
+  // logs in so the agent sees real CRM context instead of "Visitor 4321".
+  // Retries until the visitor session_key exists, so calling sequence
+  // doesn't matter (script load order, async login).
+  window.LiveTrack = window.LiveTrack || {};
+  var _pendingIdentify = null, _identifyTries = 0;
+  function _flushIdentify() {
+    if (!_pendingIdentify) return;
+    var sk = "";
+    try { sk = localStorage.getItem("ltw_session_key_" + WIDGET_KEY) || ""; } catch(e) {}
+    if (!sk) {
+      if (_identifyTries++ < 20) setTimeout(_flushIdentify, 500);
+      return;
+    }
+    var payload = {};
+    for (var k in _pendingIdentify) payload[k] = _pendingIdentify[k];
+    payload.key = WIDGET_KEY;
+    payload.session_key = sk;
+    _pendingIdentify = null;
+    try {
+      fetch(BASE + "/api/widget/identify/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        credentials: "omit",
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(function(){});
+    } catch(e) {}
+  }
+  window.LiveTrack.identify = function(user) {
+    if (!user || typeof user !== "object") return;
+    var traits = user.traits;
+    if (!traits) {
+      traits = {};
+      for (var k in user) {
+        if (k !== "email" && k !== "user_id" && k !== "id" && k !== "name" && k !== "traits") {
+          traits[k] = user[k];
+        }
+      }
+    }
+    _pendingIdentify = {
+      email: user.email || "",
+      user_id: user.user_id || user.id || "",
+      name: user.name || "",
+      traits: traits
+    };
+    _identifyTries = 0;
+    _flushIdentify();
+  };
+  // If the customer called LiveTrack.identify(...) BEFORE the script
+  // loaded, the call would have been a no-op. Support that pattern via
+  // `window.LiveTrackQueue = [['identify', {...}]]` before our script
+  // tag — replay queued calls now.
+  if (Array.isArray(window.LiveTrackQueue)) {
+    for (var q = 0; q < window.LiveTrackQueue.length; q++) {
+      var item = window.LiveTrackQueue[q];
+      if (item && item[0] === "identify" && window.LiveTrack[item[0]]) {
+        try { window.LiveTrack.identify(item[1]); } catch(e) {}
+      }
+    }
+  }
+
   // ===== Visitor session persistence (cross-page) =====
   var SK_KEY = "ltw_session_key_" + WIDGET_KEY;
   function getSessionKey() {
@@ -1814,6 +1877,61 @@ def chat_file_upload(request, room_id):
     })
 
 
+@csrf_exempt
+def widget_identify(request):
+    """Programmatic visitor identification — customer calls
+    `window.LiveTrack.identify({email, user_id, name, traits})` from their
+    app once the visitor logs in. Attaches CRM-style context to the
+    anonymous session so the agent sees a real user, not "Visitor 4321"."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    data = _parse_json_body(request) or {}
+    session_key = (data.get('session_key') or '').strip()
+    if not session_key:
+        return JsonResponse({'error': 'session_key required'}, status=400)
+
+    org, website = _get_website_from_request(request)
+    if not org:
+        return JsonResponse({'error': 'org not found'}, status=404)
+
+    from tracker.visitors.models import Visitor
+    visitor = Visitor.objects.filter(organization=org, session_key=session_key).first()
+    if not visitor:
+        return JsonResponse({'error': 'visitor not found — call after first pageview tracks'}, status=404)
+
+    # Whitelist + cap each trait to stop a misbehaving customer JS from
+    # storing megabytes of garbage in the JSON field.
+    raw_traits = data.get('traits') or {}
+    if not isinstance(raw_traits, dict):
+        raw_traits = {}
+    traits = {}
+    for k, v in raw_traits.items():
+        if not isinstance(k, str) or len(k) > 60:
+            continue
+        if isinstance(v, (str, int, float, bool)) or v is None:
+            traits[k] = (v if not isinstance(v, str) else v[:500])
+        if len(traits) >= 50:
+            break
+
+    updates = ['identified_at', 'traits']
+    visitor.identified_at = timezone.now()
+    visitor.traits = traits
+    email = (data.get('email') or '').strip()[:200]
+    if email and '@' in email:
+        visitor.identified_email = email.lower()
+        updates.append('identified_email')
+    uid = (data.get('user_id') or '').strip()[:200]
+    if uid:
+        visitor.identified_user_id = uid
+        updates.append('identified_user_id')
+    name = (data.get('name') or '').strip()[:200]
+    if name:
+        visitor.identified_name = name
+        updates.append('identified_name')
+    visitor.save(update_fields=updates)
+    return JsonResponse({'ok': True})
+
+
 def chat_reopen_consume(request, token):
     """Public landing page for /chat/reopen/<token>/. Validates the token,
     reactivates the chat, and bounces the visitor back to the customer
@@ -1979,7 +2097,9 @@ def widget_chat_transcript(request, room_id):
 
 @csrf_exempt
 def chat_rate(request, room_id):
-    """Visitor rates a chat after it ends."""
+    """Visitor rates a chat — works mid-chat (inline CSAT) or after close.
+    Cross-origin friendly: accepts session_key from body since cookies
+    aren't sent (CORS `credentials: 'omit'`)."""
     if request.method == 'POST':
         from tracker.chat.models import ChatRoom
 
@@ -1992,7 +2112,11 @@ def chat_rate(request, room_id):
         except ChatRoom.DoesNotExist:
             return JsonResponse({'error': 'Room not found'}, status=404)
 
-        if request.session.session_key != room.visitor.session_key:
+        # Auth: visitor proves they own the room via session_key (body or cookie).
+        body_sk = (data.get('session_key') or '').strip()
+        cookie_sk = request.session.session_key or ''
+        room_sk = room.visitor.session_key if room.visitor else ''
+        if not room_sk or (body_sk != room_sk and cookie_sk != room_sk):
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
         try:

@@ -286,10 +286,21 @@
             <button class="tool-btn" onclick="startVisitorCall('video')" title="Video Call" id="btnVideoCall"><i class="fas fa-video"></i></button>
             <button class="tool-btn" onclick="startVisitorScreenShare()" title="Share Screen" id="btnScreenShare"><i class="fas fa-desktop"></i></button>
             <div style="flex:1;"></div>
+            <button class="tool-btn" onclick="showInlineRating()" title="Rate this chat" style="color:#f59e0b;font-size:13px;"><i class="fas fa-star"></i></button>
             <button class="tool-btn" onclick="endChat()" title="End Chat" style="color:#ef4444;font-size:13px;"><i class="fas fa-phone-slash"></i></button>
         </div>
+        <div id="inlineRating" style="display:none;padding:10px 14px;background:rgba(245,158,11,0.08);border-top:1px solid rgba(245,158,11,0.2);text-align:center;">
+            <div style="font-size:12px;color:#1f2937;margin-bottom:6px;font-weight:600;">How are we doing?</div>
+            <div style="display:flex;justify-content:center;gap:4px;">
+                <button onclick="submitInlineRating(1)" style="background:transparent;border:0;font-size:22px;cursor:pointer;padding:2px 4px;">⭐</button>
+                <button onclick="submitInlineRating(2)" style="background:transparent;border:0;font-size:22px;cursor:pointer;padding:2px 4px;">⭐</button>
+                <button onclick="submitInlineRating(3)" style="background:transparent;border:0;font-size:22px;cursor:pointer;padding:2px 4px;">⭐</button>
+                <button onclick="submitInlineRating(4)" style="background:transparent;border:0;font-size:22px;cursor:pointer;padding:2px 4px;">⭐</button>
+                <button onclick="submitInlineRating(5)" style="background:transparent;border:0;font-size:22px;cursor:pointer;padding:2px 4px;">⭐</button>
+            </div>
+        </div>
         <div class="input-row">
-            <input type="text" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()" oninput="_fnlTypedOnce()">
+            <input type="text" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()" oninput="_fnlTypedOnce();_emitTyping(this.value)">
             <button class="send-btn" onclick="sendMsg()"><i class="fas fa-paper-plane"></i></button>
         </div>
         <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this)" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip">
@@ -676,11 +687,63 @@ function _fnl(event) {
         }).catch(function(){});
     } catch(e) {}
 }
+// Inline CSAT — agent can prompt for rating mid-chat without ending it.
+function showInlineRating() {
+    var el = document.getElementById('inlineRating');
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function submitInlineRating(stars) {
+    var rid = roomId || lastRoomId;
+    if (!rid) return;
+    fetch(BASE + '/api/chat/rate/' + encodeURIComponent(rid) + '/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'omit',
+        body: JSON.stringify({rating: stars, session_key: SESSION}),
+    }).then(function(r){ return r.ok ? r.json() : null; }).then(function(d) {
+        var el = document.getElementById('inlineRating');
+        if (el) el.innerHTML = '<div style="font-size:12px;color:#059669;font-weight:600;">Thanks for the feedback! ' + '⭐'.repeat(stars) + '</div>';
+    }).catch(function(){});
+}
+
 var _fnlTyped = false;
 function _fnlTypedOnce() {
     if (_fnlTyped) return;
     _fnlTyped = true;
     _fnl('typed');
+}
+
+// ───── MagicType: live typing preview to the agent ─────
+// Crisp's signature feature — agent sees what the visitor is typing
+// BEFORE they hit send. Throttled to 1 broadcast per 400ms so we don't
+// hammer the channel layer on every keystroke.
+var _typingThrottle = null;
+var _typingActive = false;
+var _typingStopTimer = null;
+function _emitTyping(currentText) {
+    if (!socket || socket.readyState !== 1) return;
+    var text = (currentText || '').slice(0, 120);
+    if (_typingThrottle) return;  // burning the next broadcast within 400ms
+    _typingThrottle = setTimeout(function(){ _typingThrottle = null; }, 400);
+    try {
+        socket.send(JSON.stringify({
+            type: 'typing',
+            sender_type: 'visitor',
+            is_typing: text.length > 0,
+            preview_text: text,
+        }));
+        _typingActive = text.length > 0;
+    } catch(e) {}
+    // Reset "stopped typing" if no more keystrokes within 2.5s.
+    if (_typingStopTimer) clearTimeout(_typingStopTimer);
+    _typingStopTimer = setTimeout(function(){
+        if (_typingActive && socket && socket.readyState === 1) {
+            try {
+                socket.send(JSON.stringify({type:'typing',sender_type:'visitor',is_typing:false,preview_text:''}));
+            } catch(e) {}
+            _typingActive = false;
+        }
+    }, 2500);
 }
 
 function sendMsg() {

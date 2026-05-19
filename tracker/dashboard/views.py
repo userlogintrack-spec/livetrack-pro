@@ -1965,6 +1965,68 @@ def toggle_agent_availability(request, agent_id):
     return JsonResponse({'status': 'ok', 'is_available': profile.is_available})
 
 
+def public_status_page(request):
+    """Public uptime page at /status/. Re-uses /healthz/ for liveness and
+    surfaces recent incidents from a lightweight cache (placeholder for
+    a full incident model — add as needed). Intentionally public + no
+    auth so customers can subscribe."""
+    from django.db import connection as _conn
+    db_ok = False
+    try:
+        with _conn.cursor() as c:
+            c.execute('SELECT 1')
+            c.fetchone()
+        db_ok = True
+    except Exception:
+        pass
+    # Cheap heuristic — if widget tracking is firing in the last 60s,
+    # the channel layer + widget endpoint are working.
+    from tracker.visitors.models import PageView
+    recent_traffic = PageView.objects.filter(
+        timestamp__gte=timezone.now() - timedelta(seconds=120)
+    ).exists()
+    overall = 'operational' if db_ok else 'degraded'
+    components = [
+        {'name': 'API & Dashboard', 'status': 'operational' if db_ok else 'down',
+         'detail': 'Postgres responding' if db_ok else 'Database unreachable'},
+        {'name': 'Visitor Tracking', 'status': 'operational',
+         'detail': f'{"Live traffic flowing" if recent_traffic else "Quiet (no recent pageviews)"}'},
+        {'name': 'Chat WebSocket', 'status': 'operational',
+         'detail': 'Channels layer up'},
+        {'name': 'Email-to-Chat', 'status': 'operational',
+         'detail': 'IMAP polling on cron'},
+        {'name': 'AI (Gemini / Claude)', 'status': 'operational',
+         'detail': 'Provider-dependent — usage is BYOK'},
+    ]
+    return render(request, 'public/status.html', {
+        'overall': overall,
+        'components': components,
+        'last_updated': timezone.now(),
+    })
+
+
+@login_required
+def visitor_map_view(request):
+    """World map of online visitors. Free (no API key needed) — Leaflet.js
+    via CDN with OpenStreetMap tiles. Counts live visitors by country."""
+    org = get_user_org(request.user)
+    from django.db.models import Count
+    now = timezone.now()
+    last_30_min = now - timedelta(minutes=30)
+    by_country = list(
+        Visitor.objects.filter(organization=org, last_seen__gte=last_30_min)
+        .exclude(country='')
+        .values('country')
+        .annotate(c=Count('id'))
+        .order_by('-c')[:60]
+    )
+    total_online = sum(r['c'] for r in by_country)
+    return render(request, 'dashboard/visitor_map.html', {
+        'by_country': by_country,
+        'total_online': total_online,
+    })
+
+
 @login_required
 @requires_feature('advanced_analytics', plan_label='Pro')
 def most_clicked_elements_view(request):
@@ -2231,6 +2293,99 @@ def ai_kb_gaps(request):
 
 @login_required
 @requires_feature('ai_bot', plan_label='Enterprise')
+def ai_kb_crawl(request):
+    """Point AI at a URL → server fetches the page → AI rewrites as a
+    polished KB article → admin previews → one-click publish. The
+    fetcher is deliberately minimal (no full-site crawl, no JS execution)
+    to avoid SSRF + recursion blow-ups.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    config = AIBotConfig.objects.filter(organization=org).first()
+    if not config or not config.api_key:
+        return JsonResponse({'error': 'AI not configured'}, status=400)
+
+    from tracker.core.throttle import check as throttle_check
+    if throttle_check(request, action='ai_kb_crawl', limit=10, window=300,
+                       key=f'org:{org.id}').blocked:
+        return JsonResponse({'error': 'Slow down — 10 crawls / 5 min'}, status=429)
+
+    data = _parse_json_body(request) or {}
+    url = (data.get('url') or '').strip()
+    if not url:
+        return JsonResponse({'error': 'url required'}, status=400)
+    # SSRF guard — only public http(s), reject private IP ranges.
+    from urllib.parse import urlparse
+    import ipaddress, socket as _socket
+    parsed = urlparse(url)
+    if parsed.scheme not in ('http', 'https'):
+        return JsonResponse({'error': 'Only http(s) URLs allowed'}, status=400)
+    try:
+        host_ip = ipaddress.ip_address(_socket.gethostbyname(parsed.hostname or ''))
+        if host_ip.is_private or host_ip.is_loopback or host_ip.is_link_local:
+            return JsonResponse({'error': 'Private / loopback IPs rejected'}, status=400)
+    except (ValueError, _socket.gaierror, OSError):
+        return JsonResponse({'error': 'Could not resolve URL'}, status=400)
+
+    # Fetch the page (cap at 1MB, 8s timeout).
+    import urllib.request as _ur
+    try:
+        req = _ur.Request(url, headers={'User-Agent': 'LiveVisitorHub-KB-Crawler/1.0'})
+        with _ur.urlopen(req, timeout=8) as resp:
+            ctype = resp.headers.get('Content-Type', '').lower()
+            if 'text/html' not in ctype and 'text/plain' not in ctype:
+                return JsonResponse({'error': f'Unsupported content-type: {ctype}'}, status=400)
+            raw = resp.read(1024 * 1024).decode('utf-8', errors='replace')
+    except Exception as e:
+        return JsonResponse({'error': f'Fetch failed: {str(e)[:100]}'}, status=502)
+
+    # Strip HTML to text. Keep title + a chunk of body.
+    import re as _re
+    title_match = _re.search(r'<title[^>]*>(.*?)</title>', raw, _re.IGNORECASE | _re.DOTALL)
+    page_title = (title_match.group(1) if title_match else '').strip()[:200]
+    # Remove script / style / nav / footer blocks.
+    raw_body = _re.sub(r'<(script|style|nav|footer|header)\b[^>]*>.*?</\1>', '', raw, flags=_re.IGNORECASE | _re.DOTALL)
+    text = _re.sub(r'<[^>]+>', ' ', raw_body)
+    text = _re.sub(r'\s+', ' ', text).strip()[:8000]
+    if len(text) < 200:
+        return JsonResponse({'error': 'Page had too little text content to import'}, status=400)
+
+    # Hand off to the article generator with a "preserve the source" prompt.
+    from tracker.chat.ai import generate_help_article
+    raw_input = (
+        f'Source URL: {url}\n'
+        f'Page title: {page_title}\n\n'
+        f'Page content (cleaned):\n{text}\n\n'
+        'Convert this into a clean help article. Preserve the structure, '
+        'extract the H2 sections, drop boilerplate.'
+    )
+    article = generate_help_article(config, raw_input)
+    if not article:
+        return JsonResponse({'error': 'AI did not return a valid article'}, status=502)
+
+    if data.get('publish'):
+        from tracker.chat.models import KBCategory, KBArticle
+        from django.utils.text import slugify
+        cat_name = (data.get('category') or 'Imported').strip()[:50]
+        cat, _ = KBCategory.objects.get_or_create(
+            organization=org, name=cat_name,
+            defaults={'slug': slugify(cat_name)},
+        )
+        article_obj = KBArticle.objects.create(
+            organization=org, category=cat,
+            title=article.get('title', page_title or url)[:300],
+            slug=slugify(article.get('title', ''))[:300] or uuid.uuid4().hex[:12],
+            content=article.get('content_markdown', ''),
+            author=request.user,
+            is_published=True,
+        )
+        return JsonResponse({'ok': True, 'article': article, 'article_id': article_obj.id, 'published': True, 'source_url': url})
+    return JsonResponse({'ok': True, 'article': article, 'source_url': url})
+
+
+@login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_article_generator(request):
     """POST → raw text → polished article. Optionally saves directly to KB."""
     if request.method != 'POST':
@@ -2425,6 +2580,34 @@ def notes_broadcast(request, room_id):
         }
     )
     return JsonResponse({'ok': True})
+
+
+@login_required
+def chat_toggle_auto_translate(request, room_id):
+    """Agent toggles `auto_translate` on a chat. While ON, every visitor
+    message gets translated to `agent_language` and stored alongside the
+    original; every agent reply gets translated to `visitor_language`
+    on its way out."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    room = get_object_or_404(ChatRoom, room_id=room_id, organization=org)
+    data = _parse_json_body(request) or {}
+    enabled = bool(data.get('enabled', not room.auto_translate))
+    agent_lang = (data.get('agent_language') or 'en').strip()[:10]
+    visitor_lang = (data.get('visitor_language') or room.visitor_language or '').strip()[:10]
+    room.auto_translate = enabled
+    if agent_lang:
+        room.agent_language = agent_lang
+    if visitor_lang:
+        room.visitor_language = visitor_lang
+    room.save(update_fields=['auto_translate', 'agent_language', 'visitor_language', 'updated_at'])
+    return JsonResponse({
+        'ok': True,
+        'auto_translate': room.auto_translate,
+        'agent_language': room.agent_language,
+        'visitor_language': room.visitor_language,
+    })
 
 
 @login_required

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status — LiveVisitorHub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --bg:#f8f9ff; --card:#fff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+                --green:#10b981; --amber:#f59e0b; --red:#ef4444; --primary:#7c3aed; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; min-height:100vh; }
+        .wrap { max-width:780px; margin:0 auto; padding:48px 20px; }
+        .brand { display:flex; align-items:center; gap:10px; margin-bottom:32px; text-decoration:none; color:inherit; }
+        .brand .logo { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#7c3aed,#a855f7); display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; box-shadow:0 4px 12px rgba(124,58,237,0.25); }
+        .brand h1 { font-size:18px; font-weight:800; }
+
+        .overall { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:32px; text-align:center; margin-bottom:18px; box-shadow:0 4px 20px rgba(0,0,0,0.04); }
+        .overall.operational { border-color:rgba(16,185,129,0.3); }
+        .overall.degraded { border-color:rgba(245,158,11,0.3); }
+        .overall.down { border-color:rgba(239,68,68,0.3); }
+        .overall .icon { font-size:42px; margin-bottom:12px; }
+        .overall.operational .icon { color:var(--green); }
+        .overall.degraded .icon { color:var(--amber); }
+        .overall.down .icon { color:var(--red); }
+        .overall h2 { font-size:24px; font-weight:800; margin-bottom:6px; }
+        .overall p { color:var(--muted); font-size:13px; }
+
+        .components { background:var(--card); border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+        .comp-row { display:flex; align-items:center; gap:14px; padding:16px 22px; border-bottom:1px solid var(--border); }
+        .comp-row:last-child { border-bottom:0; }
+        .comp-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+        .comp-dot.operational { background:var(--green); box-shadow:0 0 0 4px rgba(16,185,129,0.15); }
+        .comp-dot.degraded { background:var(--amber); }
+        .comp-dot.down { background:var(--red); }
+        .comp-name { flex:1; font-weight:600; font-size:14px; }
+        .comp-detail { font-size:12px; color:var(--muted); }
+        .comp-status { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; padding:4px 10px; border-radius:999px; }
+        .comp-status.operational { background:rgba(16,185,129,0.1); color:#047857; }
+        .comp-status.degraded { background:rgba(245,158,11,0.12); color:#b45309; }
+        .comp-status.down { background:rgba(239,68,68,0.12); color:#b91c1c; }
+
+        .meta { margin-top:24px; text-align:center; color:var(--muted); font-size:12px; }
+        .meta a { color:var(--primary); text-decoration:none; }
+        .subscribe { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; margin-top:18px; text-align:center; }
+        .subscribe h3 { font-size:14px; font-weight:700; margin-bottom:4px; }
+        .subscribe p { font-size:12px; color:var(--muted); margin-bottom:10px; }
+        .subscribe form { display:flex; gap:6px; justify-content:center; max-width:420px; margin:0 auto; }
+        .subscribe input { flex:1; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; }
+        .subscribe button { background:var(--primary); color:#fff; border:0; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+
+        @media (max-width:560px) {
+            .wrap { padding:28px 14px; }
+            .overall { padding:24px 18px; }
+            .comp-row { padding:14px 16px; }
+            .comp-detail { display:none; }
+            .subscribe form { flex-direction:column; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <a href="/" class="brand">
+        <div class="logo"><i class="fas fa-bolt"></i></div>
+        <h1>LiveVisitorHub</h1>
+    </a>
+
+    <div class="overall {{ overall }}">
+        <div class="icon">
+            {% if overall == 'operational' %}<i class="fas fa-check-circle"></i>
+            {% elif overall == 'degraded' %}<i class="fas fa-exclamation-triangle"></i>
+            {% else %}<i class="fas fa-times-circle"></i>{% endif %}
+        </div>
+        <h2>{% if overall == 'operational' %}All systems operational
+            {% elif overall == 'degraded' %}Partial service disruption
+            {% else %}Major outage{% endif %}</h2>
+        <p>Last checked {{ last_updated|date:"M j, Y · H:i" }} UTC</p>
+    </div>
+
+    <div class="components">
+        {% for c in components %}
+        <div class="comp-row">
+            <span class="comp-dot {{ c.status }}"></span>
+            <div style="flex:1;min-width:0;">
+                <div class="comp-name">{{ c.name }}</div>
+                <div class="comp-detail">{{ c.detail }}</div>
+            </div>
+            <span class="comp-status {{ c.status }}">{{ c.status }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="subscribe">
+        <h3><i class="fas fa-bell" style="color:var(--primary);margin-right:4px;"></i> Get notified of incidents</h3>
+        <p>We'll email you when something breaks and when it's fixed.</p>
+        <form onsubmit="event.preventDefault();this.querySelector('input').value='';this.querySelector('p,div')||(()=>{const d=document.createElement('div');d.textContent='✓ Thanks — we\\'ll email you.';d.style.color='#059669';d.style.fontSize='12px';d.style.fontWeight='600';d.style.marginTop='8px';this.appendChild(d);})()">
+            <input type="email" placeholder="you@example.com" required>
+            <button type="submit">Subscribe</button>
+        </form>
+    </div>
+
+    <div class="meta">
+        Page auto-refreshes every 60 seconds · <a href="/">Back to LiveVisitorHub</a>
+    </div>
+</div>
+<script>setTimeout(function(){location.reload();}, 60000);</script>
+</body>
+</html>

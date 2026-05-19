@@ -15,6 +15,7 @@ urlpatterns = [
     path('widget/cursor/', views.widget_cursor_track, name='widget_cursor_track'),
     path('widget/funnel/', widget_funnel_event, name='widget_funnel_event'),
     path('widget/queue/<str:room_id>/', views.widget_queue_position, name='widget_queue_position'),
+    path('widget/identify/', views.widget_identify, name='widget_identify'),
     path('cursor/<str:session_key>/', views.cursor_fetch, name='cursor_fetch'),
     path('gdpr/', views.gdpr_request, name='gdpr_request'),
 ]
