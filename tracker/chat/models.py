@@ -39,6 +39,21 @@ class ChatRoom(models.Model):
     summary = models.TextField(blank=True, default='')
     summary_topics = models.CharField(max_length=200, blank=True, default='', help_text='Comma-separated topics extracted by the summary model.')
     summary_at = models.DateTimeField(null=True, blank=True)
+    # Multi-channel: 'widget' (web chat — default), 'email' (inbound email
+    # threaded as a chat), 'whatsapp', 'sms'. Lets one inbox handle all the
+    # places visitors reach the org.
+    CHANNEL_CHOICES = [
+        ('widget', 'Web Widget'),
+        ('email', 'Email'),
+        ('whatsapp', 'WhatsApp'),
+        ('sms', 'SMS'),
+    ]
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='widget', db_index=True)
+    # Used by email channel to thread incoming replies to the right room.
+    external_thread_id = models.CharField(max_length=200, blank=True, default='', db_index=True)
+    # Post-chat AI coaching feedback (see ai.py:coach_chat). Generated once
+    # at close, shown to the primary agent on the chat detail page.
+    coach_feedback = models.TextField(blank=True, default='')
 
     class Meta:
         ordering = ['-updated_at']
@@ -47,6 +62,7 @@ class ChatRoom(models.Model):
             models.Index(fields=['organization', '-updated_at']),
             models.Index(fields=['organization', '-created_at']),
             models.Index(fields=['visitor', '-created_at']),
+            models.Index(fields=['organization', 'channel', 'status']),
         ]
 
     def __str__(self):
@@ -107,6 +123,7 @@ class Message(models.Model):
         ('file', 'File'),
         ('image', 'Image'),
         ('system', 'System'),
+        ('booking', 'Booking card (Calendly / Cal.com)'),
     ]
 
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='messages')
@@ -861,6 +878,71 @@ class ChatReopenToken(models.Model):
 
     def __str__(self):
         return f'reopen for {self.room.room_id} ({"used" if self.consumed_at else "live"})'
+
+
+# ──────────────────────────────────────────────────────────
+# Email-to-chat — per-org (or per-website) IMAP/SMTP config so customer
+# emails to support@yourdomain land in the dashboard as chats, and agent
+# replies go out via SMTP using the customer's own sending identity.
+#
+# Credentials are Fernet-encrypted at rest (same scheme as Webhook.secret).
+# Polling is driven by `manage.py poll_email_inboxes` (cron every 1–5 min).
+# ──────────────────────────────────────────────────────────
+class EmailMailbox(models.Model):
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='email_mailboxes')
+    website = models.ForeignKey('core.Website', on_delete=models.SET_NULL, null=True, blank=True, related_name='email_mailboxes',
+                                 help_text='Optional — pin this mailbox to one website. Leave blank for org-wide.')
+    name = models.CharField(max_length=100, help_text='Label shown in dashboard (e.g. "Support", "Sales")')
+    is_enabled = models.BooleanField(default=True)
+
+    # Inbound (IMAP)
+    imap_host = models.CharField(max_length=200, help_text='e.g. imap.gmail.com')
+    imap_port = models.PositiveIntegerField(default=993)
+    imap_use_ssl = models.BooleanField(default=True)
+    imap_username = models.CharField(max_length=200)
+    imap_password = models.TextField(blank=True, default='', help_text='Fernet-encrypted at rest. For Gmail use an App Password.')
+    imap_folder = models.CharField(max_length=100, default='INBOX')
+    last_polled_uid = models.PositiveBigIntegerField(default=0, help_text='Tracks the highest IMAP UID we have ingested.')
+    last_polled_at = models.DateTimeField(null=True, blank=True)
+
+    # Outbound (SMTP)
+    smtp_host = models.CharField(max_length=200, help_text='e.g. smtp.gmail.com')
+    smtp_port = models.PositiveIntegerField(default=587)
+    smtp_use_tls = models.BooleanField(default=True)
+    smtp_username = models.CharField(max_length=200)
+    smtp_password = models.TextField(blank=True, default='')
+    from_email = models.EmailField(help_text='Reply-from address shown to the customer.')
+    from_name = models.CharField(max_length=100, blank=True, default='')
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = 'Email Mailboxes'
+
+    def __str__(self):
+        return f'{self.name} ({self.from_email})'
+
+    @property
+    def imap_password_plain(self) -> str:
+        from tracker.core.crypto import decrypt_str
+        return decrypt_str(self.imap_password)
+
+    @imap_password_plain.setter
+    def imap_password_plain(self, value: str):
+        from tracker.core.crypto import encrypt_str
+        self.imap_password = encrypt_str(value or '')
+
+    @property
+    def smtp_password_plain(self) -> str:
+        from tracker.core.crypto import decrypt_str
+        return decrypt_str(self.smtp_password)
+
+    @smtp_password_plain.setter
+    def smtp_password_plain(self, value: str):
+        from tracker.core.crypto import encrypt_str
+        self.smtp_password = encrypt_str(value or '')
 
 
 # ──────────────────────────────────────────────────────────

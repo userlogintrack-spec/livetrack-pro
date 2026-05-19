@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Email Mailboxes — LiveVisitorHub{% endblock %}
+
+{% block content %}
+<style>
+    .mb-wrap { max-width: 920px; margin: 0 auto; padding: 24px; }
+    .mb-head { margin-bottom: 20px; }
+    .mb-head h1 { font-size: 22px; font-weight: 800; color: var(--text-primary, #1f2937); margin: 0; }
+    .mb-head .lede { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    .mb-row { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 12px; display: flex; align-items: center; gap: 16px; }
+    .mb-row .mb-info { flex: 1; min-width: 0; }
+    .mb-row .name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+    .mb-row .from { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .mb-row .meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+    .mb-row .status { font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+    .mb-row .status.on { background: rgba(16,185,129,0.12); color: #047857; }
+    .mb-row .status.off { background: rgba(148,163,184,0.18); color: #475569; }
+
+    .card-add { background: white; border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-top: 12px; }
+    .card-add h3 { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0 0 16px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .form-control { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; outline: none; }
+    .form-control:focus { border-color: var(--primary, #7c3aed); }
+    .form-row { display: flex; gap: 14px; align-items: center; }
+    .btn-save { background: var(--primary, #7c3aed); color: white; border: 0; padding: 10px 22px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(124,58,237,.25); }
+
+    .hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+    .hint code { background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 4px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+
+    .empty { text-align: center; padding: 30px 16px; color: var(--text-muted); font-size: 13px; }
+</style>
+
+<div class="mb-wrap">
+    <div class="mb-head">
+        <h1><i class="fas fa-envelope" style="color: var(--primary);"></i> Email-to-Chat</h1>
+        <div class="lede">Connect a Gmail / Outlook / webmail inbox. Incoming emails become chats; agent replies go out from your own address.</div>
+    </div>
+
+    {% if mailboxes %}
+        {% for mb in mailboxes %}
+        <div class="mb-row">
+            <div class="mb-info">
+                <div class="name">{{ mb.name }}</div>
+                <div class="from">{{ mb.from_email }}</div>
+                <div class="meta">
+                    IMAP {{ mb.imap_host }}:{{ mb.imap_port }} · SMTP {{ mb.smtp_host }}:{{ mb.smtp_port }}
+                    {% if mb.last_polled_at %} · last polled {{ mb.last_polled_at|timesince }} ago{% endif %}
+                </div>
+            </div>
+            <span class="status {% if mb.is_enabled %}on{% else %}off{% endif %}">{% if mb.is_enabled %}Enabled{% else %}Disabled{% endif %}</span>
+            <button onclick="deleteMailbox({{ mb.id }})" style="background:transparent;border:0;color:#ef4444;cursor:pointer;font-size:14px;" title="Delete"><i class="fas fa-trash"></i></button>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty">
+            <i class="fas fa-inbox" style="font-size:32px;opacity:.3;display:block;margin-bottom:8px;"></i>
+            No mailboxes yet. Add one below.
+        </div>
+    {% endif %}
+
+    <div class="card-add">
+        <h3>Add a mailbox</h3>
+        <form method="post">
+            {% csrf_token %}
+            <div class="grid2">
+                <div class="form-group">
+                    <label>Name (display)</label>
+                    <input class="form-control" type="text" name="name" placeholder="Support" required>
+                </div>
+                <div class="form-group">
+                    <label>From email (visitor-facing)</label>
+                    <input class="form-control" type="email" name="from_email" placeholder="support@yourdomain.com" required>
+                </div>
+                <div class="form-group">
+                    <label>From name (visitor-facing)</label>
+                    <input class="form-control" type="text" name="from_name" placeholder="Your Company Support">
+                </div>
+                <div></div>
+
+                <div class="form-group">
+                    <label>IMAP host</label>
+                    <input class="form-control" type="text" name="imap_host" placeholder="imap.gmail.com" required>
+                </div>
+                <div class="form-group">
+                    <label>IMAP port</label>
+                    <input class="form-control" type="number" name="imap_port" value="993" required>
+                </div>
+                <div class="form-group">
+                    <label>IMAP username</label>
+                    <input class="form-control" type="text" name="imap_username" required>
+                </div>
+                <div class="form-group">
+                    <label>IMAP password / App Password</label>
+                    <input class="form-control" type="password" name="imap_password" required>
+                </div>
+                <div class="form-group">
+                    <label>IMAP folder</label>
+                    <input class="form-control" type="text" name="imap_folder" value="INBOX">
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:normal;">
+                        <input type="checkbox" name="imap_use_ssl" checked> Use IMAP SSL (port 993)
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>SMTP host</label>
+                    <input class="form-control" type="text" name="smtp_host" placeholder="smtp.gmail.com" required>
+                </div>
+                <div class="form-group">
+                    <label>SMTP port</label>
+                    <input class="form-control" type="number" name="smtp_port" value="587" required>
+                </div>
+                <div class="form-group">
+                    <label>SMTP username</label>
+                    <input class="form-control" type="text" name="smtp_username" required>
+                </div>
+                <div class="form-group">
+                    <label>SMTP password</label>
+                    <input class="form-control" type="password" name="smtp_password" required>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:normal;">
+                        <input type="checkbox" name="smtp_use_tls" checked> Use STARTTLS (port 587)
+                    </label>
+                </div>
+            </div>
+
+            <div class="hint">
+                <strong>Gmail tip:</strong> enable <a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noopener">2-Step Verification</a> first, then create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Password</a> — use that as both the IMAP and SMTP password. Regular account passwords won't work.<br>
+                <strong>Outlook / Office 365:</strong> <code>imap.outlook.com:993</code> and <code>smtp.office365.com:587</code>.<br>
+                <strong>Custom domain (cPanel / Zoho / Bluehost):</strong> use the hostname your provider gives you for IMAP and SMTP.<br>
+                Credentials are encrypted at rest (Fernet) before being stored.
+            </div>
+
+            <div style="margin-top:18px;">
+                <button class="btn-save" type="submit"><i class="fas fa-plus"></i> Save mailbox</button>
+            </div>
+        </form>
+    </div>
+
+    <div style="margin-top:24px;padding:14px 18px;background:rgba(124,58,237,0.04);border:1px dashed rgba(124,58,237,0.18);border-radius:12px;font-size:12px;color:var(--text-muted);">
+        <strong style="color:var(--text-primary);">How polling works:</strong> Run
+        <code style="background:rgba(0,0,0,.06);padding:2px 6px;border-radius:4px;">python manage.py poll_email_inboxes</code>
+        on a cron schedule (every 1-5 min). Each new email arrives in the dashboard as a chat tagged <em>Email</em>. Agent replies in the chat are sent via SMTP from this mailbox.
+    </div>
+</div>
+
+<script>
+function deleteMailbox(id) {
+    if (!confirm('Delete this mailbox?')) return;
+    fetch('/dashboard/email-mailboxes/' + id + '/delete/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+    }).then(function(r) { if (r.ok) location.reload(); });
+}
+</script>
+{% endblock %}

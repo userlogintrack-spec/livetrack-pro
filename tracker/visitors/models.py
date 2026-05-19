@@ -44,6 +44,14 @@ class Visitor(models.Model):
     pages_per_session = models.PositiveIntegerField(default=0)
     is_bounced = models.BooleanField(default=False, help_text='Visited only 1 page')
 
+    # Enrichment — derived from email domain or external lookup, cached so
+    # we don't re-compute on every dashboard load. Populated lazily by
+    # `tracker.chat.ai.enrich_visitor()` once an email is captured.
+    enrichment_company = models.CharField(max_length=200, blank=True, default='')
+    enrichment_role = models.CharField(max_length=100, blank=True, default='')
+    enrichment_summary = models.TextField(blank=True, default='', help_text='Brief AI-generated visitor summary.')
+    enrichment_at = models.DateTimeField(null=True, blank=True)
+
     @property
     def score_label(self):
         if self.score >= 70:

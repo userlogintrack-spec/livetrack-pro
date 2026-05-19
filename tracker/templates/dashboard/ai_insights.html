@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}AI Insights — LiveVisitorHub{% endblock %}
+
+{% block content %}
+<style>
+    .ai-wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
+    .ai-wrap h1 { font-size: 22px; font-weight: 800; color: var(--text-primary); margin: 0 0 6px; }
+    .ai-wrap .lede { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+
+    .panel { background: white; border: 1px solid var(--border); border-radius: 16px; padding: 22px; margin-bottom: 18px; }
+    .panel h2 { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+    .panel h2 i { color: var(--primary, #7c3aed); }
+    .panel .sub { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+
+    .run-btn { background: var(--primary, #7c3aed); color: white; border: 0; padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(124,58,237,.22); }
+    .run-btn:hover { transform: translateY(-1px); }
+    .run-btn[disabled] { opacity: .5; cursor: wait; }
+
+    .result-box { margin-top: 14px; padding: 14px; background: rgba(124,58,237,0.04); border-radius: 10px; border: 1px solid rgba(124,58,237,0.1); font-size: 13px; color: var(--text-primary); display: none; }
+    .result-box.show { display: block; }
+
+    .cluster-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,.05); }
+    .cluster-row:last-child { border-bottom: 0; }
+    .cluster-row .name { font-weight: 700; min-width: 120px; }
+    .cluster-row .bar { flex: 1; height: 6px; background: rgba(124,58,237,0.1); border-radius: 999px; overflow: hidden; }
+    .cluster-row .bar .fill { height: 100%; background: var(--primary, #7c3aed); }
+    .cluster-row .share { font-weight: 700; min-width: 50px; text-align: right; color: var(--primary, #7c3aed); }
+    .cluster-row .sample { font-size: 11px; color: var(--text-muted); font-style: italic; }
+
+    .gap-card { padding: 10px 14px; border-radius: 8px; background: white; border: 1px solid var(--border); margin-bottom: 8px; }
+    .gap-card .q { font-weight: 700; font-size: 13px; }
+    .gap-card .freq { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .gap-card .a { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+    .gap-card button { margin-top: 8px; font-size: 11px; padding: 5px 10px; background: rgba(16,185,129,0.12); color: #047857; border: 0; border-radius: 6px; cursor: pointer; font-weight: 600; }
+
+    .form-control { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; }
+    textarea.form-control { resize: vertical; min-height: 120px; }
+    .form-row { display: grid; grid-template-columns: 1fr 200px; gap: 10px; }
+
+    .article-preview { white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: rgba(0,0,0,0.03); padding: 14px; border-radius: 8px; max-height: 320px; overflow-y: auto; }
+</style>
+
+<div class="ai-wrap">
+    <h1><i class="fas fa-brain" style="color: var(--primary, #7c3aed);"></i> AI Insights</h1>
+    <div class="lede">AI-derived signals from your team's chat history. All powered by your configured AI provider — no extra cost.</div>
+
+    <!-- Topic Clustering -->
+    <div class="panel">
+        <h2><i class="fas fa-shapes"></i> Topic Clusters (last 30 days)</h2>
+        <div class="sub">Groups recent visitor questions into themes so you know what's eating your support hours.</div>
+        <button class="run-btn" onclick="runClusters(this)">Analyze chats</button>
+        <div class="result-box" id="clusterResult"></div>
+    </div>
+
+    <!-- KB Gaps -->
+    <div class="panel">
+        <h2><i class="fas fa-magnifying-glass"></i> Knowledge Base Gaps (last 14 days)</h2>
+        <div class="sub">Finds repeated questions that probably deserve a help article. One click to publish.</div>
+        <button class="run-btn" onclick="runGaps(this)">Find gaps</button>
+        <div class="result-box" id="gapsResult"></div>
+    </div>
+
+    <!-- Article Generator -->
+    <div class="panel">
+        <h2><i class="fas fa-wand-magic-sparkles"></i> Help Article Generator</h2>
+        <div class="sub">Paste raw notes, bullet points, or a chat transcript. AI returns a polished article with sections.</div>
+        <textarea class="form-control" id="rawInput" placeholder="Paste raw notes here — bullets, a chat transcript, or just a rough description..."></textarea>
+        <div class="form-row" style="margin-top: 10px;">
+            <input type="text" class="form-control" id="catName" placeholder="Category name (optional, only used if you publish)">
+            <button class="run-btn" onclick="genArticle(this, false)">Draft article</button>
+        </div>
+        <div class="result-box" id="articleResult"></div>
+    </div>
+</div>
+
+<script>
+const csrf = '{{ csrf_token }}';
+
+async function runClusters(btn) {
+    const box = document.getElementById('clusterResult');
+    btn.disabled = true; btn.textContent = 'Analyzing…';
+    box.classList.remove('show');
+    try {
+        const r = await fetch('/dashboard/api/ai/clusters/', { method: 'POST', headers: { 'X-CSRFToken': csrf } });
+        const d = await r.json();
+        if (!d.ok) { box.textContent = d.error || 'Failed'; box.classList.add('show'); return; }
+        const clusters = (d.result && d.result.clusters) || [];
+        if (!clusters.length) { box.textContent = 'No clusters returned.'; box.classList.add('show'); return; }
+        const total = clusters.reduce((s, c) => s + (c.share || 0), 0) || 100;
+        box.innerHTML = '<div style="margin-bottom:10px;font-size:11px;color:var(--text-muted);">Sample size: ' + d.sample_size + ' chats</div>' +
+            clusters.map(c => {
+                const pct = Math.round((c.share || 0));
+                return '<div class="cluster-row">' +
+                    '<div class="name">' + escape(c.name || '') + '</div>' +
+                    '<div class="bar"><div class="fill" style="width:' + pct + '%"></div></div>' +
+                    '<div class="share">' + pct + '%</div>' +
+                    '</div>' +
+                    (c.sample ? '<div class="sample" style="margin-left:132px;margin-top:-6px;margin-bottom:8px;">e.g. "' + escape(c.sample) + '"</div>' : '');
+            }).join('');
+        box.classList.add('show');
+    } catch (e) {
+        box.textContent = 'Request failed: ' + e.message;
+        box.classList.add('show');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Analyze chats';
+    }
+}
+
+async function runGaps(btn) {
+    const box = document.getElementById('gapsResult');
+    btn.disabled = true; btn.textContent = 'Scanning…';
+    box.classList.remove('show');
+    try {
+        const r = await fetch('/dashboard/api/ai/kb-gaps/', { method: 'POST', headers: { 'X-CSRFToken': csrf } });
+        const d = await r.json();
+        if (!d.ok) { box.textContent = d.error || 'Failed'; box.classList.add('show'); return; }
+        const gaps = d.gaps || [];
+        if (!gaps.length) { box.textContent = 'No gaps detected.'; box.classList.add('show'); return; }
+        box.innerHTML = gaps.map((g, i) =>
+            '<div class="gap-card">' +
+            '<div class="q">' + escape(g.question || '') + '</div>' +
+            '<div class="freq">~' + (g.frequency || '?') + ' chats asking this</div>' +
+            '<div class="a">' + escape(g.suggested_answer || '') + '</div>' +
+            '<button onclick="publishGap(' + i + ')">Publish as KB article →</button>' +
+            '</div>'
+        ).join('');
+        window._gaps = gaps;
+        box.classList.add('show');
+    } catch (e) {
+        box.textContent = 'Request failed: ' + e.message;
+        box.classList.add('show');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Find gaps';
+    }
+}
+
+async function publishGap(idx) {
+    const g = (window._gaps || [])[idx];
+    if (!g) return;
+    const raw = g.question + '\n\n' + (g.suggested_answer || '');
+    const r = await fetch('/dashboard/api/ai/article/', {
+        method: 'POST', headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: raw, publish: true, category: 'FAQs' }),
+    });
+    const d = await r.json();
+    alert(d.ok ? 'Published! Edit it in Knowledge Base.' : (d.error || 'Failed'));
+}
+
+async function genArticle(btn, publish) {
+    const box = document.getElementById('articleResult');
+    const raw = document.getElementById('rawInput').value.trim();
+    const cat = document.getElementById('catName').value.trim();
+    if (raw.length < 30) { box.textContent = 'Need at least 30 chars'; box.classList.add('show'); return; }
+    btn.disabled = true; btn.textContent = 'Drafting…';
+    try {
+        const r = await fetch('/dashboard/api/ai/article/', {
+            method: 'POST', headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ raw: raw, publish: publish, category: cat || 'General' }),
+        });
+        const d = await r.json();
+        if (!d.ok) { box.textContent = d.error || 'Failed'; box.classList.add('show'); return; }
+        const art = d.article || {};
+        box.innerHTML = '<div style="font-weight:700;font-size:14px;margin-bottom:6px;">' + escape(art.title || '') + '</div>' +
+            '<pre class="article-preview">' + escape(art.content_markdown || '') + '</pre>' +
+            (publish ? '<div style="color:#047857;font-weight:600;margin-top:8px;">✓ Published to KB</div>' :
+            '<button class="run-btn" style="margin-top:10px;" onclick="genArticle(this, true)">Publish to KB</button>');
+        box.classList.add('show');
+    } catch (e) {
+        box.textContent = 'Request failed: ' + e.message;
+        box.classList.add('show');
+    } finally {
+        btn.disabled = false; btn.textContent = publish ? 'Publish to KB' : 'Draft article';
+    }
+}
+
+function escape(s) {
+    return String(s || '').replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]));
+}
+</script>
+{% endblock %}

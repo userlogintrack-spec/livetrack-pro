@@ -420,8 +420,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # An agent reply in a 'waiting' room is a clear signal that this
             # chat is now being handled — promote it so it shows up under the
             # Active tab and stops showing as Waiting on every other dashboard.
-            # Also backfill `agent` if it wasn't set (covers manual-mode rooms
-            # where the agent jumped in without clicking the explicit Join link).
             update_fields = ['updated_at']
             if sender_type == 'agent' and room.status == 'waiting':
                 room.status = 'active'
@@ -430,7 +428,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 if not room.agent_id and user_id:
                     room.agent_id = user_id
                     update_fields.append('agent')
+
+            # If the room is on the email channel, route agent replies out via
+            # SMTP instead of just storing them locally.
+            if sender_type == 'agent' and room.channel == 'email':
+                try:
+                    from tracker.chat.email_send import send_email_reply
+                    send_email_reply(room, content, agent_name=sender_name)
+                except Exception:
+                    logger.warning('email reply send failed for room=%s', room.room_id, exc_info=True)
+
             room.save(update_fields=update_fields)
+
+            # Async hooks for visitor messages (sentiment + enrichment).
+            # These spawn background threads so the WS turn stays fast.
+            if sender_type == 'visitor':
+                try:
+                    import threading
+                    t = threading.Thread(
+                        target=_run_visitor_message_hooks,
+                        args=(room.id, content, room.organization_id),
+                        daemon=True,
+                    )
+                    t.start()
+                except Exception:
+                    pass
             return message
         except ChatRoom.DoesNotExist:
             return None
@@ -443,6 +465,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             room.status = 'closed'
             room.closed_at = timezone.now()
             room.save()
+            # Post-close AI coaching — runs in a background thread so the
+            # close-chat WS round-trip doesn't wait for the model.
+            try:
+                import threading
+                t = threading.Thread(
+                    target=_run_close_chat_hooks,
+                    args=(room.id,), daemon=True,
+                )
+                t.start()
+            except Exception:
+                pass
         except ChatRoom.DoesNotExist:
             pass
 
@@ -581,3 +614,95 @@ class DashboardConsumer(AsyncWebsocketConsumer):
             sla_minutes=int(getattr(settings, 'CHAT_SLA_MINUTES', 5)),
             org_id=self.org_id,
         )
+
+
+# ────────────────────────────────────────────────
+# Background hooks (run in threads spawned by save_message + close_chat)
+# ────────────────────────────────────────────────
+
+def _run_visitor_message_hooks(room_id: int, content: str, org_id: int | None):
+    """Sentiment classifier + visitor enrichment + dashboard alert when
+    sentiment turns negative. Errors swallowed — these are best-effort
+    enrichments, never block the chat."""
+    if not content or not org_id:
+        return
+    try:
+        from django.db import close_old_connections
+        from tracker.chat.models import ChatRoom, AIBotConfig
+        from tracker.chat.ai import classify_sentiment, enrich_visitor
+        close_old_connections()
+        room = ChatRoom.objects.select_related('visitor', 'organization').filter(id=room_id).first()
+        if not room or not room.organization:
+            return
+        config = AIBotConfig.objects.filter(organization_id=org_id).first()
+        if not config or not config.api_key:
+            return
+
+        # Sentiment classification — alert dashboard on negative/angry.
+        label = classify_sentiment(config, content)
+        if label in ('negative', 'angry'):
+            try:
+                from asgiref.sync import async_to_sync
+                from channels.layers import get_channel_layer
+                cl = get_channel_layer()
+                if cl:
+                    async_to_sync(cl.group_send)(
+                        f'dashboard_updates_{org_id}',
+                        {
+                            'type': 'notification',
+                            'category': 'sentiment_alert',
+                            'severity': 'warning' if label == 'negative' else 'error',
+                            'title': f'{room.visitor_name or "Visitor"} sounds {label}',
+                            'body': content[:120],
+                            'url': f'/dashboard/chats/?room={room.room_id}',
+                            'room_id': room.room_id,
+                        }
+                    )
+            except Exception:
+                pass
+
+        # Enrichment — only once per visitor (cached on the row).
+        v = room.visitor
+        if v and not v.enrichment_at and v.visitor_email:
+            data = enrich_visitor(config, v)
+            if data:
+                v.enrichment_company = (data.get('company') or '')[:200]
+                v.enrichment_summary = (data.get('summary') or '')[:500]
+                from django.utils import timezone as _tz
+                v.enrichment_at = _tz.now()
+                v.save(update_fields=['enrichment_company', 'enrichment_summary', 'enrichment_at'])
+    except Exception:
+        logger.warning('visitor-message hooks failed', exc_info=True)
+    finally:
+        try:
+            from django.db import close_old_connections
+            close_old_connections()
+        except Exception:
+            pass
+
+
+def _run_close_chat_hooks(room_id: int):
+    """Post-close AI coaching — stores 3 actionable tips on the room."""
+    try:
+        from django.db import close_old_connections
+        from tracker.chat.models import ChatRoom, AIBotConfig
+        from tracker.chat.ai import coach_chat
+        close_old_connections()
+        room = ChatRoom.objects.filter(id=room_id).first()
+        if not room or not room.organization:
+            return
+        config = AIBotConfig.objects.filter(organization=room.organization).first()
+        if not config or not config.api_key:
+            return
+        feedback = coach_chat(config, room)
+        if feedback:
+            ChatRoom.objects.filter(id=room_id).update(coach_feedback=feedback[:5000])
+    except Exception:
+        logger.warning('close-chat coach hook failed', exc_info=True)
+    finally:
+        try:
+            from django.db import close_old_connections
+            close_old_connections()
+        except Exception:
+            pass
+

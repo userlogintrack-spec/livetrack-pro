@@ -314,3 +314,236 @@ def translate_text(config, text: str, target_language: str = 'en',
     if out:
         cache.set(cache_key, out, timeout=86400)  # translations are stable, cache 1 day
     return out
+
+
+# ────────────────────────────────────────────────
+# NEW: Conversation Coach — post-close agent feedback
+# ────────────────────────────────────────────────
+
+def coach_chat(config, room) -> Optional[str]:
+    """Generate 2-3 actionable improvement tips for the agent after a chat
+    closes. Stored on `ChatRoom.coach_feedback` and shown on the chat
+    detail page. NOT shown to the visitor."""
+    if not _provider_ready(config):
+        return None
+    from tracker.chat.models import Message
+    msgs = list(Message.objects.filter(room=room).order_by('timestamp')[:120])
+    if len(msgs) < 4:
+        return None  # too short to coach
+    transcript = []
+    for m in msgs:
+        who = 'Visitor' if m.sender_type == 'visitor' else 'Agent' if m.sender_type == 'agent' else 'System'
+        transcript.append(f'{who}: {m.content[:300]}')
+
+    system = (
+        "You are a senior customer-support manager reviewing a chat. Give the "
+        "agent THREE specific, actionable tips on how to handle the same chat "
+        "better. Each tip: one sentence, references a specific moment when "
+        "possible (e.g., 'At the visitor's third message...'). No vague "
+        "praise. Output as JSON array of strings, no preamble."
+    )
+    out = _call_llm(
+        config,
+        system=system,
+        messages=[{'role': 'user', 'content': 'Transcript:\n' + '\n'.join(transcript)}],
+        max_tokens=300,
+    )
+    return out
+
+
+# ────────────────────────────────────────────────
+# NEW: Sentiment classifier — used for sentiment-spike alerts
+# ────────────────────────────────────────────────
+
+def classify_sentiment(config, message_text: str) -> Optional[str]:
+    """Return one of: 'positive' | 'neutral' | 'negative' | 'angry'.
+    Used as a real-time spike alert input. Cached on text hash so the same
+    visitor message doesn't burn another API call across pageloads."""
+    if not _provider_ready(config) or not message_text:
+        return None
+    cache_key = _cache_key('sent', 0, message_text)
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+    out = _call_llm(
+        config,
+        system=(
+            "Classify the tone of the customer message as exactly one of: "
+            "positive, neutral, negative, angry. Output ONLY the word, "
+            "lowercase, no punctuation."
+        ),
+        messages=[{'role': 'user', 'content': message_text[:500]}],
+        max_tokens=10,
+    )
+    if not out:
+        return None
+    label = (out or '').strip().lower().split()[0] if out else ''
+    if label not in ('positive', 'neutral', 'negative', 'angry'):
+        label = 'neutral'
+    cache.set(cache_key, label, timeout=3600)
+    return label
+
+
+# ────────────────────────────────────────────────
+# NEW: Topic clustering — last-N-days chats → themes
+# ────────────────────────────────────────────────
+
+def cluster_chat_topics(config, chats_text: list[str]) -> Optional[dict]:
+    """Cluster a sample of chat snippets into themes. Returns:
+    {'clusters': [{'name': 'Refunds', 'count': 42, 'sample': '...'}, ...]}
+    """
+    if not _provider_ready(config) or not chats_text:
+        return None
+    sample = '\n\n---\n\n'.join(chats_text[:60])
+    out = _call_llm(
+        config,
+        system=(
+            "Analyse a batch of customer-support chat snippets. Cluster them "
+            "into 4-8 named themes (e.g., 'Refunds', 'Shipping delays'). For "
+            "each theme: name, approximate share (%), and one short example "
+            "phrase typical of that cluster. Output strict JSON: "
+            '{"clusters": [{"name": str, "share": int, "sample": str}, ...]}'
+        ),
+        messages=[{'role': 'user', 'content': 'Snippets:\n\n' + sample}],
+        max_tokens=600,
+    )
+    if not out:
+        return None
+    import json as _json, re as _re
+    cleaned = _re.sub(r'^```(?:json)?|```$', '', out, flags=_re.MULTILINE).strip()
+    try:
+        data = _json.loads(cleaned)
+        if isinstance(data, dict) and 'clusters' in data:
+            return data
+    except Exception:
+        pass
+    return None
+
+
+# ────────────────────────────────────────────────
+# NEW: Knowledge-gap detector — finds repeated unanswered questions
+# ────────────────────────────────────────────────
+
+def detect_kb_gaps(config, chats_text: list[str]) -> Optional[list[dict]]:
+    """Identify repeated questions the KB doesn't cover well.
+    Returns: [{'question': '...', 'frequency': 8, 'suggested_answer': '...'}]"""
+    if not _provider_ready(config) or not chats_text:
+        return None
+    sample = '\n\n---\n\n'.join(chats_text[:80])
+    out = _call_llm(
+        config,
+        system=(
+            "Identify 3-5 recurring customer questions in these chats that "
+            "appear UNANSWERED or HANDLED INCONSISTENTLY across the sample. "
+            "For each: write a clean question, estimate frequency in the "
+            "sample, and draft a 2-3 sentence canonical answer. Output as "
+            "strict JSON: "
+            '{"gaps": [{"question": str, "frequency": int, "suggested_answer": str}, ...]}'
+        ),
+        messages=[{'role': 'user', 'content': 'Chats:\n\n' + sample}],
+        max_tokens=900,
+    )
+    if not out:
+        return None
+    import json as _json, re as _re
+    cleaned = _re.sub(r'^```(?:json)?|```$', '', out, flags=_re.MULTILINE).strip()
+    try:
+        data = _json.loads(cleaned)
+        if isinstance(data, dict) and 'gaps' in data:
+            return data['gaps']
+    except Exception:
+        pass
+    return None
+
+
+# ────────────────────────────────────────────────
+# NEW: Help-article generator — raw notes → polished article
+# ────────────────────────────────────────────────
+
+def generate_help_article(config, raw_input: str) -> Optional[dict]:
+    """Turn rough notes / a chat transcript / a bullet outline into a
+    polished help article with title + headings + markdown body."""
+    if not _provider_ready(config) or not raw_input:
+        return None
+    out = _call_llm(
+        config,
+        system=(
+            "You are a technical writer. Convert the user's raw input into a "
+            "clean help article with: a short title, 2-3 H2 sections, bullet "
+            "points where useful, and a short summary at the end. Markdown. "
+            "Output strict JSON: {\"title\": str, \"content_markdown\": str}"
+        ),
+        messages=[{'role': 'user', 'content': raw_input[:5000]}],
+        max_tokens=1200,
+    )
+    if not out:
+        return None
+    import json as _json, re as _re
+    cleaned = _re.sub(r'^```(?:json)?|```$', '', out, flags=_re.MULTILINE).strip()
+    try:
+        data = _json.loads(cleaned)
+        if isinstance(data, dict) and 'title' in data:
+            return data
+    except Exception:
+        pass
+    return None
+
+
+# ────────────────────────────────────────────────
+# NEW: Visitor profile enrichment from email
+# ────────────────────────────────────────────────
+
+# Free public-email providers — skip enrichment for these (no signal).
+_FREE_EMAIL_DOMAINS = {
+    'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'live.com',
+    'icloud.com', 'me.com', 'aol.com', 'protonmail.com', 'proton.me',
+    'rediffmail.com', 'yandex.com', 'mail.ru', 'qq.com',
+}
+
+
+def enrich_visitor(config, visitor) -> Optional[dict]:
+    """Best-effort enrichment from email domain. We don't call Clearbit
+    by default (paid + privacy concerns) — instead we ask Gemini to infer
+    company/role hints from the email domain alone. Cached on the
+    Visitor record so subsequent loads don't re-fire.
+
+    For real enrichment, the agent should integrate Clearbit/Apollo via
+    the webhook integration layer; this function is the cheap default.
+    """
+    if not visitor or not getattr(visitor, 'visitor_email', '') or not _provider_ready(config):
+        return None
+    email = (visitor.visitor_email or '').strip().lower()
+    if '@' not in email:
+        return None
+    domain = email.split('@', 1)[1]
+    if domain in _FREE_EMAIL_DOMAINS:
+        return {'company': '', 'role': '', 'summary': 'Personal email — no company signal.'}
+
+    cache_key = f'enrich:{domain}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    out = _call_llm(
+        config,
+        system=(
+            "Given an email domain, infer the likely company name and a "
+            "1-sentence summary of what the company does. If you can't "
+            "place it, say so honestly. Output strict JSON: "
+            '{"company": str, "summary": str}'
+        ),
+        messages=[{'role': 'user', 'content': f'Domain: {domain}'}],
+        max_tokens=160,
+    )
+    if not out:
+        return None
+    import json as _json, re as _re
+    cleaned = _re.sub(r'^```(?:json)?|```$', '', out, flags=_re.MULTILINE).strip()
+    try:
+        data = _json.loads(cleaned)
+        if isinstance(data, dict):
+            cache.set(cache_key, data, timeout=86400 * 30)  # 30-day cache per domain
+            return data
+    except Exception:
+        pass
+    return None
