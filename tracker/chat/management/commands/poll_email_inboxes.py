@@ -204,6 +204,7 @@ class Command(BaseCommand):
             # so filter again client-side.
             uids = [u for u in uids if int(u) >= since_uid]
             uids = uids[:limit]
+            from django.db import transaction
             new_count = 0
             highest_uid = mailbox.last_polled_uid
             for uid in uids:
@@ -213,18 +214,29 @@ class Command(BaseCommand):
                 raw = msg_data[0][1]
                 if not raw:
                     continue
+                ingested = False
                 if dry_run:
-                    new_count += 1
+                    ingested = True
                 else:
+                    # Wrap each ingest in its own atomic block so a parse
+                    # failure on email N doesn't roll back email N-1.
                     try:
-                        _ingest_message(mailbox, raw)
-                        new_count += 1
+                        with transaction.atomic():
+                            _ingest_message(mailbox, raw)
+                        ingested = True
                     except Exception:
                         logger.warning('mailbox %s: ingest failed for uid %s', mailbox.name, uid, exc_info=True)
-                try:
-                    highest_uid = max(highest_uid, int(uid))
-                except (TypeError, ValueError):
-                    pass
+
+                # Critical: only advance the watermark for UIDs we
+                # *successfully ingested*. Previously the bump happened
+                # unconditionally — a parse failure silently lost the
+                # message (next run skipped past it).
+                if ingested:
+                    new_count += 1
+                    try:
+                        highest_uid = max(highest_uid, int(uid))
+                    except (TypeError, ValueError):
+                        pass
             if not dry_run:
                 mailbox.last_polled_uid = highest_uid
                 mailbox.last_polled_at = timezone.now()

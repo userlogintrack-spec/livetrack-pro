@@ -69,6 +69,10 @@ class ChatRoom(models.Model):
             models.Index(fields=['organization', '-created_at']),
             models.Index(fields=['visitor', '-created_at']),
             models.Index(fields=['organization', 'channel', 'status']),
+            # Composite for the dashboard chat_list hot path which filters
+            # by (org, status) AND orders by -updated_at — avoids index
+            # intersection cost on multi-tenant tables with 100k+ rooms.
+            models.Index(fields=['organization', 'status', '-updated_at']),
         ]
 
     def __str__(self):
