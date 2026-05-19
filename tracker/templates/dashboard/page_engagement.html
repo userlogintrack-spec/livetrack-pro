@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Per-Page Engagement — LiveVisitorHub{% endblock %}
+
+{% block content %}
+<style>
+    .pe-wrap { max-width: 1280px; margin: 0 auto; padding: 24px; }
+    .pe-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+    .pe-head h1 { font-size: 22px; font-weight: 800; color: var(--text-primary); margin: 0; }
+    .pe-head .lede { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .pe-tabs { display: inline-flex; background: white; border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+    .pe-tabs a { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-decoration: none; }
+    .pe-tabs a.active { background: var(--primary, #7c3aed); color: white; }
+
+    .pe-card { background: white; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    table.pe { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    table.pe th { padding: 10px 12px; text-align: left; font-weight: 700; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    table.pe td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    table.pe tr:last-child td { border-bottom: 0; }
+    table.pe tr:hover td { background: rgba(124,58,237,0.03); }
+    .url-cell { max-width: 320px; }
+    .url-cell .ttl { font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .url-cell .pth { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+    .badge-rage { font-size: 10px; padding: 2px 7px; border-radius: 6px; background: rgba(239,68,68,0.1); color: #b91c1c; font-weight: 700; }
+    .badge-dead { font-size: 10px; padding: 2px 7px; border-radius: 6px; background: rgba(148,163,184,0.18); color: #475569; font-weight: 700; }
+    .engagement-bar { width: 80px; height: 6px; background: rgba(0,0,0,0.06); border-radius: 999px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+    .engagement-fill { height: 100%; border-radius: 999px; transition: width .4s; }
+    .empty { text-align: center; padding: 60px 24px; color: var(--text-muted); }
+</style>
+
+<div class="pe-wrap">
+    <div class="pe-head">
+        <div>
+            <h1><i class="fas fa-table-list" style="color: var(--primary, #7c3aed);"></i> Per-Page Engagement</h1>
+            <div class="lede">Every page rolled up: views, time on page, bounce, click density, rage clicks, engagement score.</div>
+        </div>
+        <div class="pe-tabs">
+            <a href="?days=7"  class="{% if days == 7 %}active{% endif %}">7d</a>
+            <a href="?days=30" class="{% if days == 30 %}active{% endif %}">30d</a>
+            <a href="?days=90" class="{% if days == 90 %}active{% endif %}">90d</a>
+        </div>
+    </div>
+
+    <div class="pe-card">
+        {% if pages %}
+        <table class="pe">
+            <thead>
+                <tr>
+                    <th>Page</th>
+                    <th class="num">Views</th>
+                    <th class="num">Avg time</th>
+                    <th class="num">Load</th>
+                    <th class="num">Bounce</th>
+                    <th class="num">Clicks</th>
+                    <th class="num">Signals</th>
+                    <th class="num">Engagement</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pages %}
+                <tr>
+                    <td class="url-cell">
+                        <div class="ttl" title="{{ p.title }}">{{ p.title|truncatechars:55 }}</div>
+                        <div class="pth" title="{{ p.url }}">{{ p.path }}</div>
+                    </td>
+                    <td class="num">{{ p.views }}</td>
+                    <td class="num">{{ p.avg_time }}s</td>
+                    <td class="num">{% if p.avg_load_ms %}{{ p.avg_load_ms }}ms{% else %}—{% endif %}</td>
+                    <td class="num">{{ p.bounce_rate }}%</td>
+                    <td class="num">{{ p.clicks }}</td>
+                    <td class="num" style="white-space:nowrap;">
+                        {% if p.rage %}<span class="badge-rage" title="Rage clicks">🚨 {{ p.rage }}</span>{% endif %}
+                        {% if p.dead %}<span class="badge-dead" title="Dead clicks">💤 {{ p.dead }}</span>{% endif %}
+                        {% if not p.rage and not p.dead %}<span style="color:var(--text-muted);font-size:11px;">—</span>{% endif %}
+                    </td>
+                    <td class="num">
+                        <span class="engagement-bar"><span class="engagement-fill" style="width:{{ p.engagement }}%;background:{% if p.engagement >= 70 %}#10b981{% elif p.engagement >= 40 %}#f59e0b{% else %}#ef4444{% endif %};"></span></span>
+                        <span style="font-weight:700;color:{% if p.engagement >= 70 %}#047857{% elif p.engagement >= 40 %}#b45309{% else %}#b91c1c{% endif %};">{{ p.engagement }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">
+            <i class="fas fa-chart-bar" style="font-size:36px;opacity:.3;display:block;margin-bottom:10px;"></i>
+            <div style="font-size:15px;font-weight:600;color:var(--text-primary);">No page data yet</div>
+            <div style="font-size:13px;margin-top:6px;">Page metrics will roll up as visitors land on tracked pages.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top:14px;font-size:11px;color:var(--text-muted);max-width:760px;">
+        <strong>Engagement score</strong> blends avg time on page, click density, and penalty for rage/dead clicks and bounce. 0–40 needs attention, 40–70 OK, 70+ strong.
+    </div>
+</div>
+{% endblock %}

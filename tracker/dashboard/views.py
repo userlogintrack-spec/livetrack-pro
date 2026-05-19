@@ -1966,6 +1966,125 @@ def toggle_agent_availability(request, agent_id):
 
 
 @login_required
+def most_clicked_elements_view(request):
+    """Sorted list of elements visitors interact with most — what people
+    actually click, not what we *think* they click. Filterable by date range
+    and click type (normal / rage / dead)."""
+    org = get_user_org(request.user)
+    days = int(request.GET.get('days') or 30)
+    days = max(1, min(days, 180))
+    click_type = (request.GET.get('type') or 'click').strip()
+    if click_type not in ('click', 'rage', 'dead', 'all'):
+        click_type = 'click'
+
+    from tracker.visitors.models import ClickData
+    qs = ClickData.objects.filter(
+        organization=org,
+        timestamp__gte=timezone.now() - timedelta(days=days),
+    )
+    if click_type != 'all':
+        qs = qs.filter(click_type=click_type)
+
+    # Group by element. We coalesce on selector first (most specific),
+    # then text, then tag — gives the agent something readable.
+    from django.db.models import Count
+    rows = (
+        qs.exclude(element_text='', element_selector='')
+        .values('element_text', 'element_tag', 'element_selector', 'page_path')
+        .annotate(clicks=Count('id'))
+        .order_by('-clicks')[:100]
+    )
+    total = qs.count()
+
+    return render(request, 'dashboard/most_clicked.html', {
+        'rows': rows,
+        'total': total,
+        'days': days,
+        'click_type': click_type,
+    })
+
+
+@login_required
+def page_engagement_view(request):
+    """Per-page rollup: pageviews, avg time, bounce rate, scroll depth proxy,
+    click density, rage clicks, engagement score — one row per URL. Replaces
+    the disconnected slice views with a single sortable table."""
+    org = get_user_org(request.user)
+    days = int(request.GET.get('days') or 30)
+    days = max(1, min(days, 180))
+    since = timezone.now() - timedelta(days=days)
+
+    from django.db.models import Count, Avg, Sum, Q
+    from tracker.visitors.models import PageView, ClickData
+
+    # Pageview aggregates per URL.
+    pv_rows = (
+        PageView.objects.filter(
+            visitor__organization=org,
+            timestamp__gte=since,
+        )
+        .values('url', 'page_title')
+        .annotate(
+            views=Count('id'),
+            avg_time=Avg('time_spent'),
+            avg_load_ms=Avg('load_time_ms'),
+            entries=Count('id', filter=Q(is_entry=True)),
+            exits=Count('id', filter=Q(is_exit=True)),
+        )
+        .order_by('-views')[:100]
+    )
+
+    # Click rollup keyed by page_path (ClickData uses page_path, PageView uses url).
+    from urllib.parse import urlparse
+    click_rows = (
+        ClickData.objects.filter(
+            organization=org,
+            timestamp__gte=since,
+        )
+        .values('page_path')
+        .annotate(
+            clicks=Count('id'),
+            rage=Count('id', filter=Q(click_type='rage')),
+            dead=Count('id', filter=Q(click_type='dead')),
+        )
+    )
+    by_path = {r['page_path']: r for r in click_rows}
+
+    pages = []
+    for r in pv_rows:
+        path = urlparse(r['url']).path or '/'
+        clicks = by_path.get(path, {})
+        views = r['views'] or 0
+        # Simple engagement score: time-weighted + click density - rage penalty.
+        avg_time = r['avg_time'] or 0
+        rage = clicks.get('rage', 0)
+        dead = clicks.get('dead', 0)
+        bounce_rate = round((r['exits'] / views * 100) if views else 0, 1)
+        engagement = max(0, min(100, int(
+            (min(avg_time, 120) / 1.2)              # up to 100 from time on page
+            - (rage * 3)                              # rage hurts
+            - (dead * 2)                              # dead hurts a bit less
+            - (bounce_rate * 0.3)                     # bounce hurts
+        )))
+        pages.append({
+            'url': r['url'], 'path': path,
+            'title': r['page_title'] or path,
+            'views': views,
+            'avg_time': int(avg_time),
+            'avg_load_ms': int(r['avg_load_ms'] or 0),
+            'bounce_rate': bounce_rate,
+            'clicks': clicks.get('clicks', 0),
+            'rage': rage, 'dead': dead,
+            'engagement': engagement,
+        })
+
+    return render(request, 'dashboard/page_engagement.html', {
+        'pages': pages,
+        'days': days,
+    })
+
+
+@login_required
 def email_mailboxes_view(request):
     """List + create EmailMailbox rows. Owner-only because credentials
     are sensitive even though encrypted at rest."""

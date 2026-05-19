@@ -7,9 +7,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root { --accent: #7c3aed; --accent-soft: rgba(124,58,237,.15); }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Inter',sans-serif; background:#f5f3ff; color:#1e1b4b; }
-        .hero { background:linear-gradient(135deg, var(--accent), #a855f7); padding:60px 20px; text-align:center; color:white; }
+        html { scroll-behavior: smooth; }
+        body { font-family:'Inter',sans-serif; background:#f5f3ff; color:#1e1b4b; line-height:1.6; }
+        .hero { background:linear-gradient(135deg, var(--accent), #a855f7); padding:60px 20px 80px; text-align:center; color:white; position:relative; overflow:hidden; }
+        .hero::before { content:''; position:absolute; inset:0; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 40px 40px; opacity:.5; pointer-events:none; }
+        .hero > * { position:relative; z-index:1; }
+        @media(max-width:540px){
+          .hero { padding:40px 16px 56px; }
+          .hero h1 { font-size:24px; }
+          .hero p { font-size:14px; }
+          .categories { grid-template-columns:1fr; }
+          .cat-card { padding:18px; }
+          .container { padding:24px 14px; }
+        }
         .hero h1 { font-size:32px; font-weight:800; margin-bottom:8px; }
         .hero p { font-size:16px; opacity:0.9; margin-bottom:24px; }
         .search-box { max-width:500px; margin:0 auto; position:relative; }
