@@ -1017,11 +1017,13 @@
     .input-row {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
+        flex-wrap: wrap;
     }
 
     .chat-input-field {
-        flex: 1;
+        flex: 1 1 220px;
+        min-width: 0;
         padding: 12px 18px;
         background: var(--bg-primary);
         border: 1px solid var(--border);
@@ -1036,19 +1038,43 @@
     .chat-input-field:focus { border-color: var(--primary); }
 
     .send-btn {
-        width: 46px; height: 46px;
+        flex-shrink: 0;
+        width: 42px; height: 42px;
         border-radius: 50%;
         background: linear-gradient(135deg, var(--primary), var(--accent));
         color: white;
         border: none;
         cursor: pointer;
         display: flex; align-items: center; justify-content: center;
-        font-size: 17px;
+        font-size: 16px;
         transition: all 0.2s;
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
     }
 
     .send-btn:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4); }
+
+    /* Circular action buttons next to input (AI, mic, calendar, reopen, schedule).
+       Square dimensions are what makes border-radius:50% an actual circle. */
+    .act-btn {
+        flex-shrink: 0;
+        width: 38px; height: 38px;
+        border-radius: 50%;
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px;
+        transition: all .2s;
+    }
+    .act-btn:hover { background: var(--bg-hover, #f3f4f6); color: var(--primary); border-color: var(--primary); }
+    .act-btn.primary {
+        background: linear-gradient(135deg,#7c3aed,#a855f7);
+        border: 0;
+        color: white;
+        box-shadow: 0 4px 12px rgba(124,58,237,.25);
+    }
+    .act-btn.primary:hover { color: white; transform: scale(1.05); box-shadow: 0 6px 16px rgba(124,58,237,.35); }
 
     .chat-closed-bar {
         padding: 16px;
@@ -1638,6 +1664,9 @@
         .bubble { padding: 8px 12px; font-size: 13px; }
         .chat-input-area { padding: 8px 10px; gap: 6px; }
         .send-btn { width: 38px; height: 38px; font-size: 14px; }
+        .act-btn { width: 34px; height: 34px; font-size: 12px; }
+        .input-row { gap: 6px; }
+        .chat-input-field { padding: 10px 14px; font-size: 13px; flex-basis: 100%; }
         .visitor-panel { width: 300px; }
         .side-tabs { gap: 3px; padding: 3px; }
         .side-tab-btn { padding: 6px 4px; font-size: 9px; }
@@ -2021,19 +2050,19 @@
                 <button class="send-btn" onclick="sendMessage()" title="Send now (Enter) — slash commands become AI suggestions">
                     <i class="fas fa-paper-plane"></i>
                 </button>
-                <button onclick="triggerAiSuggest()" style="width:36px;height:46px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);border:0;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;box-shadow:0 4px 12px rgba(124,58,237,.25);" title="AI suggest reply">
+                <button class="act-btn primary" onclick="triggerAiSuggest()" title="AI suggest reply">
                     <i class="fas fa-wand-magic-sparkles"></i>
                 </button>
-                <button id="micBtn" onmousedown="startMic(event)" onmouseup="stopMic(event)" onmouseleave="stopMic(event)" ontouchstart="startMic(event)" ontouchend="stopMic(event)" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Hold to talk — Gemini transcribes">
+                <button class="act-btn" id="micBtn" onmousedown="startMic(event)" onmouseup="stopMic(event)" onmouseleave="stopMic(event)" ontouchstart="startMic(event)" ontouchend="stopMic(event)" title="Hold to talk — Gemini transcribes">
                     <i class="fas fa-microphone"></i>
                 </button>
-                <button onclick="sendBookingCard()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Send booking link (Calendly / Cal.com)">
+                <button class="act-btn" onclick="sendBookingCard()" title="Send booking link (Calendly / Cal.com)">
                     <i class="far fa-calendar"></i>
                 </button>
-                <button onclick="sendReopenLink()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Email visitor a magic link to reopen this chat later">
+                <button class="act-btn" onclick="sendReopenLink()" title="Email visitor a magic link to reopen this chat later">
                     <i class="fas fa-envelope-open-text"></i>
                 </button>
-                <button onclick="scheduleMessage()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Schedule message">
+                <button class="act-btn" onclick="scheduleMessage()" title="Schedule message">
                     <i class="fas fa-clock"></i>
                 </button>
             </div>
