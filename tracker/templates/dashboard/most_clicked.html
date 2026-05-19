@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Most Clicked Elements — LiveVisitorHub{% endblock %}
+
+{% block content %}
+<style>
+    .mc-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .mc-head { margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; }
+    .mc-head h1 { font-size: 22px; font-weight: 800; color: var(--text-primary); margin: 0; }
+    .mc-head .lede { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .mc-tabs { display: inline-flex; background: white; border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+    .mc-tabs a { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-decoration: none; }
+    .mc-tabs a.active { background: var(--primary, #7c3aed); color: white; }
+
+    .mc-card { background: white; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    table.mc { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.mc th { padding: 12px 16px; text-align: left; font-weight: 700; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); }
+    table.mc td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+    table.mc tr:last-child td { border-bottom: 0; }
+    table.mc tr:hover td { background: rgba(124,58,237,0.03); }
+    .tag-chip { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 6px; background: rgba(124,58,237,0.1); color: var(--primary, #7c3aed); font-family: ui-monospace, Menlo, monospace; }
+    .selector { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--text-muted); word-break: break-all; max-width: 380px; }
+    .count-pill { display: inline-block; font-weight: 700; color: var(--primary, #7c3aed); }
+    .empty { text-align: center; padding: 60px 24px; color: var(--text-muted); }
+</style>
+
+<div class="mc-wrap">
+    <div class="mc-head">
+        <div>
+            <h1><i class="fas fa-hand-pointer" style="color: var(--primary, #7c3aed);"></i> Most Clicked Elements</h1>
+            <div class="lede">What visitors actually click. Sorted by frequency — pages, buttons, and links.</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <div class="mc-tabs">
+                <a href="?days={{ days }}&type=click"  class="{% if click_type == 'click' %}active{% endif %}">Normal</a>
+                <a href="?days={{ days }}&type=rage"   class="{% if click_type == 'rage' %}active{% endif %}">Rage</a>
+                <a href="?days={{ days }}&type=dead"   class="{% if click_type == 'dead' %}active{% endif %}">Dead</a>
+                <a href="?days={{ days }}&type=all"    class="{% if click_type == 'all' %}active{% endif %}">All</a>
+            </div>
+            <div class="mc-tabs">
+                <a href="?days=7&type={{ click_type }}"  class="{% if days == 7 %}active{% endif %}">7d</a>
+                <a href="?days=30&type={{ click_type }}" class="{% if days == 30 %}active{% endif %}">30d</a>
+                <a href="?days=90&type={{ click_type }}" class="{% if days == 90 %}active{% endif %}">90d</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="mc-card">
+        {% if rows %}
+        <table class="mc">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Element</th>
+                    <th>Page</th>
+                    <th style="text-align:right;">Clicks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>
+                        <div style="font-weight:600;color:var(--text-primary);">
+                            {% if r.element_text %}"{{ r.element_text|truncatechars:60 }}"{% else %}<em>(no text)</em>{% endif %}
+                        </div>
+                        <div style="margin-top:4px;display:flex;gap:6px;align-items:center;">
+                            <span class="tag-chip">&lt;{{ r.element_tag|default:'?' }}&gt;</span>
+                            <span class="selector">{{ r.element_selector|truncatechars:80 }}</span>
+                        </div>
+                    </td>
+                    <td><code style="font-size:11px;color:var(--text-muted);">{{ r.page_path|default:'/' }}</code></td>
+                    <td style="text-align:right;"><span class="count-pill">{{ r.clicks }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">
+            <i class="fas fa-mouse-pointer" style="font-size:36px;opacity:.3;display:block;margin-bottom:10px;"></i>
+            <div style="font-size:15px;font-weight:600;color:var(--text-primary);">No click data yet</div>
+            <div style="font-size:13px;margin-top:6px;">Clicks are recorded automatically once visitors land on tracked pages.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top:14px;font-size:12px;color:var(--text-muted);">
+        Total {{ click_type|default:'click' }} events in window: <strong>{{ total }}</strong>
+    </div>
+</div>
+{% endblock %}
