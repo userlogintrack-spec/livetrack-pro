@@ -1966,6 +1966,7 @@ def toggle_agent_availability(request, agent_id):
 
 
 @login_required
+@requires_feature('advanced_analytics', plan_label='Pro')
 def most_clicked_elements_view(request):
     """Sorted list of elements visitors interact with most — what people
     actually click, not what we *think* they click. Filterable by date range
@@ -2005,6 +2006,7 @@ def most_clicked_elements_view(request):
 
 
 @login_required
+@requires_feature('advanced_analytics', plan_label='Pro')
 def page_engagement_view(request):
     """Per-page rollup: pageviews, avg time, bounce rate, scroll depth proxy,
     click density, rage clicks, engagement score — one row per URL. Replaces
@@ -2085,6 +2087,7 @@ def page_engagement_view(request):
 
 
 @login_required
+@requires_feature('api_access', plan_label='Enterprise')
 def email_mailboxes_view(request):
     """List + create EmailMailbox rows. Owner-only because credentials
     are sensitive even though encrypted at rest."""
@@ -2132,6 +2135,7 @@ def email_mailboxes_view(request):
 
 
 @login_required
+@requires_feature('api_access', plan_label='Enterprise')
 def email_mailbox_delete(request, mailbox_id):
     profile = getattr(request.user, 'agent_profile', None)
     is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
@@ -2148,6 +2152,7 @@ def email_mailbox_delete(request, mailbox_id):
 # ═══════════════════════════════════════════════════════════
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_insights_view(request):
     """Combined admin view that surfaces three AI-derived insights:
     chat topic clusters, KB gaps, and a help-article composer."""
@@ -2160,6 +2165,7 @@ def ai_insights_view(request):
 
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_topic_clusters(request):
     """POST → analyse last 30 days of chats → cluster into themes."""
     if request.method != 'POST':
@@ -2193,6 +2199,7 @@ def ai_topic_clusters(request):
 
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_kb_gaps(request):
     """POST → analyse recent chats → suggest KB articles."""
     if request.method != 'POST':
@@ -2223,6 +2230,7 @@ def ai_kb_gaps(request):
 
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_article_generator(request):
     """POST → raw text → polished article. Optionally saves directly to KB."""
     if request.method != 'POST':
@@ -2269,6 +2277,7 @@ def ai_article_generator(request):
 
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_quick_replies(request, room_id):
     """Mid-typing predictions: while a visitor is typing, return 3 short
     reply options the agent can click-to-send. Lighter than `ai_snippet`
@@ -2323,6 +2332,7 @@ def ai_quick_replies(request, room_id):
 
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def voice_transcribe(request):
     """Accept an audio blob from the agent's push-to-talk mic, ship it to
     Gemini multimodal for transcription, return the text.
@@ -2418,6 +2428,7 @@ def notes_broadcast(request, room_id):
 
 
 @login_required
+@requires_feature('email_notifications', plan_label='Pro')
 def chat_send_reopen_link(request, room_id):
     """Agent → visitor: email a one-time link to resume this chat later.
     POST body: {"email": "...", "days": 7 (optional)}."""
@@ -5755,6 +5766,7 @@ def visitors_bulk_action(request):
 # ═══════════════════════════════════════════════════════════
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_snippet_view(request, room_id):
     """POST /dashboard/api/ai/snippet/<room_id>/ {"command": "refund"}
     Returns a drafted reply based on the chat context + visitor + KB. Agent
@@ -5807,6 +5819,7 @@ def ai_snippet_view(request, room_id):
 # ═══════════════════════════════════════════════════════════
 
 @login_required
+@requires_feature('ai_bot', plan_label='Enterprise')
 def ai_translate_view(request):
     """POST /dashboard/api/ai/translate/ {"text": "...", "target": "en"}
     Returns the translated text. Used by the per-message Translate button."""

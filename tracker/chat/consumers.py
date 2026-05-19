@@ -77,7 +77,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 # but we also don't disconnect, so legit users recover next minute.
                 return
 
+            # Whitelist msg_type — clients can send arbitrary strings and we
+            # broadcast them downstream, so they'd otherwise be a vector for
+            # injecting "msg_type": "system-looking-thing" or other fake
+            # types into recipient widgets.
             msg_type = data.get('msg_type', 'text')
+            if msg_type not in ('text', 'file', 'image', 'system', 'booking'):
+                msg_type = 'text'
+            # Booking cards must come from agents only — a visitor shouldn't
+            # be able to render a CTA button in their own message.
+            if msg_type == 'booking' and not self.is_agent:
+                msg_type = 'text'
             file_url = data.get('file_url', '')
             file_name = data.get('file_name', '')
 

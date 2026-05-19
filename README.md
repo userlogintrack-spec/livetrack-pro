@@ -108,13 +108,91 @@ python manage.py runserver 8000
 - Channel layer: `InMemoryChannelLayer`
 - Timezone: `Asia/Kolkata`
 
-## Production Checklist
-- Change `SECRET_KEY`
-- Set `DEBUG = False`
-- Restrict `ALLOWED_HOSTS`
-- Replace in-memory channel layer with Redis
-- Use HTTPS + secure cookie settings
-- Change default admin password immediately
+## Production Deployment
+
+### 1. Required environment variables
+
+Copy `.env.example` and fill these (see the file for full list):
+
+| Variable | Notes |
+|---|---|
+| `SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
+| `DEBUG` | `False` |
+| `ALLOWED_HOSTS` | Your domain + optional `.subdomain.com` for wildcards |
+| `DATABASE_URL` | PostgreSQL connection string (Neon / Render / Supabase) |
+| `REDIS_URL` | Redis instance. Free option: [Upstash](https://upstash.com) — use `rediss://` (TLS) |
+| `CSRF_TRUSTED_ORIGINS` | `https://yourdomain.com,https://*.yourdomain.com` |
+| `FIELD_ENCRYPTION_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `EMAIL_HOST_USER` + `EMAIL_HOST_PASSWORD` | For password reset, magic-link emails. Gmail: use an App Password |
+| `SENTRY_DSN` *(optional)* | Error monitoring |
+
+### 2. Build / release steps
+
+```bash
+pip install -r requirements.txt
+python manage.py collectstatic --no-input
+python manage.py migrate
+```
+
+Render's "Build Command" should chain these together. The first deploy will apply ~20 migrations.
+
+### 3. Schedule cron jobs
+
+These management commands need to run periodically:
+
+| Command | Frequency | Purpose |
+|---|---|---|
+| `python manage.py poll_email_inboxes` | every 2–5 min | Pulls customer emails into the dashboard as chats. Required only if Email-to-Chat is enabled. |
+| `python manage.py process_webhook_retries` | every 1–5 min | Retries failed webhook deliveries with exponential backoff |
+| `python manage.py send_auto_replies` | every 5–15 min | Sends auto-responder messages on long-waiting chats |
+| `python manage.py purge_old_data` | daily | Deletes chats / recordings / events past the org's retention window |
+
+**Render Cron Jobs** (recommended):
+- Dashboard → "+ New" → "Cron Job"
+- Schedule (cron string), e.g. `*/2 * * * *` for every 2 minutes
+- Build command: same as your web service
+- Command: `python manage.py <command_name>`
+
+**System cron** (self-hosted):
+```cron
+*/2 * * * * cd /path/to/app && python manage.py poll_email_inboxes
+*/5 * * * * cd /path/to/app && python manage.py process_webhook_retries
+*/15 * * * * cd /path/to/app && python manage.py send_auto_replies
+0 3 * * *   cd /path/to/app && python manage.py purge_old_data
+```
+
+### 4. First-time setup after first deploy
+
+1. Visit `https://yourdomain.com/admin/` and log in with the bootstrap admin (created by `setup.py`).
+2. Change the admin password immediately.
+3. Visit `/dashboard/settings/website/` to:
+   - Set widget title, color, welcome message
+   - Configure business hours
+   - Set allowed-domains (anti-abuse) if your widget should only run on specific sites
+4. (Optional) Visit `/dashboard/ai-bot/` to plug in a Gemini or Claude API key for AI features.
+5. (Optional) Visit `/dashboard/email-mailboxes/` to connect a Gmail/Outlook/custom mailbox for Email-to-Chat.
+
+### 5. Health checks
+
+| Endpoint | Use |
+|---|---|
+| `GET /healthz/` | Liveness probe (DB only — cheap, safe to poll every 30s) |
+| `GET /healthz/full/` | Deep probe — DB + cache + channel layer. Use manually for debugging |
+
+Render's "Health Check Path" should be set to `/healthz/`.
+
+### 6. Security posture
+
+The app ships with:
+- Field-level encryption (Fernet) for 2FA secrets, webhook keys, AI API keys
+- TOTP 2FA + 8 hashed backup codes per agent
+- Magic-link passwordless login
+- Throttled login, magic-link, password reset, AI endpoints
+- `session.cycle_key()` rotation at every auth boundary
+- HSTS, secure cookies, CSP-friendly widget script
+- Per-org isolation enforced at every query
+
+Run `python manage.py check --deploy` before launch.
 
 ## Troubleshooting
 

@@ -8,13 +8,26 @@ client groups replies under the original conversation.
 from __future__ import annotations
 
 import email.utils
+import html as _html
 import logging
+import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+_HEADER_INJECTION_RE = re.compile(r'[\r\n\0]')
+
+
+def _sanitize_header(value: str, max_len: int = 200) -> str:
+    """Strip CR/LF/NUL from a value that's about to land in an SMTP header.
+    Without this, `from_name = "Bob\\r\\nBcc: attacker@evil.com"` injects a
+    BCC into every outbound reply — a Section 5.4 SMTP injection."""
+    if not value:
+        return ''
+    return _HEADER_INJECTION_RE.sub(' ', str(value))[:max_len].strip()
 
 
 def _pick_mailbox(room):
@@ -47,26 +60,45 @@ def send_email_reply(room, body_text: str, agent_name: str = '') -> bool:
         logger.warning('email reply: no mailbox configured for org=%s', getattr(room.organization, 'id', None))
         return False
 
-    subject = room.subject or 'Re: your message'
+    # Sanitize anything that lands in an SMTP header — subject, display name,
+    # visitor email — so a stray CR/LF can't sneak in a Bcc or Reply-To.
+    subject_raw = room.subject or 'Re: your message'
+    subject = _sanitize_header(subject_raw, max_len=200)
     if not subject.lower().startswith('re:'):
         subject = f'Re: {subject}'
 
-    from_display = f'{(mb.from_name or agent_name or mb.from_email)} <{mb.from_email}>'
+    display_name = _sanitize_header(mb.from_name or agent_name or mb.from_email, max_len=100)
+    safe_from_email = _sanitize_header(mb.from_email, max_len=200)
+    safe_to_email = _sanitize_header(room.visitor_email, max_len=200)
+    # email.utils.formataddr quotes special chars in display names properly —
+    # use it instead of f-string concatenation.
+    from_display = email.utils.formataddr((display_name, safe_from_email))
+
     msg = MIMEMultipart('alternative')
     msg['From'] = from_display
-    msg['To'] = room.visitor_email
+    msg['To'] = safe_to_email
     msg['Subject'] = subject
-    msg['Message-ID'] = email.utils.make_msgid(domain=mb.from_email.split('@', 1)[-1])
-    # Reference the thread so the visitor's client groups replies.
+    # Use the real mailbox's domain for Message-ID and references — the
+    # earlier synthetic 'livetrack.local' broke threading in Gmail/Outlook
+    # because mail clients verify the referenced Message-IDs share a domain.
+    from_domain = safe_from_email.split('@', 1)[-1] if '@' in safe_from_email else 'livevisitorhub.com'
+    msg['Message-ID'] = email.utils.make_msgid(domain=from_domain)
     if room.external_thread_id:
-        msg['References'] = f'<{room.external_thread_id}@livetrack.local>'
-        msg['In-Reply-To'] = f'<{room.external_thread_id}@livetrack.local>'
+        thread_ref = f'<{_sanitize_header(room.external_thread_id, 64)}@{from_domain}>'
+        msg['References'] = thread_ref
+        msg['In-Reply-To'] = thread_ref
 
     body_text = body_text or ''
     # Plain text first (most compatible), then a soft HTML version.
     msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
-    html_body = '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#1f2937;">' \
-                + body_text.replace('\n', '<br>') + '</div>'
+    # Escape body before inlining into HTML — without this, anything that
+    # looks like a tag in the agent's reply (or a compromised draft) would
+    # render as live HTML on the visitor's mail client.
+    escaped = _html.escape(body_text).replace('\n', '<br>')
+    html_body = (
+        '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#1f2937;">'
+        + escaped + '</div>'
+    )
     msg.attach(MIMEText(html_body, 'html', 'utf-8'))
 
     try:
