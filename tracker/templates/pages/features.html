@@ -56,14 +56,17 @@
         .nav-brand h1 { font-size: 19px; font-weight: 800; color: var(--text-dark); }
         .nav-brand h1 em { font-style: normal; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 14px; border-radius: 8px; transition: all 0.2s; }
-        .nav-links a:hover { color: var(--primary); background: rgba(99,102,241,0.06); }
-        .nav-links a.active { color: var(--primary); background: rgba(99,102,241,0.08); font-weight: 600; }
+        .nav-links a { position: relative; color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 8px 16px; border-radius: 10px; transition: color 0.2s; }
+        .nav-links a::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 0; height: 2px; background: var(--gradient-primary); border-radius: 2px; transform: translateX(-50%); transition: width 0.25s ease; }
+        .nav-links a:hover { color: var(--primary); }
+        .nav-links a:hover::after { width: calc(100% - 32px); }
+        .nav-links a.active { color: var(--primary); font-weight: 600; }
+        .nav-links a.active::after { width: calc(100% - 32px); }
         .nav-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
         .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; font-family: inherit; transition: all 0.25s; }
-        .btn-ghost { color: var(--text-dark); background: transparent; border: 1.5px solid var(--border-light); }
-        .btn-ghost:hover { background: #f1f0ff; color: var(--primary); }
+        .btn-ghost { color: var(--text-dark); background: rgba(124,58,237,0.04); border: 1px solid transparent; }
+        .btn-ghost:hover { background: rgba(124,58,237,0.09); color: var(--primary); border-color: rgba(124,58,237,0.12); }
         .btn-primary { background: var(--gradient-primary); color: white; box-shadow: 0 3px 12px rgba(124,58,237,0.25); }
         .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.35); }
         .btn-lg { padding: 14px 32px; font-size: 15px; border-radius: 12px; }
@@ -435,7 +438,7 @@
     <div class="hero-inner">
         <div class="hero-badge"><span class="dot"></span> 25 New Features Just Launched</div>
         <h1>Every Feature Your<br>Support Team <span class="grad">Needs</span></h1>
-        <p class="sub">AI auto-replies, heatmaps, session recordings, UTM tracking, goals, WhatsApp — LiveVisitorHub combines Google Analytics + Microsoft Clarity + Intercom. 100% free.</p>
+        <p class="sub">AI auto-replies, heatmaps, session recordings, UTM tracking, goals, WhatsApp — LiveVisitorHub combines Google Analytics + Microsoft Clarity + Intercom. Free plan available.</p>
         <div class="hero-actions">
             <a href="{% url 'core:register' %}" class="btn btn-primary btn-xl">Start Free Now <i class="fas fa-arrow-right"></i></a>
             <a href="#all-features" class="btn btn-outline-light btn-lg">Explore 200+ Features <i class="fas fa-chevron-down"></i></a>
@@ -443,7 +446,7 @@
         <div class="hero-stats">
             <div class="hero-stat"><div class="num">200+</div><div class="label">Total Features</div></div>
             <div class="hero-stat"><div class="num">25</div><div class="label">New This Release</div></div>
-            <div class="hero-stat"><div class="num">$0</div><div class="label">Forever Free</div></div>
+            <div class="hero-stat"><div class="num">$0</div><div class="label">Free Plan</div></div>
             <div class="hero-stat"><div class="num">3-in-1</div><div class="label">GA + Clarity + Chat</div></div>
         </div>
     </div>
@@ -747,7 +750,7 @@
                 <li><i class="fas fa-check-circle"></i> Natural response delay for human-like feel</li>
                 <li><i class="fas fa-check-circle"></i> Only responds when no human agent is assigned</li>
             </ul>
-            <a href="{% url 'core:register' %}" class="btn btn-primary">Try AI Bot Free <i class="fas fa-arrow-right"></i></a>
+            <a href="{% url 'core:register' %}" class="btn btn-primary">See AI Bot — Enterprise Plan <i class="fas fa-arrow-right"></i></a>
         </div>
         <div class="mega-visual" style="background: linear-gradient(135deg, #7c3aed, #a855f7);">
             <div class="mock" style="background: white;">
@@ -768,7 +771,7 @@
                     </div>
                     <div style="background:#f5f3ff;padding:10px 14px;border-radius:10px;margin-bottom:6px;">
                         <div style="font-size:11px;color:#7c3aed;font-weight:600;margin-bottom:2px;">Q: How much does it cost?</div>
-                        <div style="font-size:12px;color:#4b5563;">A: LiveVisitorHub is 100% free, forever!</div>
+                        <div style="font-size:12px;color:#4b5563;">A: Free plan available — Pro from $19/mo.</div>
                     </div>
                     <div style="background:#fef3c7;padding:10px 14px;border-radius:10px;">
                         <div style="font-size:11px;color:#92400e;font-weight:600;">Keywords: agent, human, help</div>
@@ -990,7 +993,7 @@
 <div class="section">
     <div class="section-header reveal">
         <div class="section-label"><i class="fas fa-chart-line"></i> Google Analytics Features</div>
-        <h2 class="section-title">15 Analytics Features.<br>Zero Cost.</h2>
+        <h2 class="section-title">15 Analytics Features.<br>Honest Pricing.</h2>
         <p class="section-desc">Everything Google Analytics offers — built into your dashboard. No external scripts needed.</p>
     </div>
     <div class="feature-grid">
@@ -1097,7 +1100,7 @@
         <div class="mega-info">
             <div class="mega-tag" style="background:rgba(16,185,129,0.08);color:#10b981;"><i class="fas fa-fire"></i> NEW — MICROSOFT CLARITY ALTERNATIVE</div>
             <h3>Heatmaps & Session Recordings</h3>
-            <p>See exactly what users do on your site. Click heatmaps, scroll depth tracking, session replay with frustration detection — Microsoft Clarity features, built-in for free.</p>
+            <p>See exactly what users do on your site. Click heatmaps, scroll depth tracking, session replay with frustration detection — Microsoft Clarity features, built into the Pro plan.</p>
             <ul class="mega-features">
                 <li><i class="fas fa-check-circle"></i> Click heatmaps — see where users click on every page</li>
                 <li><i class="fas fa-check-circle"></i> Scroll depth tracking — know how far users scroll</li>
@@ -1107,7 +1110,7 @@
                 <li><i class="fas fa-check-circle"></i> JavaScript error tracking & grouping</li>
                 <li><i class="fas fa-check-circle"></i> Per-page engagement & frustration metrics</li>
             </ul>
-            <a href="{% url 'core:register' %}" class="btn btn-primary">Try Heatmaps Free <i class="fas fa-arrow-right"></i></a>
+            <a href="{% url 'core:register' %}" class="btn btn-primary">See Heatmaps — Pro Plan <i class="fas fa-arrow-right"></i></a>
         </div>
         <div class="mega-visual" style="background: linear-gradient(135deg, #10b981, #059669);">
             <div class="mock" style="background: white;">
@@ -1219,8 +1222,8 @@
 <div class="section">
     <div class="section-header reveal">
         <div class="section-label"><i class="fas fa-star"></i> More Powerful Features</div>
-        <h2 class="section-title">Enterprise Features.<br>Completely Free.</h2>
-        <p class="section-desc">Everything competitors charge $100+/month for — included in LiveVisitorHub at no cost.</p>
+        <h2 class="section-title">Enterprise-Grade Features.<br>Honest Pricing.</h2>
+        <p class="section-desc">Everything competitors charge $100+/month for — start free, scale on Pro ($19/mo) or Enterprise ($79/mo).</p>
     </div>
 
     <div class="feature-grid">
@@ -1358,12 +1361,12 @@
     <div class="section-header reveal">
         <div class="section-label"><i class="fas fa-trophy"></i> Comparison</div>
         <h2 class="section-title">LiveVisitorHub vs Others</h2>
-        <p class="section-desc">See why LiveVisitorHub is the best choice — more features, zero cost.</p>
+        <p class="section-desc">See why LiveVisitorHub is the best choice — more features, transparent pricing.</p>
     </div>
 
     <table class="compare-table reveal">
         <thead>
-            <tr><th>Feature</th><th style="text-align:center;">LiveVisitorHub<br><span style="font-size:11px;color:var(--primary);font-weight:800;">FREE</span></th><th style="text-align:center;">Intercom<br><span style="font-size:11px;color:var(--text-muted);">$74/mo</span></th><th style="text-align:center;">Google Analytics<br><span style="font-size:11px;color:var(--text-muted);">Free</span></th><th style="text-align:center;">MS Clarity<br><span style="font-size:11px;color:var(--text-muted);">Free</span></th></tr>
+            <tr><th>Feature</th><th style="text-align:center;">LiveVisitorHub<br><span style="font-size:11px;color:var(--primary);font-weight:800;">FROM $0</span></th><th style="text-align:center;">Intercom<br><span style="font-size:11px;color:var(--text-muted);">$74/mo</span></th><th style="text-align:center;">Google Analytics<br><span style="font-size:11px;color:var(--text-muted);">Free</span></th><th style="text-align:center;">MS Clarity<br><span style="font-size:11px;color:var(--text-muted);">Free</span></th></tr>
         </thead>
         <tbody>
             <tr style="background:rgba(59,130,246,0.03);"><td colspan="5" style="font-weight:700;color:#3b82f6;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:10px 20px;">Chat & Support</td></tr>
@@ -1409,7 +1412,7 @@
     <div class="orb orb-1"></div><div class="orb orb-2"></div>
     <div class="cta-inner reveal">
         <h2>Ready to Transform Your<br>Customer Support?</h2>
-        <p>200+ features. Google Analytics + Microsoft Clarity + Live Chat in one platform. Zero cost. No credit card.</p>
+        <p>200+ features. Google Analytics + Microsoft Clarity + Live Chat in one platform. Free plan available — no credit card.</p>
         <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
             <a href="{% url 'core:register' %}" class="btn btn-primary btn-xl">Get Started Free <i class="fas fa-arrow-right"></i></a>
             <a href="/" class="btn btn-outline-light btn-lg">See Live Demo</a>
@@ -1422,7 +1425,7 @@
     <div class="footer-grid">
         <div class="footer-brand">
             <h3><i class="fas fa-bolt"></i> LiveVisitorHub</h3>
-            <p>The most powerful visitor tracking and live chat platform — 100% free, forever.</p>
+            <p>The most powerful visitor tracking and live chat platform — with a generous free plan.</p>
             <div class="footer-social">
                 <a href="#"><i class="fab fa-twitter"></i></a>
                 <a href="#"><i class="fab fa-linkedin-in"></i></a>
