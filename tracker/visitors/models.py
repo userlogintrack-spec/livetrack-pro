@@ -44,6 +44,16 @@ class Visitor(models.Model):
     pages_per_session = models.PositiveIntegerField(default=0)
     is_bounced = models.BooleanField(default=False, help_text='Visited only 1 page')
 
+    # Identify SDK — pushed by customer's app via
+    # `window.LiveTrack.identify({email, user_id, name, plan, ...})`.
+    # `traits` is a free-form JSON bag for org-specific attributes
+    # (plan, mrr, sign-up date, etc) so agents see real CRM context.
+    identified_email = models.EmailField(blank=True, default='', db_index=True)
+    identified_user_id = models.CharField(max_length=200, blank=True, default='', db_index=True)
+    identified_name = models.CharField(max_length=200, blank=True, default='')
+    traits = models.JSONField(default=dict, blank=True)
+    identified_at = models.DateTimeField(null=True, blank=True)
+
     # Enrichment — derived from email domain or external lookup, cached so
     # we don't re-compute on every dashboard load. Populated lazily by
     # `tracker.chat.ai.enrich_visitor()` once an email is captured.

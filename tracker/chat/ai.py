@@ -501,18 +501,16 @@ _FREE_EMAIL_DOMAINS = {
 }
 
 
-def enrich_visitor(config, visitor) -> Optional[dict]:
-    """Best-effort enrichment from email domain. We don't call Clearbit
-    by default (paid + privacy concerns) — instead we ask Gemini to infer
-    company/role hints from the email domain alone. Cached on the
-    Visitor record so subsequent loads don't re-fire.
+def enrich_visitor(config, visitor, email: str = '') -> Optional[dict]:
+    """Best-effort enrichment from email domain. Cheap default — caller
+    passes the most-trusted email source (chat room's visitor_email, or
+    Visitor.identified_email from the Identify SDK).
 
-    For real enrichment, the agent should integrate Clearbit/Apollo via
-    the webhook integration layer; this function is the cheap default.
+    Returns {company, summary, ...} or None when not configured / no signal.
     """
-    if not visitor or not getattr(visitor, 'visitor_email', '') or not _provider_ready(config):
+    if not visitor or not _provider_ready(config):
         return None
-    email = (visitor.visitor_email or '').strip().lower()
+    email = (email or getattr(visitor, 'identified_email', '') or '').strip().lower()
     if '@' not in email:
         return None
     domain = email.split('@', 1)[1]

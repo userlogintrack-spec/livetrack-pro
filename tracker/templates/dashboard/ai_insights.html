@@ -60,6 +60,17 @@
         <div class="result-box" id="gapsResult"></div>
     </div>
 
+    <!-- KB Auto-Crawl -->
+    <div class="panel">
+        <h2><i class="fas fa-spider"></i> Auto-Import KB from URL</h2>
+        <div class="sub">Paste a help page URL — AI fetches the content and turns it into a clean KB article. Great for migrating from Notion / Intercom / Zendesk.</div>
+        <div class="form-row" style="margin-bottom:10px;">
+            <input type="url" class="form-control" id="crawlUrl" placeholder="https://example.com/help/refund-policy">
+            <button class="run-btn" onclick="crawlUrl(this, false)">Fetch &amp; preview</button>
+        </div>
+        <div class="result-box" id="crawlResult"></div>
+    </div>
+
     <!-- Article Generator -->
     <div class="panel">
         <h2><i class="fas fa-wand-magic-sparkles"></i> Help Article Generator</h2>
@@ -170,6 +181,33 @@ async function genArticle(btn, publish) {
         box.classList.add('show');
     } finally {
         btn.disabled = false; btn.textContent = publish ? 'Publish to KB' : 'Draft article';
+    }
+}
+
+async function crawlUrl(btn, publish) {
+    const box = document.getElementById('crawlResult');
+    const url = document.getElementById('crawlUrl').value.trim();
+    if (!/^https?:\/\//.test(url)) { box.textContent = 'URL must start with http(s)://'; box.classList.add('show'); return; }
+    btn.disabled = true; btn.textContent = 'Fetching…';
+    try {
+        const r = await fetch('/dashboard/api/ai/kb-crawl/', {
+            method: 'POST', headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url, publish: publish, category: 'Imported' }),
+        });
+        const d = await r.json();
+        if (!d.ok) { box.textContent = d.error || 'Failed'; box.classList.add('show'); return; }
+        const art = d.article || {};
+        box.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Source: <a href="' + escape(d.source_url) + '" target="_blank" rel="noopener">' + escape(d.source_url) + '</a></div>' +
+            '<div style="font-weight:700;font-size:14px;margin-bottom:6px;">' + escape(art.title || '') + '</div>' +
+            '<pre class="article-preview">' + escape(art.content_markdown || '') + '</pre>' +
+            (publish ? '<div style="color:#047857;font-weight:600;margin-top:8px;">✓ Published to KB</div>' :
+            '<button class="run-btn" style="margin-top:10px;" onclick="crawlUrl(this, true)">Publish to KB</button>');
+        box.classList.add('show');
+    } catch (e) {
+        box.textContent = 'Request failed: ' + e.message;
+        box.classList.add('show');
+    } finally {
+        btn.disabled = false; btn.textContent = publish ? 'Publish to KB' : 'Fetch & preview';
     }
 }
 

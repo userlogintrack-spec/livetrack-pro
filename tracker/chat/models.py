@@ -54,6 +54,12 @@ class ChatRoom(models.Model):
     # Post-chat AI coaching feedback (see ai.py:coach_chat). Generated once
     # at close, shown to the primary agent on the chat detail page.
     coach_feedback = models.TextField(blank=True, default='')
+    # Auto-translate: when ON, every visitor message is translated to
+    # `agent_language` and every agent reply is translated to
+    # `visitor_language`. Toggled per-chat by the agent.
+    auto_translate = models.BooleanField(default=False)
+    agent_language = models.CharField(max_length=10, blank=True, default='en')
+    visitor_language = models.CharField(max_length=10, blank=True, default='')
 
     class Meta:
         ordering = ['-updated_at']
@@ -135,6 +141,11 @@ class Message(models.Model):
     file_name = models.CharField(max_length=255, blank=True, default='')
     is_read = models.BooleanField(default=False)
     timestamp = models.DateTimeField(default=timezone.now)
+    # Auto-translate output. `translated_content` is the room's target
+    # language version of `content`; agents and visitors see whichever
+    # matches their preferred language.
+    translated_content = models.TextField(blank=True, default='')
+    translated_to = models.CharField(max_length=10, blank=True, default='')
 
     class Meta:
         ordering = ['timestamp']

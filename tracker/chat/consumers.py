@@ -448,6 +448,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 except Exception:
                     logger.warning('email reply send failed for room=%s', room.room_id, exc_info=True)
 
+            # Cross-channel chat → email handover: if the visitor has gone
+            # offline (no active WebSocket) and we have their email, ship
+            # the agent's reply out via SMTP so they can continue the
+            # conversation by email. Crisp calls this "continuity".
+            elif (sender_type == 'agent' and room.channel == 'widget'
+                  and room.visitor_email and self._visitor_offline_for(room)):
+                try:
+                    from tracker.chat.email_send import send_email_reply
+                    if send_email_reply(room, content, agent_name=sender_name):
+                        # Note the handover in the chat so the visitor sees
+                        # it next time they open the widget.
+                        from tracker.chat.models import Message as _Msg
+                        _Msg.objects.create(
+                            room=room, sender_type='system', sender_name='System',
+                            content=f'Sent to {room.visitor_email} (visitor was offline).',
+                        )
+                except Exception:
+                    logger.warning('chat→email handover failed for room=%s', room.room_id, exc_info=True)
+
             room.save(update_fields=update_fields)
 
             # Async hooks for visitor messages (sentiment + enrichment).
@@ -466,6 +485,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return message
         except ChatRoom.DoesNotExist:
             return None
+
+    def _visitor_offline_for(self, room):
+        """Heuristic: visitor is "offline" if their last_seen is older than
+        5 min. Used to decide whether to handover an agent reply to email.
+        """
+        try:
+            from datetime import timedelta
+            if not room.visitor or not room.visitor.last_seen:
+                return False
+            return (timezone.now() - room.visitor.last_seen) > timedelta(minutes=5)
+        except Exception:
+            return False
 
     @database_sync_to_async
     def close_chat(self):
@@ -631,9 +662,9 @@ class DashboardConsumer(AsyncWebsocketConsumer):
 # ────────────────────────────────────────────────
 
 def _run_visitor_message_hooks(room_id: int, content: str, org_id: int | None):
-    """Sentiment classifier + visitor enrichment + dashboard alert when
-    sentiment turns negative. Errors swallowed — these are best-effort
-    enrichments, never block the chat."""
+    """Sentiment classifier + visitor enrichment + auto-translate + dashboard
+    alert when sentiment turns negative. Errors swallowed — these are
+    best-effort enrichments, never block the chat."""
     if not content or not org_id:
         return
     try:
@@ -671,10 +702,34 @@ def _run_visitor_message_hooks(room_id: int, content: str, org_id: int | None):
             except Exception:
                 pass
 
-        # Enrichment — only once per visitor (cached on the row).
+        # Auto-translate (if room.auto_translate=True): translate the
+        # incoming visitor message to agent_language and store on the
+        # latest Message row so the agent sees it inline.
+        if getattr(room, 'auto_translate', False) and room.agent_language:
+            try:
+                from tracker.chat.ai import translate_text
+                from tracker.chat.models import Message as _Msg
+                target = room.agent_language or 'en'
+                latest = _Msg.objects.filter(
+                    room_id=room_id, sender_type='visitor', content=content,
+                ).order_by('-timestamp').first()
+                if latest and not latest.translated_content:
+                    translated = translate_text(config, content, target_language=target)
+                    if translated:
+                        _Msg.objects.filter(id=latest.id).update(
+                            translated_content=translated[:8000],
+                            translated_to=target,
+                        )
+            except Exception:
+                logger.warning('auto-translate failed', exc_info=True)
+
+        # Enrichment — only once per visitor (cached on the row). Uses the
+        # most-trusted email source we have: Identify-SDK email > chat
+        # room visitor_email > nothing.
         v = room.visitor
-        if v and not v.enrichment_at and v.visitor_email:
-            data = enrich_visitor(config, v)
+        email_hint = getattr(v, 'identified_email', '') or room.visitor_email or ''
+        if v and not v.enrichment_at and email_hint:
+            data = enrich_visitor(config, v, email=email_hint)
             if data:
                 v.enrichment_company = (data.get('company') or '')[:200]
                 v.enrichment_summary = (data.get('summary') or '')[:500]

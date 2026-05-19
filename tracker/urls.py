@@ -153,6 +153,7 @@ urlpatterns = [
     path('healthz/', healthz, name='healthz'),
     path('healthz/full/', healthz_full, name='healthz_full'),
     path('chat/reopen/<str:token>/', chat_reopen_consume, name='chat_reopen'),
+    path('status/', dashboard_views.public_status_page, name='public_status'),
     path('robots.txt', robots_txt, name='robots_txt'),
     path('sitemap.xml', sitemap_xml, name='sitemap_xml'),
     path('manifest.json', manifest_json, name='manifest_json'),
