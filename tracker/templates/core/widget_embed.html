@@ -495,19 +495,40 @@ function addMsg(text, type, timestamp, msgType, fileUrl, fileName) {
     } else if (msgType === 'file' && fileUrl) {
         d.innerHTML = '<a href="'+(fileUrl.startsWith('http')?fileUrl:BASE+fileUrl)+'" target="_blank">📎 '+(fileName||'File')+'</a>';
     } else if (msgType === 'booking') {
-        // Calendly / Cal.com card. Agent sends the URL as the message body; we
-        // render a CTA card with a "Pick a time" button that opens the
-        // scheduling page in a new tab.
+        // Calendly / Cal.com card. Agent sends the URL as the message body.
+        // Strict scheme whitelist — javascript:, data:, vbscript: all rejected.
+        // The previous `.replace(/[<>"]/g, '')` filter let `javascript:alert(1)`
+        // through unchanged, which would execute when the visitor clicked.
         var url = (text || '').trim();
-        var safe = url.replace(/[<>"]/g, '');
-        d.innerHTML =
-            '<div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px;background:linear-gradient(135deg,#fafbff,#f3f0ff);">' +
-                '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
-                    '<div style="width:36px;height:36px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;"><i class="far fa-calendar"></i></div>' +
-                    '<div><div style="font-weight:700;color:#1f2937;font-size:13px;">Book a time</div><div style="font-size:11px;color:#6b7280;">15-30 min — pick what works.</div></div>' +
-                '</div>' +
-                '<a href="' + safe + '" target="_blank" rel="noopener" style="display:block;text-align:center;padding:9px;background:#7c3aed;color:white;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;">Pick a time →</a>' +
+        var safeUrl = '';
+        try {
+            var parsed = new URL(url, location.origin);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                safeUrl = parsed.toString();
+            }
+        } catch (e) { /* invalid URL → blank */ }
+        // Build via DOM nodes (no innerHTML) so even if safeUrl were tampered
+        // with, it lands only in the href attribute, never as HTML.
+        var card = document.createElement('div');
+        card.style.cssText = 'border:1px solid #e5e7eb;border-radius:12px;padding:14px;background:linear-gradient(135deg,#fafbff,#f3f0ff);';
+        card.innerHTML = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+            '<div style="width:36px;height:36px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;"><i class="far fa-calendar"></i></div>' +
+            '<div><div style="font-weight:700;color:#1f2937;font-size:13px;">Book a time</div><div style="font-size:11px;color:#6b7280;">15-30 min — pick what works.</div></div>' +
             '</div>';
+        var btn = document.createElement('a');
+        btn.target = '_blank';
+        btn.rel = 'noopener noreferrer';
+        btn.style.cssText = 'display:block;text-align:center;padding:9px;background:#7c3aed;color:white;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;';
+        if (safeUrl) {
+            btn.href = safeUrl;
+            btn.textContent = 'Pick a time →';
+        } else {
+            btn.style.background = '#9ca3af';
+            btn.style.cursor = 'not-allowed';
+            btn.textContent = 'Invalid booking link';
+        }
+        card.appendChild(btn);
+        d.appendChild(card);
     } else {
         d.textContent = text || '';
     }

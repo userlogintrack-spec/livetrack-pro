@@ -34,6 +34,13 @@ import time
 _state: dict[str, float] = {}
 _lock = threading.Lock()
 
+# Hard ceiling so a flood of unique keys (one per visitor, one per session)
+# can't cause unbounded memory growth and O(n) sweeps on every call.
+# Reached only under extreme key cardinality; eviction is FIFO by insertion
+# order which matches Python dict ordering.
+_MAX_KEYS = 5000
+_SWEEP_THRESHOLD = 1024
+
 
 def should_run(key: str, interval_seconds: float) -> bool:
     """Returns True the first call for `key`, then False until
@@ -44,10 +51,23 @@ def should_run(key: str, interval_seconds: float) -> bool:
         if now < deadline:
             return False
         _state[key] = now + interval_seconds
-        # Opportunistic sweep — keeps the dict from growing without bound
-        # when many distinct keys are used briefly (e.g. per-visitor gates).
-        if len(_state) > 1024:
+        # Two-stage pressure relief:
+        #   1. Cheap: drop expired keys when we cross the soft threshold.
+        #   2. Hard: if we're still at the ceiling after pruning, FIFO-evict
+        #      the oldest insertions until we're under it. Bounds memory at
+        #      the cost of a small chance of "lost dedup" for the evicted
+        #      keys — fine because these gates are throttles, not security
+        #      counters.
+        size = len(_state)
+        if size > _SWEEP_THRESHOLD:
             _prune_expired_locked(now)
+            size = len(_state)
+            if size > _MAX_KEYS:
+                # Evict 10% of the oldest entries in one pass so we don't
+                # do this on every call when we're at the ceiling.
+                to_evict = max(1, size - int(_MAX_KEYS * 0.9))
+                for k in list(_state.keys())[:to_evict]:
+                    _state.pop(k, None)
         return True
 
 

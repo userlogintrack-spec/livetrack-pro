@@ -122,10 +122,13 @@
     <div class="row" style="margin-top:10px;">
         <div class="tour-tabs" id="tourTabs">
             <a class="tour-tab active" data-cat="all" href="#">All</a>
+            <a class="tour-tab" data-cat="What's New" href="#cat-whats-new" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-color:transparent;">✨ What's New</a>
             <a class="tour-tab" data-cat="Main" href="#cat-main">Main</a>
             <a class="tour-tab" data-cat="Communication" href="#cat-communication">Communication</a>
             <a class="tour-tab" data-cat="Analytics & Insights" href="#cat-analytics">Analytics</a>
             <a class="tour-tab" data-cat="AI & Automation" href="#cat-ai">AI & Automation</a>
+            <a class="tour-tab" data-cat="Email Channel" href="#cat-email">Email</a>
+            <a class="tour-tab" data-cat="Security & Auth" href="#cat-security">Security</a>
             <a class="tour-tab" data-cat="Management" href="#cat-management">Management</a>
             <a class="tour-tab" data-cat="Integrations" href="#cat-integrations">Integrations</a>
             <a class="tour-tab" data-cat="Settings" href="#cat-settings">Settings</a>
@@ -563,6 +566,279 @@
                 <a href="{% url 'dashboard:activity_log' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Activity Log</a>
                 <a href="{% url 'dashboard:ban_list' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Ban List</a>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ WHAT'S NEW ═══════ -->
+<div class="cat-label" id="cat-whats-new" data-cat="What's New" style="color:#7c3aed;"><i class="fas fa-sparkles"></i> What's New ✨</div>
+<div class="section-grid">
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(124,58,237,0.12);color:#7c3aed;">Gemini</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;"><i class="fas fa-wand-magic-sparkles"></i></div>
+            <div><div class="tour-title">AI Snippet Completion</div><div class="tour-sub">Slash commands → AI drafts personalised replies</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Type <code>/refund</code>, <code>/shipping</code>, <code>/thanks</code> in any chat. AI drafts a full reply grounded in the visitor's name, recent transcript, and your KB. Edit before sending — never auto-send.</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> 10 built-in shortcuts + per-org via Canned Responses</li>
+                <li><i class="fas fa-check-circle"></i> Works with Gemini (cheap default) or Claude</li>
+                <li><i class="fas fa-check-circle"></i> ✨ wand button next to send for free-form prompts</li>
+            </ul>
+            <div class="tip"><i class="fas fa-lightbulb"></i> Bring your own Anthropic / Gemini key in AI Bot config — you pay providers directly with no markup.</div>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(6,182,212,0.12);color:#06b6d4;">Real-time</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;"><i class="fas fa-comments"></i></div>
+            <div><div class="tour-title">AI Quick-Reply Chips</div><div class="tour-sub">3 click-to-send options on every visitor message</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Every time the visitor speaks, 3 short reply options appear above your input. Distinct in tone (acknowledge / clarify / propose action). Click → send instantly.</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> 4-second client-side throttle (no API spam)</li>
+                <li><i class="fas fa-check-circle"></i> Server-rate-limited 40/min/agent</li>
+                <li><i class="fas fa-check-circle"></i> Saves ~30s per chat</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(239,68,68,0.12);color:#dc2626;">Push-to-talk</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;"><i class="fas fa-microphone"></i></div>
+            <div><div class="tour-title">Voice-to-Text Replies</div><div class="tour-sub">Hold the mic, speak, Gemini transcribes</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Hold the mic button next to send → speak → release → Gemini transcribes the audio → text fills the input. 3-4× faster than typing. Especially powerful on mobile.</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> Uses browser MediaRecorder + Gemini multimodal</li>
+                <li><i class="fas fa-check-circle"></i> 8MB max per recording, 60s timeout</li>
+                <li><i class="fas fa-check-circle"></i> Requires browser microphone permission</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(124,58,237,0.12);color:#7c3aed;">AI</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;"><i class="fas fa-brain"></i></div>
+            <div><div class="tour-title">AI Insights (Managers)</div><div class="tour-sub">Topic clusters · KB gaps · Article generator</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Three AI tools on one admin page that turn last 30 days of chats into actionable signal:</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> <strong>Topic Clusters:</strong> 4-8 named themes with share % (e.g., "35% refunds, 18% shipping")</li>
+                <li><i class="fas fa-check-circle"></i> <strong>KB Gap Detector:</strong> finds recurring unanswered questions, one-click publish</li>
+                <li><i class="fas fa-check-circle"></i> <strong>Article Generator:</strong> paste rough notes → polished article with sections</li>
+            </ul>
+            <a href="{% url 'dashboard:ai_insights' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Open AI Insights</a>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(16,185,129,0.12);color:#059669;">Free</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#10b981,#06b6d4);color:#fff;"><i class="fas fa-stream"></i></div>
+            <div><div class="tour-title">Unified Visitor Timeline</div><div class="tour-sub">Every event for one visitor in one feed</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Pageviews + chats + notes + recordings + surveys + UTM history merged into one chronological feed on the visitor detail page. "Bhavesh asked for a refund 2 weeks ago, viewed premium 3 visits ago, is here now."</p>
+            <a href="{% url 'dashboard:visitor_list' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Open Visitor List</a>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(245,158,11,0.12);color:#b45309;">Analytics</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;"><i class="fas fa-filter"></i></div>
+            <div><div class="tour-title">Widget Conversion Funnel</div><div class="tour-sub">Where visitors drop off before chatting</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Bubble seen → opened → typed → sent. See exactly where visitors leak before becoming a real chat. Identify if your bubble copy or panel UX is killing conversions.</p>
+            <a href="{% url 'dashboard:widget_funnel' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Open Funnel</a>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(167,139,250,0.18);color:#7c3aed;">Unique</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#a78bfa,#ec4899);color:#fff;"><i class="fas fa-envelope-open-text"></i></div>
+            <div><div class="tour-title">Reopen Chat Magic Link</div><div class="tour-sub">Visitor returns days later, conversation resumes</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Agent emails the visitor a one-time link. 7 days later visitor clicks it → same conversation continues, agent reassigned, transcript intact. <em>No competitor has this.</em></p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> 32-byte tokens, single-use, 7-day default TTL</li>
+                <li><i class="fas fa-check-circle"></i> Constant-time compare on consume</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(245,158,11,0.12);color:#b45309;">Booking</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#f59e0b,#7c3aed);color:#fff;"><i class="far fa-calendar"></i></div>
+            <div><div class="tour-title">Calendly / Cal.com Inline Booking</div><div class="tour-sub">Send a "Pick a time" card directly in chat</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Drop a scheduling URL right in chat. Visitor sees a CTA card with "Pick a time →" button. URL remembered per agent in localStorage — one-click reuse.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(239,68,68,0.12);color:#dc2626;">Real-time</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#ef4444,#f59e0b);color:#fff;"><i class="fas fa-bell"></i></div>
+            <div><div class="tour-title">Sentiment-Spike Alerts</div><div class="tour-sub">Supervisor pinged when chat turns negative</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Every visitor message classified in background (positive / neutral / negative / angry). Negative or angry → instant notification to the dashboard so supervisors can jump in before things escalate.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(124,58,237,0.12);color:#7c3aed;">AI</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#ec4899,#a855f7);color:#fff;"><i class="fas fa-graduation-cap"></i></div>
+            <div><div class="tour-title">AI Conversation Coach</div><div class="tour-sub">Post-chat improvement tips for agents</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>When a chat closes, AI quietly analyses the transcript and writes 3 specific tips for the agent — referencing exact moments. Onboarding new agents on autopilot.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(59,130,246,0.12);color:#2563eb;">Wait</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff;"><i class="fas fa-hourglass-half"></i></div>
+            <div><div class="tour-title">Wait-Room Queue Position</div><div class="tour-sub">"You're #2 · about 3 min wait"</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>While visitors wait for an agent, they see their queue position and ETA based on the org's recent first-response time. Transparency reduces abandonment.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(148,163,184,0.18);color:#475569;">Agent</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#64748b,#1f2937);color:#fff;"><i class="fas fa-moon"></i></div>
+            <div><div class="tour-title">Do Not Disturb Mode</div><div class="tour-sub">Stronger than "Away" — auto-assign skips you</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Toggle DND on your profile → the auto-assigner skips you entirely. Optional custom away message shown to visitors. Existing chats stay assigned.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ EMAIL CHANNEL ═══════ -->
+<div class="cat-label" id="cat-email" data-cat="Email Channel" style="color:#dc2626;"><i class="fas fa-envelope"></i> Email Channel</div>
+<div class="section-grid">
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(239,68,68,0.12);color:#dc2626;">Zendesk killer</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;"><i class="fas fa-envelope-open"></i></div>
+            <div><div class="tour-title">Email-to-Chat (IMAP + SMTP)</div><div class="tour-sub">Customer emails become chats; agent replies go out via your SMTP</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Connect a Gmail, Outlook, or custom-domain mailbox. Incoming emails to <code>support@yourdomain.com</code> arrive in your queue as chats. Agent replies go out via SMTP from your own address — the customer never knows it's not a "real" email thread.</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> <strong>Gmail:</strong> use an <a href="https://myaccount.google.com/apppasswords" target="_blank">App Password</a> (regular passwords won't work)</li>
+                <li><i class="fas fa-check-circle"></i> <strong>Outlook / Office 365:</strong> <code>imap.outlook.com:993</code> + <code>smtp.office365.com:587</code></li>
+                <li><i class="fas fa-check-circle"></i> <strong>Custom domain:</strong> any IMAP/SMTP works (cPanel, Zoho, Bluehost)</li>
+                <li><i class="fas fa-check-circle"></i> Automatic threading by subject + sender hash</li>
+                <li><i class="fas fa-check-circle"></i> Credentials Fernet-encrypted at rest</li>
+            </ul>
+            <a href="{% url 'dashboard:email_mailboxes' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Connect a mailbox</a>
+            <div class="tip"><i class="fas fa-clock"></i> Polling runs via <code>python manage.py poll_email_inboxes</code> on a cron schedule (every 2-5 min recommended).</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ SECURITY & AUTH ═══════ -->
+<div class="cat-label" id="cat-security" data-cat="Security & Auth" style="color:#059669;"><i class="fas fa-shield-halved"></i> Security &amp; Auth</div>
+<div class="section-grid">
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(16,185,129,0.12);color:#059669;">2FA</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;"><i class="fas fa-mobile-screen"></i></div>
+            <div><div class="tour-title">TOTP 2FA + Backup Codes</div><div class="tour-sub">Time-based OTP for every agent</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Each agent can enable TOTP 2FA via Google Authenticator, Authy, or 1Password. Setup flow generates a QR rendered locally (your secret never leaves the server) and 8 single-use backup codes shown once.</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> TOTP secret Fernet-encrypted at rest</li>
+                <li><i class="fas fa-check-circle"></i> Backup codes PBKDF2-hashed (one-way)</li>
+                <li><i class="fas fa-check-circle"></i> 10 attempts / 5 min rate limit on verify</li>
+            </ul>
+            <a href="/accounts/2fa/setup/" class="go-btn"><i class="fas fa-arrow-right"></i> Set up 2FA</a>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(59,130,246,0.12);color:#2563eb;">Passwordless</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff;"><i class="fas fa-link"></i></div>
+            <div><div class="tour-title">Magic-Link Login</div><div class="tour-sub">Skip the password — email yourself a login link</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Enter your email on the magic-link page → one-time link arrives in your inbox → click and you're in. No password to remember, no password to leak.</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> 32-byte tokens, 30-min expiry, single-use</li>
+                <li><i class="fas fa-check-circle"></i> Constant-time compare on consume</li>
+                <li><i class="fas fa-check-circle"></i> Rate-limited 5 requests / 15 min / IP</li>
+            </ul>
+            <a href="/accounts/magic-link/" class="go-btn"><i class="fas fa-arrow-right"></i> Try Magic Link</a>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(124,58,237,0.12);color:#7c3aed;">Encryption</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;"><i class="fas fa-lock"></i></div>
+            <div><div class="tour-title">Field-Level Encryption</div><div class="tour-sub">Sensitive columns Fernet-encrypted at rest</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Every "secret" field is encrypted before hitting the DB — not just relying on disk encryption from your cloud provider. A DB dump leak doesn't leak credentials.</p>
+            <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> TOTP secrets</li>
+                <li><i class="fas fa-check-circle"></i> Webhook HMAC signing keys</li>
+                <li><i class="fas fa-check-circle"></i> AI API keys (Anthropic / Gemini)</li>
+                <li><i class="fas fa-check-circle"></i> WhatsApp / SMTP credentials</li>
+            </ul>
+            <div class="tip"><i class="fas fa-key"></i> Set <code>FIELD_ENCRYPTION_KEY</code> in your environment; otherwise it's derived from <code>SECRET_KEY</code>.</div>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(245,158,11,0.12);color:#b45309;">Privacy</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#64748b,#1f2937);color:#fff;"><i class="fas fa-user-secret"></i></div>
+            <div><div class="tour-title">Tracking-Only Widget Mode</div><div class="tour-sub">Hide the chat bubble, keep analytics</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>One toggle in Widget Settings hides the chat bubble entirely on customer sites while keeping page-view tracking and session recordings active. Useful for analytics-only customers or for trialling chat internally before launch.</p>
+            <a href="{% url 'dashboard:website_settings' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Widget Settings</a>
         </div>
     </div>
 </div>
