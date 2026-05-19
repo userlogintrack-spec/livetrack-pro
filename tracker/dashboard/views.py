@@ -371,6 +371,7 @@ def chat_list(request):
     min_messages = request.GET.get('min_messages', '').strip()
     visitor_name_filter = request.GET.get('visitor_name', '').strip()
     visitor_email_filter = request.GET.get('visitor_email', '').strip()
+    channel_filter = (request.GET.get('channel') or 'all').strip()
 
     from django.db.models import Exists, OuterRef, Subquery
     profile = getattr(request.user, 'agent_profile', None)
@@ -424,6 +425,8 @@ def chat_list(request):
         chats = chats.filter(agent_id=int(agent_filter))
     if min_messages.isdigit():
         chats = chats.filter(message_count_db__gte=int(min_messages))
+    if channel_filter in ('widget', 'email', 'whatsapp', 'sms'):
+        chats = chats.filter(channel=channel_filter)
 
     chats = chats.order_by('-updated_at')
     chats_all = chats
@@ -495,6 +498,7 @@ def chat_list(request):
         'min_messages': min_messages,
         'visitor_name_filter': visitor_name_filter,
         'visitor_email_filter': visitor_email_filter,
+        'channel_filter': channel_filter,
         'selected_chat': selected_chat,
         'selected_messages': selected_messages,
         'selected_pageviews': selected_pageviews,
@@ -2162,9 +2166,16 @@ def email_mailboxes_view(request):
 
     if request.method == 'POST':
         data = request.POST
+        # Resolve optional per-website pin; validate it belongs to this org
+        # so a forged form can't link to another org's website row.
+        website = None
+        wid = (data.get('website_id') or '').strip()
+        if wid.isdigit():
+            website = Website.objects.filter(id=int(wid), organization=org).first()
         try:
             mb = EmailMailbox(
                 organization=org,
+                website=website,
                 name=(data.get('name') or 'Support').strip()[:100],
                 imap_host=data.get('imap_host', '').strip(),
                 imap_port=int(data.get('imap_port') or 993),
@@ -2187,12 +2198,14 @@ def email_mailboxes_view(request):
         except (ValueError, TypeError) as e:
             return render(request, 'dashboard/email_mailboxes.html', {
                 'mailboxes': EmailMailbox.objects.filter(organization=org),
+                'websites': Website.objects.filter(organization=org).order_by('domain'),
                 'error': str(e),
             })
 
-    mailboxes = EmailMailbox.objects.filter(organization=org).order_by('name')
+    mailboxes = EmailMailbox.objects.filter(organization=org).select_related('website').order_by('name')
     return render(request, 'dashboard/email_mailboxes.html', {
         'mailboxes': mailboxes,
+        'websites': Website.objects.filter(organization=org).order_by('domain'),
     })
 
 

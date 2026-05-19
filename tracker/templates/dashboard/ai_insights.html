@@ -37,7 +37,21 @@
     textarea.form-control { resize: vertical; min-height: 120px; }
     .form-row { display: grid; grid-template-columns: 1fr 200px; gap: 10px; }
 
-    .article-preview { white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: rgba(0,0,0,0.03); padding: 14px; border-radius: 8px; max-height: 320px; overflow-y: auto; }
+    .article-preview { white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: rgba(0,0,0,0.03); padding: 14px; border-radius: 8px; max-height: 320px; overflow-y: auto; word-break: break-word; }
+
+    @media (max-width: 640px) {
+        .ai-wrap { padding: 16px 12px; }
+        .ai-wrap h1 { font-size: 18px; }
+        .panel { padding: 16px; border-radius: 12px; }
+        .panel h2 { font-size: 14px; }
+        .form-row { grid-template-columns: 1fr; }
+        .cluster-row { flex-wrap: wrap; }
+        .cluster-row .name { min-width: 0; flex: 1 1 50%; }
+        .cluster-row .share { min-width: 50px; }
+        .cluster-row .bar { flex: 1 1 100%; order: 3; }
+        .run-btn { width: 100%; }
+        textarea.form-control { font-size: 13px; }
+    }
 </style>
 
 <div class="ai-wrap">

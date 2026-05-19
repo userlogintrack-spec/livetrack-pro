@@ -52,11 +52,16 @@
             var severity = opts.severity || 'info';
             var url = opts.url || '';
             var sound = opts.sound !== false;
+            var roomId = opts.room_id || '';
 
-            // Rate limit: max 1 notification per category per 10 seconds
+            // Rate limit: 1 notification per (category + room) per 10s, so
+            // two angry chats in different rooms both surface — only repeat
+            // alerts on the same room get throttled. For category-wide events
+            // (no room_id), throttle by category alone.
+            var rateKey = roomId ? category + ':' + roomId : category;
             var now = Date.now();
-            if (this._lastNotif[category] && (now - this._lastNotif[category]) < 10000) return;
-            this._lastNotif[category] = now;
+            if (this._lastNotif[rateKey] && (now - this._lastNotif[rateKey]) < 10000) return;
+            this._lastNotif[rateKey] = now;
 
             // 1. Toast notification
             var toastType = severity === 'error' ? 'error' : severity === 'warning' ? 'warning' : 'success';

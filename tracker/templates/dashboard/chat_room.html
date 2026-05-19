@@ -2030,6 +2030,9 @@
                 <button onclick="sendBookingCard()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Send booking link (Calendly / Cal.com)">
                     <i class="far fa-calendar"></i>
                 </button>
+                <button onclick="sendReopenLink()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Email visitor a magic link to reopen this chat later">
+                    <i class="fas fa-envelope-open-text"></i>
+                </button>
                 <button onclick="scheduleMessage()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Schedule message">
                     <i class="fas fa-clock"></i>
                 </button>
@@ -2808,6 +2811,27 @@
         div.innerHTML = `<div class="msg-sender"><i class="fas fa-user-secret" style="margin-right:4px;"></i>${escapeHtml(agentName)} · Whisper</div><div class="bubble">${escapeHtml(text)}</div><div class="msg-time">${time}</div>`;
         container.appendChild(div);
         scrollToBottom();
+    }
+
+    // ───── Reopen-chat magic link ─────
+    function sendReopenLink() {
+        var defaultEmail = '{{ room.visitor_email|escapejs }}';
+        var email = prompt('Email visitor a one-time link to resume this chat later (expires in 7 days)?\n\nVisitor email:', defaultEmail);
+        if (!email) return;
+        email = email.trim();
+        if (!email || email.indexOf('@') < 0) { alert('Invalid email'); return; }
+        fetch('/dashboard/chats/' + encodeURIComponent(roomId) + '/reopen-link/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, days: 7 }),
+        }).then(function(r){ return r.json(); }).then(function(d) {
+            if (d.ok) {
+                appendMessage('Sent reopen link to ' + email + ' (expires ' + new Date(d.expires_at).toLocaleDateString() + ')',
+                              'system', 'System', new Date().toISOString(), 'text');
+            } else {
+                alert(d.error || 'Could not send link');
+            }
+        }).catch(function(){ alert('Network error'); });
     }
 
     // ───── Calendly / Cal.com inline booking card ─────

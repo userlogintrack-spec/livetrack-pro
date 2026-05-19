@@ -198,6 +198,13 @@
         <option value="medium" {% if priority_filter == 'medium' %}selected{% endif %}>Medium</option>
         <option value="low" {% if priority_filter == 'low' %}selected{% endif %}>Low</option>
     </select>
+    <select name="channel" class="form-control" style="max-width:140px;" title="Filter by source channel">
+        <option value="all" {% if channel_filter == 'all' %}selected{% endif %}>All Channels</option>
+        <option value="widget" {% if channel_filter == 'widget' %}selected{% endif %}>🌐 Web Widget</option>
+        <option value="email" {% if channel_filter == 'email' %}selected{% endif %}>📧 Email</option>
+        <option value="whatsapp" {% if channel_filter == 'whatsapp' %}selected{% endif %}>💬 WhatsApp</option>
+        <option value="sms" {% if channel_filter == 'sms' %}selected{% endif %}>📱 SMS</option>
+    </select>
     <input type="date" name="from" value="{{ date_from }}" class="form-control" style="max-width:150px;">
     <input type="date" name="to" value="{{ date_to }}" class="form-control" style="max-width:150px;">
     <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-search"></i></button>
@@ -280,6 +287,14 @@
         </div>
 
         <div class="cr-badges-cell" style="display:flex;gap:4px;flex-wrap:wrap;">
+            {% if chat.channel and chat.channel != 'widget' %}
+            <span class="cr-badge" title="Source: {{ chat.get_channel_display }}" style="{% if chat.channel == 'email' %}background:rgba(239,68,68,0.1);color:#dc2626;{% elif chat.channel == 'whatsapp' %}background:rgba(37,211,102,0.1);color:#059669;{% elif chat.channel == 'sms' %}background:rgba(59,130,246,0.1);color:#2563eb;{% else %}background:rgba(100,116,139,0.1);color:#64748b;{% endif %}">
+                {% if chat.channel == 'email' %}<i class="fas fa-envelope" style="font-size:9px;"></i> Email
+                {% elif chat.channel == 'whatsapp' %}<i class="fab fa-whatsapp" style="font-size:9px;"></i> WhatsApp
+                {% elif chat.channel == 'sms' %}<i class="fas fa-comment-sms" style="font-size:9px;"></i> SMS
+                {% else %}{{ chat.get_channel_display }}{% endif %}
+            </span>
+            {% endif %}
             <span class="cr-badge cr-badge-priority" style="{% if chat.priority == 'high' %}background:rgba(239,68,68,0.1);color:#ef4444;{% elif chat.priority == 'medium' %}background:rgba(245,158,11,0.1);color:#f59e0b;{% else %}background:rgba(16,185,129,0.1);color:#10b981;{% endif %}">{{ chat.priority|title }}</span>
             <span class="cr-badge" style="{% if chat.status == 'waiting' %}background:rgba(245,158,11,0.1);color:#f59e0b;{% elif chat.status == 'active' %}background:rgba(16,185,129,0.1);color:#10b981;{% else %}background:rgba(100,116,139,0.1);color:#64748b;{% endif %}">{{ chat.get_status_display }}</span>
         </div>
