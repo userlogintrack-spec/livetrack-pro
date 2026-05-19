@@ -741,7 +741,114 @@
             <i class="fas fa-chevron-down tour-arrow"></i>
         </div>
         <div class="tour-detail">
-            <p>Toggle DND on your profile → the auto-assigner skips you entirely. Optional custom away message shown to visitors. Existing chats stay assigned.</p>
+            <p>Toggle DND with the 🌙 button in the sidebar footer → auto-assigner skips you entirely. Optional custom away message shown to visitors. Existing chats stay assigned.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(6,182,212,0.12);color:#06b6d4;">Real-time</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#06b6d4,#7c3aed);color:#fff;"><i class="fas fa-keyboard"></i></div>
+            <div><div class="tour-title">MagicType — Live typing preview</div><div class="tour-sub">See what the visitor is typing before they hit send</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Crisp's signature feature. Visitor's typing now broadcasts live to the agent's chat panel — 1-2 seconds of "free preparation time" to compose a better reply. Throttled to 1 update per 400ms; auto-stops after 2.5s of inactivity.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(16,185,129,0.12);color:#059669;">Translate</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#10b981,#06b6d4);color:#fff;"><i class="fas fa-language"></i></div>
+            <div><div class="tour-title">Auto-Translate (bidirectional)</div><div class="tour-sub">Visitor types Hindi → agent reads English; agent replies English → visitor sees Hindi</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Toggle per-chat. Every visitor message auto-translates to <code>agent_language</code> in the background; every agent reply auto-translates to the visitor's detected language on its way out. Gemini-powered, 24h cache so the same message never costs twice.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(245,158,11,0.12);color:#b45309;">Feedback</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;"><i class="fas fa-star"></i></div>
+            <div><div class="tour-title">Inline CSAT during chat</div><div class="tour-sub">Visitor can rate any time, not just after close</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>⭐ button in the widget toolbar lets visitors share feedback mid-conversation. Catches frustration before they bounce; gives you a real signal between "all-or-nothing" post-chat surveys.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(59,130,246,0.12);color:#2563eb;">Map</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff;"><i class="fas fa-globe"></i></div>
+            <div><div class="tour-title">Live Visitor Map (MagicMap)</div><div class="tour-sub">Pulsing dots for every online visitor by country</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>World map at <code>/dashboard/visitor-map/</code> built with Leaflet.js + OpenStreetMap — completely free, no API key. Auto-refreshes every 30 seconds. Sidebar → Analytics → Visitor Map.</p>
+            <a href="{% url 'dashboard:visitor_map' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Open Visitor Map</a>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(245,158,11,0.12);color:#b45309;">SDK</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#f59e0b,#7c3aed);color:#fff;"><i class="fas fa-id-badge"></i></div>
+            <div><div class="tour-title">Identify SDK</div><div class="tour-sub">Attach real CRM context to anonymous visitors</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Drop one line in your app after the user logs in:</p>
+            <pre style="background:rgba(0,0,0,0.04);padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;">window.LiveTrack.identify({
+  email: 'bhavesh@aabhyasa.com',
+  user_id: '12345',
+  name: 'Bhavesh',
+  plan: 'pro',  mrr: 99
+});</pre>
+            <p style="margin-top:8px;">Agent now sees the visitor's real name + traits next to every chat. Supports queued calls via <code>window.LiveTrackQueue</code> for async / pre-load patterns.</p>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(124,58,237,0.12);color:#7c3aed;">AI</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;"><i class="fas fa-spider"></i></div>
+            <div><div class="tour-title">KB Auto-Crawl from URL</div><div class="tour-sub">Paste a help URL → AI imports as a clean article</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>In AI Insights → "Auto-Import KB from URL". Server fetches the page (SSRF-guarded: rejects private IPs, capped at 1MB / 8s), strips boilerplate, hands off to the article generator. One-click publish to your KB. Great for migrating from Notion / Intercom / Zendesk.</p>
+            <a href="{% url 'dashboard:ai_insights' %}" class="go-btn"><i class="fas fa-arrow-right"></i> Try it</a>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(239,68,68,0.12);color:#dc2626;">Continuity</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#dc2626,#a855f7);color:#fff;"><i class="fas fa-arrows-turn-right"></i></div>
+            <div><div class="tour-title">Cross-Channel: chat → email handover</div><div class="tour-sub">Visitor goes offline mid-chat? Your reply emails them automatically</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>If the visitor has been offline {'>'}5 minutes and we have their email, the agent's next reply ships out via SMTP using your configured mailbox. A system message in the chat notes the handover so the visitor sees it next time they open the widget.</p>
+            <div class="tip"><i class="fas fa-info-circle"></i> Requires Email-to-Chat to be configured for the org or website.</div>
+        </div>
+    </div>
+
+    <div class="tour-card" onclick="toggleCard(this)">
+        <div class="tour-badge" style="background:rgba(16,185,129,0.12);color:#059669;">Uptime</div>
+        <div class="tour-head">
+            <div class="tour-icon" style="background:linear-gradient(135deg,#10b981,#3b82f6);color:#fff;"><i class="fas fa-heart-pulse"></i></div>
+            <div><div class="tour-title">Public Status Page</div><div class="tour-sub">Embedded uptime board with 5 component checks</div></div>
+            <i class="fas fa-chevron-down tour-arrow"></i>
+        </div>
+        <div class="tour-detail">
+            <p>Public page at <code>/status/</code> shows overall status, 5 component health checks (API, Tracking, WebSocket, Email-to-Chat, AI), and an email subscribe form for incident notifications. Auto-refreshes every 60s. Bookmark + share.</p>
+            <a href="/status/" target="_blank" class="go-btn"><i class="fas fa-arrow-right"></i> View Status Page</a>
         </div>
     </div>
 </div>

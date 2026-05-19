@@ -105,6 +105,10 @@ class PageView(models.Model):
         indexes = [
             models.Index(fields=['visitor', '-timestamp']),
             models.Index(fields=['-timestamp']),
+            # page_engagement_view aggregates last-N-days by (visitor.org, ts).
+            # Visitor FK already indexed; this composite makes the join +
+            # range scan single-index instead of post-filter sort.
+            models.Index(fields=['url', '-timestamp']),
         ]
 
     def __str__(self):
@@ -291,6 +295,10 @@ class ClickData(models.Model):
         indexes = [
             models.Index(fields=['organization', 'page_path', '-timestamp']),
             models.Index(fields=['click_type']),
+            # Used by most_clicked_elements_view + page_engagement_view for
+            # date-range scans across the org's clicks. Without this, every
+            # 30/90-day window does a full sort on millions of rows.
+            models.Index(fields=['organization', '-timestamp']),
         ]
 
     def __str__(self):
