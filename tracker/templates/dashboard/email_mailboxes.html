@@ -31,6 +31,19 @@
     .hint code { background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 4px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
 
     .empty { text-align: center; padding: 30px 16px; color: var(--text-muted); font-size: 13px; }
+
+    @media (max-width: 640px) {
+        .mb-wrap { padding: 16px 12px; }
+        .mb-head h1 { font-size: 18px; }
+        .grid2 { grid-template-columns: 1fr; gap: 10px; }
+        .mb-row { flex-wrap: wrap; gap: 10px; padding: 14px; }
+        .mb-row .mb-info { flex: 1 1 100%; }
+        .mb-row .status { order: 2; font-size: 10px; }
+        .card-add { padding: 18px; border-radius: 12px; }
+        .card-add h3 { font-size: 14px; }
+        .form-row { flex-direction: column; align-items: stretch; gap: 8px; }
+        .form-row input, .form-row select { width: 100%; }
+    }
 </style>
 
 <div class="mb-wrap">
@@ -46,7 +59,7 @@
                 <div class="name">{{ mb.name }}</div>
                 <div class="from">{{ mb.from_email }}</div>
                 <div class="meta">
-                    IMAP {{ mb.imap_host }}:{{ mb.imap_port }} · SMTP {{ mb.smtp_host }}:{{ mb.smtp_port }}
+                    {% if mb.website %}<strong>📌 {{ mb.website.domain }}</strong> · {% endif %}IMAP {{ mb.imap_host }}:{{ mb.imap_port }} · SMTP {{ mb.smtp_host }}:{{ mb.smtp_port }}
                     {% if mb.last_polled_at %} · last polled {{ mb.last_polled_at|timesince }} ago{% endif %}
                 </div>
             </div>
@@ -78,7 +91,15 @@
                     <label>From name (visitor-facing)</label>
                     <input class="form-control" type="text" name="from_name" placeholder="Your Company Support">
                 </div>
-                <div></div>
+                <div class="form-group">
+                    <label>Pin to website (optional)</label>
+                    <select class="form-control" name="website_id">
+                        <option value="">All websites (org-wide)</option>
+                        {% for w in websites %}
+                        <option value="{{ w.id }}">{{ w.domain }} ({{ w.name }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
                 <div class="form-group">
                     <label>IMAP host</label>
