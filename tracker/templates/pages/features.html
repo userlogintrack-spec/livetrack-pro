@@ -56,14 +56,17 @@
         .nav-brand h1 { font-size: 19px; font-weight: 800; color: var(--text-dark); }
         .nav-brand h1 em { font-style: normal; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 14px; border-radius: 8px; transition: all 0.2s; }
-        .nav-links a:hover { color: var(--primary); background: rgba(99,102,241,0.06); }
-        .nav-links a.active { color: var(--primary); background: rgba(99,102,241,0.08); font-weight: 600; }
+        .nav-links a { position: relative; color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 8px 16px; border-radius: 10px; transition: color 0.2s; }
+        .nav-links a::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 0; height: 2px; background: var(--gradient-primary); border-radius: 2px; transform: translateX(-50%); transition: width 0.25s ease; }
+        .nav-links a:hover { color: var(--primary); }
+        .nav-links a:hover::after { width: calc(100% - 32px); }
+        .nav-links a.active { color: var(--primary); font-weight: 600; }
+        .nav-links a.active::after { width: calc(100% - 32px); }
         .nav-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
         .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; font-family: inherit; transition: all 0.25s; }
-        .btn-ghost { color: var(--text-dark); background: transparent; border: 1.5px solid var(--border-light); }
-        .btn-ghost:hover { background: #f1f0ff; color: var(--primary); }
+        .btn-ghost { color: var(--text-dark); background: rgba(124,58,237,0.04); border: 1px solid transparent; }
+        .btn-ghost:hover { background: rgba(124,58,237,0.09); color: var(--primary); border-color: rgba(124,58,237,0.12); }
         .btn-primary { background: var(--gradient-primary); color: white; box-shadow: 0 3px 12px rgba(124,58,237,0.25); }
         .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.35); }
         .btn-lg { padding: 14px 32px; font-size: 15px; border-radius: 12px; }
