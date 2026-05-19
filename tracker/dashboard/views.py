@@ -1,5 +1,6 @@
 import csv
 import logging
+import uuid
 from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
@@ -1962,6 +1963,190 @@ def toggle_agent_availability(request, agent_id):
     profile.is_available = not profile.is_available
     profile.save(update_fields=['is_available'])
     return JsonResponse({'status': 'ok', 'is_available': profile.is_available})
+
+
+@login_required
+def email_mailboxes_view(request):
+    """List + create EmailMailbox rows. Owner-only because credentials
+    are sensitive even though encrypted at rest."""
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner:
+        return HttpResponse('Forbidden — owners only.', status=403)
+    org = get_user_org(request.user)
+    from tracker.chat.models import EmailMailbox
+
+    if request.method == 'POST':
+        data = request.POST
+        try:
+            mb = EmailMailbox(
+                organization=org,
+                name=(data.get('name') or 'Support').strip()[:100],
+                imap_host=data.get('imap_host', '').strip(),
+                imap_port=int(data.get('imap_port') or 993),
+                imap_use_ssl=data.get('imap_use_ssl') == 'on',
+                imap_username=data.get('imap_username', '').strip(),
+                imap_folder=(data.get('imap_folder') or 'INBOX').strip(),
+                smtp_host=data.get('smtp_host', '').strip(),
+                smtp_port=int(data.get('smtp_port') or 587),
+                smtp_use_tls=data.get('smtp_use_tls') == 'on',
+                smtp_username=data.get('smtp_username', '').strip(),
+                from_email=data.get('from_email', '').strip(),
+                from_name=data.get('from_name', '').strip()[:100],
+                is_enabled=True,
+            )
+            mb.imap_password_plain = data.get('imap_password', '').strip()
+            mb.smtp_password_plain = data.get('smtp_password', '').strip()
+            mb.save()
+            _log_activity(org, request.user, 'mailbox.created', f'Created mailbox: {mb.name}',
+                          target_type='mailbox', target_id=str(mb.id))
+        except (ValueError, TypeError) as e:
+            return render(request, 'dashboard/email_mailboxes.html', {
+                'mailboxes': EmailMailbox.objects.filter(organization=org),
+                'error': str(e),
+            })
+
+    mailboxes = EmailMailbox.objects.filter(organization=org).order_by('name')
+    return render(request, 'dashboard/email_mailboxes.html', {
+        'mailboxes': mailboxes,
+    })
+
+
+@login_required
+def email_mailbox_delete(request, mailbox_id):
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner or request.method != 'POST':
+        return JsonResponse({'error': 'Not allowed'}, status=403)
+    org = get_user_org(request.user)
+    from tracker.chat.models import EmailMailbox
+    EmailMailbox.objects.filter(id=mailbox_id, organization=org).delete()
+    return JsonResponse({'status': 'ok'})
+
+
+# ═══════════════════════════════════════════════════════════
+# AI Topic Clustering + KB Gap Detector + Help Article Generator
+# ═══════════════════════════════════════════════════════════
+
+@login_required
+def ai_insights_view(request):
+    """Combined admin view that surfaces three AI-derived insights:
+    chat topic clusters, KB gaps, and a help-article composer."""
+    org = get_user_org(request.user)
+    profile = getattr(request.user, 'agent_profile', None)
+    is_owner = bool(request.user.is_superuser or (profile and profile.role in ('owner', 'admin')))
+    if not is_owner:
+        return HttpResponse('Forbidden — owners only.', status=403)
+    return render(request, 'dashboard/ai_insights.html', {})
+
+
+@login_required
+def ai_topic_clusters(request):
+    """POST → analyse last 30 days of chats → cluster into themes."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    config = AIBotConfig.objects.filter(organization=org).first()
+    if not config or not config.api_key:
+        return JsonResponse({'error': 'AI not configured'}, status=400)
+
+    from tracker.core.throttle import check as throttle_check
+    if throttle_check(request, action='ai_clusters', limit=5, window=300,
+                       key=f'org:{org.id}').blocked:
+        return JsonResponse({'error': 'Too many cluster requests — please wait 5 min'}, status=429)
+
+    since = timezone.now() - timedelta(days=30)
+    # Sample first message per chat — represents the intent.
+    msgs = (Message.objects
+            .filter(room__organization=org, sender_type='visitor',
+                    timestamp__gte=since)
+            .order_by('room_id', 'timestamp')
+            .values_list('content', flat=True)[:200])
+    snippets = [m[:400] for m in msgs if m and len(m.strip()) > 10]
+    if not snippets:
+        return JsonResponse({'error': 'Not enough chats in the last 30 days'}, status=400)
+
+    from tracker.chat.ai import cluster_chat_topics
+    result = cluster_chat_topics(config, snippets)
+    if not result:
+        return JsonResponse({'error': 'AI did not return a valid response'}, status=502)
+    return JsonResponse({'ok': True, 'result': result, 'sample_size': len(snippets)})
+
+
+@login_required
+def ai_kb_gaps(request):
+    """POST → analyse recent chats → suggest KB articles."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    config = AIBotConfig.objects.filter(organization=org).first()
+    if not config or not config.api_key:
+        return JsonResponse({'error': 'AI not configured'}, status=400)
+
+    from tracker.core.throttle import check as throttle_check
+    if throttle_check(request, action='ai_kb_gaps', limit=5, window=300,
+                       key=f'org:{org.id}').blocked:
+        return JsonResponse({'error': 'Slow down'}, status=429)
+
+    since = timezone.now() - timedelta(days=14)
+    # Take first visitor message per recent chat.
+    chats = (ChatRoom.objects.filter(organization=org, created_at__gte=since)
+             .values_list('id', flat=True)[:150])
+    snippets = []
+    for cid in chats:
+        first = Message.objects.filter(room_id=cid, sender_type='visitor').order_by('timestamp').first()
+        if first and first.content:
+            snippets.append(first.content[:300])
+
+    from tracker.chat.ai import detect_kb_gaps
+    gaps = detect_kb_gaps(config, snippets) or []
+    return JsonResponse({'ok': True, 'gaps': gaps, 'sample_size': len(snippets)})
+
+
+@login_required
+def ai_article_generator(request):
+    """POST → raw text → polished article. Optionally saves directly to KB."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    org = get_user_org(request.user)
+    config = AIBotConfig.objects.filter(organization=org).first()
+    if not config or not config.api_key:
+        return JsonResponse({'error': 'AI not configured'}, status=400)
+
+    from tracker.core.throttle import check as throttle_check
+    if throttle_check(request, action='ai_article', limit=20, window=60,
+                       key=f'user:{request.user.id}').blocked:
+        return JsonResponse({'error': 'Slow down'}, status=429)
+
+    data = _parse_json_body(request) or {}
+    raw = (data.get('raw') or '').strip()
+    if not raw or len(raw) < 30:
+        return JsonResponse({'error': 'Need at least 30 chars of raw input'}, status=400)
+
+    from tracker.chat.ai import generate_help_article
+    article = generate_help_article(config, raw)
+    if not article:
+        return JsonResponse({'error': 'AI did not return a valid article'}, status=502)
+
+    # Optionally save straight to KB if `publish` is true + category supplied.
+    if data.get('publish'):
+        from tracker.chat.models import KBCategory, KBArticle
+        from django.utils.text import slugify
+        cat_name = (data.get('category') or 'General').strip()[:50]
+        cat, _ = KBCategory.objects.get_or_create(
+            organization=org, name=cat_name,
+            defaults={'slug': slugify(cat_name)},
+        )
+        article_obj = KBArticle.objects.create(
+            organization=org, category=cat,
+            title=article.get('title', '')[:300],
+            slug=slugify(article.get('title', ''))[:300] or uuid.uuid4().hex[:12],
+            content=article.get('content_markdown', ''),
+            author=request.user,
+            is_published=True,
+        )
+        return JsonResponse({'ok': True, 'article': article, 'article_id': article_obj.id, 'published': True})
+    return JsonResponse({'ok': True, 'article': article})
 
 
 @login_required

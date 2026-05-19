@@ -2027,6 +2027,9 @@
                 <button id="micBtn" onmousedown="startMic(event)" onmouseup="stopMic(event)" onmouseleave="stopMic(event)" ontouchstart="startMic(event)" ontouchend="stopMic(event)" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Hold to talk — Gemini transcribes">
                     <i class="fas fa-microphone"></i>
                 </button>
+                <button onclick="sendBookingCard()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Send booking link (Calendly / Cal.com)">
+                    <i class="far fa-calendar"></i>
+                </button>
                 <button onclick="scheduleMessage()" style="width:36px;height:46px;border-radius:50%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s;" title="Schedule message">
                     <i class="fas fa-clock"></i>
                 </button>
@@ -2805,6 +2808,27 @@
         div.innerHTML = `<div class="msg-sender"><i class="fas fa-user-secret" style="margin-right:4px;"></i>${escapeHtml(agentName)} · Whisper</div><div class="bubble">${escapeHtml(text)}</div><div class="msg-time">${time}</div>`;
         container.appendChild(div);
         scrollToBottom();
+    }
+
+    // ───── Calendly / Cal.com inline booking card ─────
+    // Agent picks a scheduling URL once, we remember it in localStorage.
+    function sendBookingCard() {
+        var stored = '';
+        try { stored = localStorage.getItem('agent_booking_url_' + '{{ request.user.id }}') || ''; } catch(e) {}
+        var url = prompt('Booking URL (Calendly / Cal.com)?', stored);
+        if (!url) return;
+        url = url.trim();
+        if (!/^https?:\/\//i.test(url)) { alert('Must start with https://'); return; }
+        try { localStorage.setItem('agent_booking_url_' + '{{ request.user.id }}', url); } catch(e) {}
+        if (!chatSocket) return;
+        chatSocket.send(JSON.stringify({
+            type: 'chat_message',
+            message: url,
+            sender_type: 'agent',
+            sender_name: agentName,
+            msg_type: 'booking',
+        }));
+        appendMessage(url, 'agent', agentName, new Date().toISOString(), 'booking');
     }
 
     // ───── AI Quick-Reply Hints ─────

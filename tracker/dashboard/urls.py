@@ -80,6 +80,12 @@ urlpatterns = [
     path('api/agent/dnd/', views.toggle_agent_dnd, name='toggle_dnd'),
     path('api/voice/transcribe/', views.voice_transcribe, name='voice_transcribe'),
     path('chats/<str:room_id>/reopen-link/', views.chat_send_reopen_link, name='chat_send_reopen_link'),
+    path('email-mailboxes/', views.email_mailboxes_view, name='email_mailboxes'),
+    path('email-mailboxes/<int:mailbox_id>/delete/', views.email_mailbox_delete, name='email_mailbox_delete'),
+    path('ai-insights/', views.ai_insights_view, name='ai_insights'),
+    path('api/ai/clusters/', views.ai_topic_clusters, name='ai_topic_clusters'),
+    path('api/ai/kb-gaps/', views.ai_kb_gaps, name='ai_kb_gaps'),
+    path('api/ai/article/', views.ai_article_generator, name='ai_article_generator'),
     path('widget-funnel/', views.widget_funnel_dashboard, name='widget_funnel'),
     path('chats/<str:room_id>/notes-broadcast/', views.notes_broadcast, name='notes_broadcast'),
 
